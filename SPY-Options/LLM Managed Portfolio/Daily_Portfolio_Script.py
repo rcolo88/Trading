@@ -166,7 +166,25 @@ class DailyPortfolioReport:
         
         # Individual positions with weight analysis
         print(f"\n🏢 POSITION DETAILS:")
-        print(f"{'Ticker':<6} {'Shares':<7} {'Entry':<8} {'Current':<8} {'Value':<10} {'P&L 
+        print(f"{'Ticker':<6} {'Shares':<7} {'Entry':<8} {'Current':<8} {'Value':<10} {'P&L $':<10} {'P&L %':<8} {'Cur.Wt':<7} {'Tgt.Wt':<7} {'Drift':<6}")
+        print("-" * 95)
+        
+        # Sort by P&L %
+        positions.sort(key=lambda x: x['pnl_percent'], reverse=True)
+        
+        # Track positions that need rebalancing
+        rebalance_alerts = []
+        
+        for pos in positions:
+            drift_alert = ""
+            if abs(pos['weight_drift']) > 5:  # >5% weight drift
+                drift_alert = " ⚠️"
+                rebalance_alerts.append(f"{pos['ticker']}: {pos['weight_drift']:+.1f}% drift")
+            
+            print(f"{pos['ticker']:<6} {pos['shares']:<7} ${pos['entry_price']:<7.2f} ${pos['current_price']:<7.2f} "
+                  f"${pos['current_value']:<9.2f} ${pos['pnl_dollar']:<9.2f} {pos['pnl_percent']:+.1f}%   "
+                  f"{pos['current_weight']:.1f}%   {pos['target_weight']:.1f}%   {pos['weight_drift']:+.1f}%{drift_alert}")
+            
         alerts = self.check_alerts(positions)
         volume_alerts = self.get_volume_alerts(volumes, price_history)
         
@@ -268,68 +286,66 @@ Please provide analysis and trading recommendations based on this data."""
 if __name__ == "__main__":
     reporter = DailyPortfolioReport()
     reporter.generate_report()
-:<10} {'P&L %':<8} {'Cur.Wt':<7} {'Tgt.Wt':<7} {'Drift':<6}")
-        print("-" * 95)
+    
+    # Sort by P&L %
+    positions.sort(key=lambda x: x['pnl_percent'], reverse=True)
+    
+    # Track positions that need rebalancing
+    rebalance_alerts = []
+    
+    for pos in positions:
+        drift_alert = ""
+        if abs(pos['weight_drift']) > 5:  # >5% weight drift
+            drift_alert = " ⚠️"
+            rebalance_alerts.append(f"{pos['ticker']}: {pos['weight_drift']:+.1f}% drift")
         
-        # Sort by P&L %
-        positions.sort(key=lambda x: x['pnl_percent'], reverse=True)
-        
-        # Track positions that need rebalancing
-        rebalance_alerts = []
-        
-        for pos in positions:
-            drift_alert = ""
-            if abs(pos['weight_drift']) > 5:  # >5% weight drift
-                drift_alert = " ⚠️"
-                rebalance_alerts.append(f"{pos['ticker']}: {pos['weight_drift']:+.1f}% drift")
-            
-            print(f"{pos['ticker']:<6} {pos['shares']:<7} ${pos['entry_price']:<7.2f} ${pos['current_price']:<7.2f} "
-                  f"${pos['current_value']:<9.2f} ${pos['pnl_dollar']:<9.2f} {pos['pnl_percent']:+.1f}%   "
-                  f"{pos['current_weight']:.1f}%   {pos['target_weight']:.1f}%   {pos['weight_drift']:+.1f}%{drift_alert}")
-        
-        # Alerts
-        alerts = self.check_alerts(positions)
-        volume_alerts = self.get_volume_alerts(volumes, price_history)
-        
-        if alerts or volume_alerts:
-            print(f"\n⚠️  ALERTS:")
-            for alert in alerts + volume_alerts:
-                print(f"   {alert}")
-        else:
-            print(f"\n✅ No alerts triggered")
-        
-        # Top movers
-        print(f"\n📊 TOP MOVERS:")
-        best_performer = max(positions, key=lambda x: x['pnl_percent'])
-        worst_performer = min(positions, key=lambda x: x['pnl_percent'])
-        print(f"   Best:  {best_performer['ticker']} ({best_performer['pnl_percent']:+.1f}%)")
-        print(f"   Worst: {worst_performer['ticker']} ({worst_performer['pnl_percent']:+.1f}%)")
-        
-        # Generate JSON output for programmatic analysis
-        report_data = {
-            'date': datetime.now().isoformat(),
-            'portfolio_value': total_value,
-            'total_pnl': total_pnl,
-            'total_pnl_pct': total_pnl_pct,
-            'positions': positions,
-            'alerts': alerts,
-            'volume_alerts': volume_alerts,
-            'benchmarks': {
-                'SPY': current_prices.get('SPY', 0),
-                'IWM': current_prices.get('IWM', 0),
-                'VIX': current_prices.get('VIX', 0)
-            }
+        print(f"{pos['ticker']:<6} {pos['shares']:<7} ${pos['entry_price']:<7.2f} ${pos['current_price']:<7.2f} "
+                f"${pos['current_value']:<9.2f} ${pos['pnl_dollar']:<9.2f} {pos['pnl_percent']:+.1f}%   "
+                f"{pos['current_weight']:.1f}%   {pos['target_weight']:.1f}%   {pos['weight_drift']:+.1f}%{drift_alert}")
+    
+    # Alerts
+    alerts = self.check_alerts(positions)
+    volume_alerts = self.get_volume_alerts(volumes, price_history)
+    
+    if alerts or volume_alerts:
+        print(f"\n⚠️  ALERTS:")
+        for alert in alerts + volume_alerts:
+            print(f"   {alert}")
+    else:
+        print(f"\n✅ No alerts triggered")
+    
+    # Top movers
+    print(f"\n📊 TOP MOVERS:")
+    best_performer = max(positions, key=lambda x: x['pnl_percent'])
+    worst_performer = min(positions, key=lambda x: x['pnl_percent'])
+    print(f"   Best:  {best_performer['ticker']} ({best_performer['pnl_percent']:+.1f}%)")
+    print(f"   Worst: {worst_performer['ticker']} ({worst_performer['pnl_percent']:+.1f}%)")
+    
+    # Generate JSON output for programmatic analysis
+    report_data = {
+        'date': datetime.now().isoformat(),
+        'portfolio_value': total_value,
+        'total_pnl': total_pnl,
+        'total_pnl_pct': total_pnl_pct,
+        'positions': positions,
+        'alerts': alerts,
+        'volume_alerts': volume_alerts,
+        'benchmarks': {
+            'SPY': current_prices.get('SPY', 0),
+            'IWM': current_prices.get('IWM', 0),
+            'VIX': current_prices.get('VIX', 0)
         }
-        
-        # Generate formatted output file for AI analysis
-        self.generate_analysis_file(report_data)
-        
-        print(f"\n" + "=" * 60)
-        print("📋 JSON DATA FOR CLAUDE ANALYSIS:")
-        print("=" * 60)
-        print(json.dumps(report_data, indent=2))
-        
-        return report_data
+    }
+    
+    # Generate formatted output file for AI analysis
+    self.generate_analysis_file(report_data)
+    
+    print(f"\n" + "=" * 60)
+    print("📋 JSON DATA FOR CLAUDE ANALYSIS:")
+    print("=" * 60)
+    print(json.dumps(report_data, indent=2))
+    
+    return report_data
     
     def generate_analysis_file(self, report_data):
         """Generate formatted text file for AI analysis"""
@@ -375,7 +391,6 @@ Please provide analysis and trading recommendations based on this data."""
 if __name__ == "__main__":
     reporter = DailyPortfolioReport()
     reporter.generate_report()
-:<10} {'P&L %':<8} {'Cur.Wt':<7} {'Tgt.Wt':<7} {'Drift':<6}")
         print("-" * 95)
         
         # Sort by P&L %
