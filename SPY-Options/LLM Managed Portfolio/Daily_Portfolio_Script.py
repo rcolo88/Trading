@@ -113,14 +113,25 @@ class DailyPortfolioReport:
         """Check for unusual volume activity"""
         volume_alerts = []
         
+        # Handle case where volume_data might be a Series instead of DataFrame
+        if volume_data is None:
+            return volume_alerts
+        
+        # Convert Series to DataFrame if needed
+        if isinstance(volume_data, pd.Series):
+            return volume_alerts  # Skip volume analysis if data structure is unexpected
+        
         for ticker in self.holdings.keys():
             if ticker in volume_data.columns and len(volume_data[ticker]) >= 5:
-                current_volume = volume_data[ticker].iloc[-1]
-                avg_volume = volume_data[ticker].iloc[-5:-1].mean()
-                
-                if current_volume > avg_volume * 2:  # 2x average volume
-                    price_change = ((price_data[ticker].iloc[-1] - price_data[ticker].iloc[-2]) / price_data[ticker].iloc[-2]) * 100
-                    volume_alerts.append(f"📊 HIGH VOLUME: {ticker} - {current_volume/1000000:.1f}M vs {avg_volume/1000000:.1f}M avg (Price: {price_change:+.1f}%)")
+                recent_volume = volume_data[ticker].dropna()
+                if len(recent_volume) >= 5:
+                    current_volume = recent_volume.iloc[-1]
+                    avg_volume = recent_volume.iloc[-5:-1].mean()
+                    
+                    if current_volume > avg_volume * 2:  # 2x average volume
+                        if ticker in price_data.columns and len(price_data[ticker]) >= 2:
+                            price_change = ((price_data[ticker].iloc[-1] - price_data[ticker].iloc[-2]) / price_data[ticker].iloc[-2]) * 100
+                            volume_alerts.append(f"📊 HIGH VOLUME: {ticker} - {current_volume/1000000:.1f}M vs {avg_volume/1000000:.1f}M avg (Price: {price_change:+.1f}%)")
         
         return volume_alerts
     
