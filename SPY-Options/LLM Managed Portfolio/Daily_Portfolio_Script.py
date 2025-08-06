@@ -18,7 +18,7 @@ class DailyPortfolioReport:
             'SERV': {'shares': 23, 'entry_price': 10.15, 'allocation': 233.45}, # No change
             'CYTK': {'shares': 6, 'entry_price': 36.58, 'allocation': 219.48},  # No change
             'SOUN': {'shares': 19, 'entry_price': 11.01, 'allocation': 209.19}, # No change
-            'QS': {'shares': 23, 'entry_price': 6.00, 'allocation': 138.00},    # No change
+            'QS': {'shares': 23, 'entry_price': 8.50, 'allocation': 138.00},    # No change
             'RIG': {'shares': 65, 'entry_price': 3.00, 'allocation': 195.00},   # No change
             'AMD': {'shares': 1, 'entry_price': 176.78, 'allocation': 176.78},  # No change
             'NVDA': {'shares': 1, 'entry_price': 175.00, 'allocation': 135.00}, # NEW POSITION
