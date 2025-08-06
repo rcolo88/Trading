@@ -406,10 +406,10 @@ class DailyPortfolioReport:
         self.generate_analysis_file(report_data)
 
         # Generate performance chart
-        self.plot_performance_chart(save_path='LLM Managed Portfolio')
+        self.plot_performance_chart(save_path='LLM Managed Portfolio Performance')
 
         # Generate position details chart
-        self.plot_position_details(positions, total_value, save_path='LLM Managed Portfolio')
+        self.plot_position_details(positions, total_value, save_path='LLM Position Details')
         
         # Export historical metrics
         self.export_historical_metrics(report_data)
@@ -678,19 +678,10 @@ Please provide analysis and trading recommendations based on this data."""
         if save_path:
             plt.savefig(save_path, dpi=300, bbox_inches='tight')
             print(f"📊 Position Details saved to {save_path}")
-        else:
-            print("⚠️  Could not save position details")
         
-        # Display the chart
-        try:
-            plt.show()
-        except:
-            print("📊 Chart created (display may not be available in this environment)")
+        plt.show()
+        # plt.close()  # Clean up to prevent memory issues
         
-        plt.close()  # Clean up to prevent memory issues
-        
-        return save_path
-
     def export_historical_metrics(self, report_data):
         """Export daily metrics to CSV for historical tracking"""
         
