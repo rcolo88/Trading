@@ -13,20 +13,22 @@ class DailyPortfolioReport:
     def __init__(self):
         # Updated portfolio holdings (from your corrected allocation)
         self.holdings = {
-            'IONS': {'shares': 8, 'entry_price': 37.01, 'allocation': 296.08},
-            'CRGY': {'shares': 26, 'entry_price': 9.10, 'allocation': 236.60},
-            'SERV': {'shares': 23, 'entry_price': 10.15, 'allocation': 233.45},
-            'CYTK': {'shares': 6, 'entry_price': 36.58, 'allocation': 219.48},
-            'SOUN': {'shares': 19, 'entry_price': 11.01, 'allocation': 209.19},
-            'QS': {'shares': 33, 'entry_price': 6.00, 'allocation': 198.00},
-            'RIG': {'shares': 65, 'entry_price': 3.00, 'allocation': 195.00},
-            'AMD': {'shares': 1, 'entry_price': 176.78, 'allocation': 176.78}
+            'IONS': {'shares': 3, 'entry_price': 37.01, 'allocation': 111.03},  # Reduced from 4 shares
+            'CRGY': {'shares': 26, 'entry_price': 9.10, 'allocation': 236.60},  # No change
+            'SERV': {'shares': 23, 'entry_price': 10.15, 'allocation': 233.45}, # No change
+            'CYTK': {'shares': 6, 'entry_price': 36.58, 'allocation': 219.48},  # No change
+            'SOUN': {'shares': 19, 'entry_price': 11.01, 'allocation': 209.19}, # No change
+            'QS': {'shares': 23, 'entry_price': 6.00, 'allocation': 138.00},    # No change
+            'RIG': {'shares': 65, 'entry_price': 3.00, 'allocation': 195.00},   # No change
+            'AMD': {'shares': 1, 'entry_price': 176.78, 'allocation': 176.78},  # No change
+            'NVDA': {'shares': 1, 'entry_price': 175.00, 'allocation': 135.00}, # NEW POSITION
+            'GOOGL': {'shares': 1, 'entry_price': 193.00, 'allocation': 193.00} # NEW POSITION
         }
-        
+
         self.benchmarks = ['SPY', 'IWM', 'VIX']
-        self.total_investment = 1964.58
-        self.cash = 35.42
-        
+        self.total_investment = 1964.58  # Unchanged - original investment
+        self.cash = 2.34  # Minimal cash remaining
+    
     def fetch_data_individually(self, tickers):
         """Fallback method to fetch data for each ticker individually"""
         
@@ -73,11 +75,13 @@ class DailyPortfolioReport:
             
             if len(self.price_data) > 0:
                 print(f"📅 Data range: {self.price_data.index[0].date()} to {self.price_data.index[-1].date()}")
-                return True
+                return True  # Keep returning True for success
         
         print("❌ Could not fetch any valid data")
+        self.price_data = pd.DataFrame()  # Ensure empty DataFrame
+        self.volume_data = pd.DataFrame()  # Ensure empty DataFrame
         return False
-    
+
     def fetch_current_data(self):
         """Fetch current price data for all holdings and benchmarks"""
         
@@ -98,7 +102,7 @@ class DailyPortfolioReport:
             # Handle different data structures from yfinance
             if raw_data.empty:
                 print("❌ No data returned from yfinance")
-                return False
+                return None, None, None  # Return tuple instead of False
             
             # Handle multi-ticker vs single ticker cases
             if len(all_tickers) == 1:
@@ -114,7 +118,7 @@ class DailyPortfolioReport:
                         self.price_data = raw_data['Close']
                     else:
                         print("❌ Could not find price data columns")
-                        return False
+                        return None, None, None  # Return tuple instead of False
                 else:
                     self.price_data = raw_data
             
@@ -155,21 +159,31 @@ class DailyPortfolioReport:
             # Verify we have some data
             if self.price_data.empty:
                 print("❌ Price data is empty after processing")
-                return False
+                return None, None, None  # Return tuple instead of False
             
             print(f"✅ Successfully fetched data for {len(self.price_data.columns)} securities")
             print(f"📅 Data range: {self.price_data.index[0].date()} to {self.price_data.index[-1].date()}")
             print(f"📊 Available tickers: {list(self.price_data.columns)}")
             
-            return True
+            # Extract current prices (most recent row)
+            current_prices = self.price_data.iloc[-1].to_dict()
+            
+            # Return the tuple that generate_report expects
+            return current_prices, self.volume_data, self.price_data
             
         except Exception as e:
             print(f"❌ Error fetching data: {e}")
             print("🔄 Trying alternative approach...")
             
             # Alternative approach: fetch tickers individually
-            return self.fetch_data_individually(all_tickers + ['^VIX'])
-    
+            success = self.fetch_data_individually(all_tickers + ['^VIX'])
+            if success:
+                # If successful, extract and return the data
+                current_prices = self.price_data.iloc[-1].to_dict() if not self.price_data.empty else {}
+                return current_prices, self.volume_data, self.price_data
+            else:
+                return None, None, None
+
     def calculate_position_metrics(self, current_prices):
         """Calculate key metrics for each position"""
         positions = []
@@ -531,7 +545,7 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"📊 Chart saved to {save_path}")
         
         plt.show()
-    
+        plt.savefig('output.png')
     def export_historical_metrics(self, report_data):
         """Export daily metrics to CSV for historical tracking"""
         
