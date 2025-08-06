@@ -492,7 +492,7 @@ Please provide analysis and trading recommendations based on this data."""
                     label=f'Russell 2000 (${initial_portfolio_value:,.0f} Invested)', zorder=1)
         
         # Formatting
-        ax.set_title('Portfolio vs. S&P 500 vs. Russell 2000', fontsize=16, fontweight='bold', pad=20)
+        ax.set_title('LLM Portfolio vs. S&P 500 vs. Russell 2000', fontsize=16, fontweight='bold', pad=20)
         ax.set_xlabel('Date', fontsize=12)
         ax.set_ylabel(f'Value of ${initial_portfolio_value:,.0f} Investment', fontsize=12)
         ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
