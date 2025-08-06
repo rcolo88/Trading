@@ -191,17 +191,21 @@ class DailyPortfolioReport:
         # STEP 1: Calculate the COMPLETE total portfolio value FIRST
         total_current_value = self.cash
         position_values = {}
+        total_cost_basis = 0  # Track actual total investment
         
         # First pass: Calculate all position values and total
         for ticker, position in self.holdings.items():
             if ticker in current_prices:
                 current_price = current_prices[ticker]
                 current_value = position['shares'] * current_price
+                cost_basis = position['shares'] * position['entry_price']
                 position_values[ticker] = {
                     'current_price': current_price,
-                    'current_value': current_value
+                    'current_value': current_value,
+                    'cost_basis': cost_basis
                 }
                 total_current_value += current_value
+                total_cost_basis += cost_basis
         
         # STEP 2: Now calculate metrics using the FINAL total for all positions
         for ticker, position in self.holdings.items():
@@ -209,15 +213,16 @@ class DailyPortfolioReport:
                 pos_data = position_values[ticker]
                 current_price = pos_data['current_price']
                 current_value = pos_data['current_value']
+                cost_basis = pos_data['cost_basis']
                 
-                # P&L calculations
-                pnl_dollar = current_value - position['allocation']
-                pnl_percent = (pnl_dollar / position['allocation']) * 100
+                # P&L calculations - FIXED to use actual cost basis
+                pnl_dollar = current_value - cost_basis
+                pnl_percent = (pnl_dollar / cost_basis) * 100
                 daily_change = ((current_price - position['entry_price']) / position['entry_price']) * 100
                 
                 # ✅ FIXED: Use the complete total for weight calculations
                 current_weight = (current_value / total_current_value) * 100 if total_current_value > 0 else 0
-                target_weight = (position['allocation'] / self.total_investment) * 100
+                target_weight = (cost_basis / total_cost_basis) * 100  # Fixed to use actual total cost basis
                 weight_drift = current_weight - target_weight
                 
                 positions.append({
@@ -226,16 +231,16 @@ class DailyPortfolioReport:
                     'entry_price': position['entry_price'],
                     'current_price': current_price,
                     'current_value': current_value,
+                    'cost_basis': cost_basis,
                     'pnl_dollar': pnl_dollar,
                     'pnl_percent': pnl_percent,
                     'daily_change': daily_change,
                     'current_weight': current_weight,
                     'target_weight': target_weight,
-                    'weight_drift': weight_drift,
-                    'initial_allocation': position['allocation']
+                    'weight_drift': weight_drift
                 })
         
-        return positions, total_current_value
+        return positions, total_current_value, total_cost_basis
 
     def check_alerts(self, positions):
         """Check for stop-loss and profit target alerts"""
@@ -302,19 +307,19 @@ class DailyPortfolioReport:
             return
         
         # Calculate positions
-        positions, total_value = self.calculate_position_metrics(current_prices)
-        
-        # Portfolio summary with account value context
-        total_pnl = total_value - (self.total_investment + self.cash)
-        total_pnl_pct = (total_pnl / self.total_investment) * 100
-        account_value = total_value  # This is your total account value
-        
+        positions, total_value, total_cost_basis = self.calculate_position_metrics(current_prices)
+
+        # Also update the P&L calculations to use the actual cost basis:
+        total_pnl = total_value - total_cost_basis  # Use actual cost basis, not self.total_investment
+        total_pnl_pct = (total_pnl / total_cost_basis) * 100
+
+        # Update the account summary print statements:
         print(f"\n💰 ACCOUNT VALUE SUMMARY:")
-        print(f"   Total Account Value:    ${account_value:,.2f}")
-        print(f"   Initial Investment:     ${self.total_investment:,.2f}")
+        print(f"   Total Account Value:    ${total_value:,.2f}")
+        print(f"   Total Cost Basis:       ${total_cost_basis:,.2f}")  # Show actual cost basis
         print(f"   Cash Available:         ${self.cash:.2f}")
         print(f"   Total P&L:              ${total_pnl:+,.2f} ({total_pnl_pct:+.2f}%)")
-        print(f"   Account Growth:         {((account_value / (self.total_investment + self.cash)) - 1) * 100:+.2f}%")
+        print(f"   Account Growth:         {((total_value / (total_cost_basis + self.cash)) - 1) * 100:+.2f}%")
         
         # Benchmark performance
         print(f"\n📈 BENCHMARK PERFORMANCE:")
@@ -401,7 +406,10 @@ class DailyPortfolioReport:
         self.generate_analysis_file(report_data)
 
         # Generate performance chart
-        self.plot_performance_chart()
+        self.plot_performance_chart(save_path='LLM Managed Portfolio')
+
+        # Generate position details chart
+        self.plot_position_details(positions, total_value, save_path='LLM Managed Portfolio')
         
         # Export historical metrics
         self.export_historical_metrics(report_data)
@@ -561,7 +569,128 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"📊 Chart saved to {save_path}")
         
         plt.show()
-        plt.savefig('output.png')
+    
+    def plot_position_details(self, positions, total_value, save_path=None):
+        """Create position details chart showing portfolio breakdown and performance"""
+        
+        if not positions:
+            print("❌ No position data available for charting")
+            return
+        
+        # Create figure with subplots
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+        fig.suptitle('Position Details', fontsize=16, fontweight='bold')
+        
+        # Extract data for plotting
+        tickers = [pos['ticker'] for pos in positions]
+        current_values = [pos['current_value'] for pos in positions]
+        pnl_dollars = [pos['pnl_dollar'] for pos in positions]
+        pnl_percentages = [pos['pnl_percent'] for pos in positions]
+        current_weights = [pos['current_weight'] for pos in positions]
+        
+        # Define colors for consistency
+        colors = plt.cm.Set3(np.linspace(0, 1, len(positions)))
+        profit_colors = ['#2E8B57' if pnl >= 0 else '#DC143C' for pnl in pnl_dollars]
+        
+        # 1. Portfolio Allocation (Pie Chart)
+        ax1.pie(current_values, labels=tickers, autopct='%1.1f%%', startangle=90, colors=colors)
+        ax1.set_title('Portfolio Allocation by Value', fontweight='bold', pad=20)
+        
+        # 2. Position Values (Horizontal Bar Chart)
+        y_pos = np.arange(len(tickers))
+        bars = ax2.barh(y_pos, current_values, color=colors, alpha=0.7)
+        ax2.set_yticks(y_pos)
+        ax2.set_yticklabels(tickers)
+        ax2.set_xlabel('Current Value ($)')
+        ax2.set_title('Position Values', fontweight='bold', pad=20)
+        ax2.grid(axis='x', alpha=0.3)
+        
+        # Add value labels on bars
+        for i, (bar, value) in enumerate(zip(bars, current_values)):
+            ax2.text(value + max(current_values) * 0.01, bar.get_y() + bar.get_height()/2, 
+                    f'${value:.0f}', ha='left', va='center', fontsize=9)
+        
+        # 3. P&L Performance ($ and %)
+        x_pos = np.arange(len(tickers))
+        
+        # Create twin axis for percentage
+        ax3_twin = ax3.twinx()
+        
+        # Plot P&L dollars as bars
+        bars3 = ax3.bar(x_pos, pnl_dollars, color=profit_colors, alpha=0.7, label='P&L ($)')
+        ax3.set_xlabel('Positions')
+        ax3.set_ylabel('P&L ($)', color='black')
+        ax3.set_title('P&L Performance', fontweight='bold', pad=20)
+        ax3.set_xticks(x_pos)
+        ax3.set_xticklabels(tickers, rotation=45)
+        ax3.grid(axis='y', alpha=0.3)
+        ax3.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+        
+        # Plot P&L percentages as line
+        line = ax3_twin.plot(x_pos, pnl_percentages, color='orange', marker='o', 
+                            linewidth=2, markersize=6, label='P&L (%)')
+        ax3_twin.set_ylabel('P&L (%)', color='orange')
+        ax3_twin.tick_params(axis='y', labelcolor='orange')
+        ax3_twin.axhline(y=0, color='orange', linestyle='--', alpha=0.5)
+        
+        # Add value labels on bars
+        for bar, pnl_dollar, pnl_pct in zip(bars3, pnl_dollars, pnl_percentages):
+            height = bar.get_height()
+            ax3.text(bar.get_x() + bar.get_width()/2., height + (max(pnl_dollars) * 0.02 if height >= 0 else min(pnl_dollars) * 0.02),
+                    f'${pnl_dollar:.0f}', ha='center', va='bottom' if height >= 0 else 'top', fontsize=8)
+        
+        # 4. Weight Distribution vs Target
+        ax4.barh(y_pos, current_weights, color=colors, alpha=0.7, label='Current Weight')
+        ax4.set_yticks(y_pos)
+        ax4.set_yticklabels(tickers)
+        ax4.set_xlabel('Portfolio Weight (%)')
+        ax4.set_title('Current Portfolio Weights', fontweight='bold', pad=20)
+        ax4.grid(axis='x', alpha=0.3)
+        
+        # Add weight labels
+        for i, weight in enumerate(current_weights):
+            ax4.text(weight + max(current_weights) * 0.01, i, f'{weight:.1f}%', 
+                    ha='left', va='center', fontsize=9)
+        
+        # Add portfolio summary text box
+        total_pnl = sum(pnl_dollars)
+        total_cost_basis = sum([pos['cost_basis'] for pos in positions])
+        total_pnl_pct = (total_pnl / total_cost_basis) * 100 if total_cost_basis > 0 else 0
+        profitable_positions = len([p for p in pnl_dollars if p >= 0])
+        
+        summary_text = f"""Portfolio Summary:
+        Total Value: ${total_value:,.0f}
+        Total P&L: ${total_pnl:+,.0f} ({total_pnl_pct:+.1f}%)
+        Profitable Positions: {profitable_positions}/{len(positions)}
+        Largest Position: {max(current_weights):.1f}%
+        Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"""
+        
+        # Add text box to the figure
+        fig.text(0.02, 0.02, summary_text, fontsize=10, 
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8),
+                verticalalignment='bottom')
+        
+        # Adjust layout to prevent overlapping
+        plt.tight_layout()
+        plt.subplots_adjust(bottom=0.15)  # Make room for summary text
+        
+        # Save the chart
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"📊 Position Details saved to {save_path}")
+        else:
+            print("⚠️  Could not save position details")
+        
+        # Display the chart
+        try:
+            plt.show()
+        except:
+            print("📊 Chart created (display may not be available in this environment)")
+        
+        plt.close()  # Clean up to prevent memory issues
+        
+        return save_path
+
     def export_historical_metrics(self, report_data):
         """Export daily metrics to CSV for historical tracking"""
         
