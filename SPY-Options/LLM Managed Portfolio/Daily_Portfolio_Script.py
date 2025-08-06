@@ -2,6 +2,7 @@
 # Run this daily and paste the output to Claude for analysis
 
 import yfinance as yf
+import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
@@ -26,26 +27,148 @@ class DailyPortfolioReport:
         self.total_investment = 1964.58
         self.cash = 35.42
         
+    def fetch_data_individually(self, tickers):
+        """Fallback method to fetch data for each ticker individually"""
+        
+        print("🔄 Fetching tickers individually...")
+        
+        price_data_dict = {}
+        successful_tickers = []
+        
+        for ticker in tickers:
+            # Use ^VIX for VIX data
+            fetch_ticker = '^VIX' if ticker == 'VIX' else ticker
+            
+            try:
+                print(f"   Fetching {ticker}...")
+                start_fetch_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
+                ticker_data = yf.download(fetch_ticker, start=start_fetch_date, progress=False, auto_adjust=True)
+                
+                if not ticker_data.empty:
+                    if 'Close' in ticker_data.columns:
+                        price_data_dict[ticker] = ticker_data['Close']
+                    elif 'Adj Close' in ticker_data.columns:
+                        price_data_dict[ticker] = ticker_data['Adj Close']
+                    else:
+                        numeric_cols = ticker_data.select_dtypes(include=[np.number]).columns
+                        if len(numeric_cols) > 0:
+                            price_data_dict[ticker] = ticker_data[numeric_cols[0]]
+                    
+                    successful_tickers.append(ticker)
+                else:
+                    print(f"   ⚠️  No data for {ticker}")
+                    
+            except Exception as e:
+                print(f"   ❌ Failed to fetch {ticker}: {e}")
+        
+        if price_data_dict:
+            self.price_data = pd.DataFrame(price_data_dict)
+            self.price_data = self.price_data.fillna(method='ffill').fillna(method='bfill')
+            
+            # Initialize empty volume data
+            self.volume_data = pd.DataFrame()
+            
+            print(f"✅ Successfully fetched {len(successful_tickers)} out of {len(tickers)} tickers")
+            print(f"📊 Available data: {successful_tickers}")
+            
+            if len(self.price_data) > 0:
+                print(f"📅 Data range: {self.price_data.index[0].date()} to {self.price_data.index[-1].date()}")
+                return True
+        
+        print("❌ Could not fetch any valid data")
+        return False
+    
     def fetch_current_data(self):
-        """Fetch current market data for all positions"""
-        tickers = list(self.holdings.keys()) + self.benchmarks
+        """Fetch current price data for all holdings and benchmarks"""
+        
+        print("📡 Fetching current market data...")
+        
+        # Get all tickers
+        portfolio_tickers = list(self.holdings.keys())
+        benchmark_tickers = ['SPY', 'IWM']  # Remove VIX for now
+        all_tickers = portfolio_tickers + benchmark_tickers
+        
+        print(f"🎯 Fetching data for tickers: {all_tickers}")
         
         try:
-            # Get current prices
-            current_data = yf.download(tickers, period='5d', progress=False)['Close']
-            if len(tickers) == 1:
-                current_data = pd.DataFrame({tickers[0]: current_data})
+            # Fetch data with more robust handling
+            start_fetch_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
+            raw_data = yf.download(all_tickers, start=start_fetch_date, progress=False, auto_adjust=True)
             
-            # Get volume data
-            volume_data = yf.download(tickers, period='5d', progress=False)['Volume']
-            if len(tickers) == 1:
-                volume_data = pd.DataFrame({tickers[0]: volume_data})
-                
-            return current_data.iloc[-1], volume_data.iloc[-1], current_data
+            # Handle different data structures from yfinance
+            if raw_data.empty:
+                print("❌ No data returned from yfinance")
+                return False
+            
+            # Handle multi-ticker vs single ticker cases
+            if len(all_tickers) == 1:
+                if 'Adj Close' in raw_data.columns:
+                    self.price_data = pd.DataFrame({all_tickers[0]: raw_data['Adj Close']})
+                else:
+                    self.price_data = pd.DataFrame({all_tickers[0]: raw_data['Close']})
+            else:
+                if isinstance(raw_data.columns, pd.MultiIndex):
+                    if 'Adj Close' in raw_data.columns.get_level_values(0):
+                        self.price_data = raw_data['Adj Close']
+                    elif 'Close' in raw_data.columns.get_level_values(0):
+                        self.price_data = raw_data['Close']
+                    else:
+                        print("❌ Could not find price data columns")
+                        return False
+                else:
+                    self.price_data = raw_data
+            
+            # Get volume data separately (excluding VIX which doesn't have volume)
+            try:
+                volume_raw = yf.download(all_tickers, start=start_fetch_date, progress=False, auto_adjust=True)
+                if isinstance(volume_raw.columns, pd.MultiIndex) and 'Volume' in volume_raw.columns.get_level_values(0):
+                    volume_data = volume_raw['Volume']
+                else:
+                    volume_data = pd.DataFrame()  # Empty if volume data unavailable
+            except:
+                volume_data = pd.DataFrame()
+            
+            # Try to get VIX separately using alternative ticker
+            try:
+                print("🔍 Attempting to fetch VIX data separately...")
+                vix_data = yf.download('^VIX', start=start_fetch_date, progress=False, auto_adjust=True)
+                if not vix_data.empty:
+                    if 'Close' in vix_data.columns:
+                        vix_prices = vix_data['Close']
+                    else:
+                        vix_prices = vix_data.iloc[:, 0]  # Take first column
+                    
+                    # Add VIX to price data
+                    self.price_data['VIX'] = vix_prices
+                    print("✅ VIX data fetched successfully using ^VIX")
+                else:
+                    print("⚠️  VIX data unavailable - continuing without VIX")
+            except Exception as e:
+                print(f"⚠️  VIX fetch failed: {e} - continuing without VIX")
+            
+            # Clean up data
+            self.price_data = self.price_data.fillna(method='ffill').fillna(method='bfill')
+            
+            # Store volume data
+            self.volume_data = volume_data
+            
+            # Verify we have some data
+            if self.price_data.empty:
+                print("❌ Price data is empty after processing")
+                return False
+            
+            print(f"✅ Successfully fetched data for {len(self.price_data.columns)} securities")
+            print(f"📅 Data range: {self.price_data.index[0].date()} to {self.price_data.index[-1].date()}")
+            print(f"📊 Available tickers: {list(self.price_data.columns)}")
+            
+            return True
             
         except Exception as e:
-            print(f"Error fetching data: {e}")
-            return None, None, None
+            print(f"❌ Error fetching data: {e}")
+            print("🔄 Trying alternative approach...")
+            
+            # Alternative approach: fetch tickers individually
+            return self.fetch_data_individually(all_tickers + ['^VIX'])
     
     def calculate_position_metrics(self, current_prices):
         """Calculate key metrics for each position"""
@@ -246,6 +369,12 @@ class DailyPortfolioReport:
         
         # Generate formatted output file for AI analysis
         self.generate_analysis_file(report_data)
+
+        # Generate performance chart
+        self.plot_performance_chart()
+        
+        # Export historical metrics
+        self.export_historical_metrics(report_data)
         
         print(f"\n" + "=" * 60)
         print("📋 JSON DATA FOR CLAUDE ANALYSIS:")
@@ -402,6 +531,52 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"📊 Chart saved to {save_path}")
         
         plt.show()
+    
+    def export_historical_metrics(self, report_data):
+        """Export daily metrics to CSV for historical tracking"""
+        
+        filename = 'portfolio_historical_metrics.csv'
+        
+        # Current metrics to track
+        current_metrics = {
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'time': datetime.now().strftime('%H:%M:%S'),
+            'account_value': report_data['account_value'],
+            'total_pnl_dollar': report_data['total_pnl_dollar'],
+            'total_pnl_percent': report_data['total_pnl_percent'],
+            'account_growth_percent': report_data['account_growth_percent'],
+            'spy_price': report_data['benchmarks']['SPY'],
+            'iwm_price': report_data['benchmarks']['IWM'],
+            'vix_level': report_data['benchmarks']['VIX'],
+            'positions_profitable': report_data['portfolio_metrics']['positions_profitable'],
+            'largest_position_weight': report_data['portfolio_metrics']['largest_position_weight'],
+            'concentration_risk': report_data['portfolio_metrics']['concentration_risk'],
+            'total_alerts': len(report_data['alerts']) + len(report_data['volume_alerts']) + len(report_data['rebalancing_alerts'])
+        }
+        
+        # Add individual position performance
+        for pos in report_data['positions']:
+            current_metrics[f"{pos['ticker']}_price"] = pos['current_price']
+            current_metrics[f"{pos['ticker']}_pnl_pct"] = pos['pnl_percent']
+            current_metrics[f"{pos['ticker']}_weight"] = pos['current_weight']
+            current_metrics[f"{pos['ticker']}_drift"] = pos['weight_drift']
+        
+        # Create DataFrame
+        df_new = pd.DataFrame([current_metrics])
+        
+        # Append to existing file or create new one
+        try:
+            if os.path.exists(filename):
+                df_existing = pd.read_csv(filename)
+                df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+            else:
+                df_combined = df_new
+            
+            df_combined.to_csv(filename, index=False)
+            print(f"📈 Historical metrics saved to {filename}")
+            
+        except Exception as e:
+            print(f"❌ Error saving historical metrics: {e}")
 
 # Usage
 if __name__ == "__main__":
