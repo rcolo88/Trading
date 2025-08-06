@@ -187,19 +187,35 @@ class DailyPortfolioReport:
     def calculate_position_metrics(self, current_prices):
         """Calculate key metrics for each position"""
         positions = []
-        total_current_value = self.cash
         
+        # STEP 1: Calculate the COMPLETE total portfolio value FIRST
+        total_current_value = self.cash
+        position_values = {}
+        
+        # First pass: Calculate all position values and total
         for ticker, position in self.holdings.items():
             if ticker in current_prices:
                 current_price = current_prices[ticker]
                 current_value = position['shares'] * current_price
+                position_values[ticker] = {
+                    'current_price': current_price,
+                    'current_value': current_value
+                }
                 total_current_value += current_value
+        
+        # STEP 2: Now calculate metrics using the FINAL total for all positions
+        for ticker, position in self.holdings.items():
+            if ticker in position_values:
+                pos_data = position_values[ticker]
+                current_price = pos_data['current_price']
+                current_value = pos_data['current_value']
                 
+                # P&L calculations
                 pnl_dollar = current_value - position['allocation']
                 pnl_percent = (pnl_dollar / position['allocation']) * 100
                 daily_change = ((current_price - position['entry_price']) / position['entry_price']) * 100
                 
-                # Calculate multiple weight metrics
+                # ✅ FIXED: Use the complete total for weight calculations
                 current_weight = (current_value / total_current_value) * 100 if total_current_value > 0 else 0
                 target_weight = (position['allocation'] / self.total_investment) * 100
                 weight_drift = current_weight - target_weight
@@ -220,7 +236,7 @@ class DailyPortfolioReport:
                 })
         
         return positions, total_current_value
-    
+
     def check_alerts(self, positions):
         """Check for stop-loss and profit target alerts"""
         alerts = []
