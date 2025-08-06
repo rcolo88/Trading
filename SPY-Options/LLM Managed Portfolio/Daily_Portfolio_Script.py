@@ -2,6 +2,7 @@
 # Run this daily and paste the output to Claude for analysis
 
 import yfinance as yf
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -292,6 +293,115 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"❌ Error creating analysis file: {e}")
         
         return content
+    
+    def plot_performance_chart(self, save_path=None):
+        """Create performance chart matching the reference style"""
+        
+        if not hasattr(self, 'price_data') or self.price_data is None:
+            print("❌ No price data available for charting")
+            return
+        
+        # Create the plot
+        fig, ax = plt.subplots(figsize=(14, 8))
+        
+        # Calculate portfolio performance over time
+        portfolio_values = []
+        spy_values = []
+        iwm_values = []
+        dates = self.price_data.index
+        
+        initial_portfolio_value = self.total_investment + self.cash
+        
+        for date in dates:
+            # Calculate daily portfolio value
+            daily_portfolio_value = self.cash
+            for ticker, position in self.holdings.items():
+                if ticker in self.price_data.columns:
+                    current_price = self.price_data.loc[date, ticker]
+                    if not pd.isna(current_price):
+                        daily_portfolio_value += position['shares'] * current_price
+                    else:
+                        daily_portfolio_value += position['allocation']
+                else:
+                    daily_portfolio_value += position['allocation']
+            
+            portfolio_values.append(daily_portfolio_value)
+        
+        # Calculate benchmark values (normalized to start at same dollar amount)
+        if 'SPY' in self.price_data.columns:
+            spy_start = self.price_data['SPY'].iloc[0]
+            spy_values = (self.price_data['SPY'] / spy_start) * initial_portfolio_value
+        
+        if 'IWM' in self.price_data.columns:
+            iwm_start = self.price_data['IWM'].iloc[0]
+            iwm_values = (self.price_data['IWM'] / iwm_start) * initial_portfolio_value
+        
+        # Plot lines
+        ax.plot(dates, portfolio_values, color='#1f77b4', linewidth=2.5, marker='o', markersize=3,
+                label=f'Portfolio (${initial_portfolio_value:,.0f} Invested)', zorder=3)
+        
+        if len(spy_values) > 0:
+            ax.plot(dates, spy_values, color='#ff7f0e', linewidth=2, linestyle='-',
+                    label=f'S&P 500 (${initial_portfolio_value:,.0f} Invested)', zorder=2)
+        
+        if len(iwm_values) > 0:
+            ax.plot(dates, iwm_values, color='#2ca02c', linewidth=2, linestyle='--',
+                    label=f'Russell 2000 (${initial_portfolio_value:,.0f} Invested)', zorder=1)
+        
+        # Formatting
+        ax.set_title('Portfolio vs. S&P 500 vs. Russell 2000', fontsize=16, fontweight='bold', pad=20)
+        ax.set_xlabel('Date', fontsize=12)
+        ax.set_ylabel(f'Value of ${initial_portfolio_value:,.0f} Investment', fontsize=12)
+        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+        ax.legend(loc='upper left', fontsize=11)
+        
+        # Format y-axis as currency
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
+        
+        # Add performance annotations
+        if len(portfolio_values) > 0:
+            portfolio_return = ((portfolio_values[-1] - initial_portfolio_value) / initial_portfolio_value) * 100
+            ax.annotate(f'{portfolio_return:+.1f}%', 
+                    xy=(dates[-1], portfolio_values[-1]),
+                    xytext=(10, 10), textcoords='offset points',
+                    fontsize=11, fontweight='bold', color='#1f77b4',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+        
+        if len(spy_values) > 0:
+            spy_return = ((spy_values.iloc[-1] - initial_portfolio_value) / initial_portfolio_value) * 100
+            ax.annotate(f'{spy_return:+.1f}%', 
+                    xy=(dates[-1], spy_values.iloc[-1]),
+                    xytext=(10, -10), textcoords='offset points',
+                    fontsize=11, fontweight='bold', color='#ff7f0e',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+        
+        if len(iwm_values) > 0:
+            iwm_return = ((iwm_values.iloc[-1] - initial_portfolio_value) / initial_portfolio_value) * 100
+            ax.annotate(f'{iwm_return:+.1f}%', 
+                    xy=(dates[-1], iwm_values.iloc[-1]),
+                    xytext=(10, 0), textcoords='offset points',
+                    fontsize=11, fontweight='bold', color='#2ca02c',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+        
+        # Format x-axis dates
+        import matplotlib.dates as mdates
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+        num_days = len(dates)
+        if num_days <= 7:
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+        elif num_days <= 30:
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=2))
+        else:
+            ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
+        
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        
+        if save_path:
+            plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            print(f"📊 Chart saved to {save_path}")
+        
+        plt.show()
 
 # Usage
 if __name__ == "__main__":

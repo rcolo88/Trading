@@ -1,0 +1,164 @@
+Daily portfolio update for 2025-08-05. Here's the data:
+
+{
+  "date": "2025-08-05T21:29:10.487759",
+  "account_value": 1949.6199695301057,
+  "initial_investment": 1964.58,
+  "cash_available": 35.42,
+  "total_pnl_dollar": -50.380030469894336,
+  "total_pnl_percent": -2.5644173548490943,
+  "account_growth_percent": -2.5190015234947127,
+  "positions": [
+    {
+      "ticker": "QS",
+      "shares": 33,
+      "entry_price": 6.0,
+      "current_price": 8.6899995803833,
+      "current_value": 286.7699861526489,
+      "pnl_dollar": 88.76998615264893,
+      "pnl_percent": 44.83332633972168,
+      "daily_change": 44.83332633972168,
+      "current_weight": 18.07951229565226,
+      "target_weight": 10.078490058943897,
+      "weight_drift": 8.001022236708364,
+      "initial_allocation": 198.0
+    },
+    {
+      "ticker": "IONS",
+      "shares": 8,
+      "entry_price": 37.01,
+      "current_price": 43.04999923706055,
+      "current_value": 344.3999938964844,
+      "pnl_dollar": 48.31999389648439,
+      "pnl_percent": 16.319911475440556,
+      "daily_change": 16.319911475440556,
+      "current_weight": 90.67452989068993,
+      "target_weight": 15.070905740667214,
+      "weight_drift": 75.60362415002271,
+      "initial_allocation": 296.08
+    },
+    {
+      "ticker": "SERV",
+      "shares": 23,
+      "entry_price": 10.15,
+      "current_price": 10.739999771118164,
+      "current_value": 247.01999473571777,
+      "pnl_dollar": 13.569994735717785,
+      "pnl_percent": 5.812805626779947,
+      "daily_change": 5.812805626779937,
+      "current_weight": 28.386577855268175,
+      "target_weight": 11.882946991214407,
+      "weight_drift": 16.50363086405377,
+      "initial_allocation": 233.45
+    },
+    {
+      "ticker": "CRGY",
+      "shares": 26,
+      "entry_price": 9.1,
+      "current_price": 9.359999656677246,
+      "current_value": 243.3599910736084,
+      "pnl_dollar": 6.759991073608404,
+      "pnl_percent": 2.857139084365344,
+      "daily_change": 2.857139084365346,
+      "current_weight": 39.05131694582385,
+      "target_weight": 12.043286605788515,
+      "weight_drift": 27.008030340035333,
+      "initial_allocation": 236.6
+    },
+    {
+      "ticker": "SOUN",
+      "shares": 19,
+      "entry_price": 11.01,
+      "current_price": 11.170000076293945,
+      "current_value": 212.23000144958496,
+      "pnl_dollar": 3.040001449584963,
+      "pnl_percent": 1.4532250344590867,
+      "daily_change": 1.4532250344590876,
+      "current_weight": 16.333048944275156,
+      "target_weight": 10.64807745166906,
+      "weight_drift": 5.6849714926060955,
+      "initial_allocation": 209.19
+    },
+    {
+      "ticker": "CYTK",
+      "shares": 6,
+      "entry_price": 36.58,
+      "current_price": 36.15999984741211,
+      "current_value": 216.95999908447266,
+      "pnl_dollar": -2.5200009155273335,
+      "pnl_percent": -1.1481688151664542,
+      "daily_change": -1.1481688151664542,
+      "current_weight": 19.95658443257733,
+      "target_weight": 11.171853525944476,
+      "weight_drift": 8.784730906632854,
+      "initial_allocation": 219.48
+    },
+    {
+      "ticker": "AMD",
+      "shares": 1,
+      "entry_price": 176.78,
+      "current_price": 174.30999755859375,
+      "current_value": 174.30999755859375,
+      "pnl_dollar": -2.470002441406251,
+      "pnl_percent": -1.397218260779642,
+      "daily_change": -1.397218260779642,
+      "current_weight": 8.940716666982318,
+      "target_weight": 8.998360972828797,
+      "weight_drift": -0.057644305846478616,
+      "initial_allocation": 176.78
+    },
+    {
+      "ticker": "RIG",
+      "shares": 65,
+      "entry_price": 3.0,
+      "current_price": 2.9100000858306885,
+      "current_value": 189.15000557899475,
+      "pnl_dollar": -5.849994421005249,
+      "pnl_percent": -2.999997138977051,
+      "daily_change": -2.999997138977051,
+      "current_weight": 10.654477728694356,
+      "target_weight": 9.925785664111414,
+      "weight_drift": 0.7286920645829422,
+      "initial_allocation": 195.0
+    }
+  ],
+  "alerts": [],
+  "volume_alerts": [],
+  "rebalancing_alerts": [
+    "QS: +8.0% drift",
+    "IONS: +75.6% drift",
+    "SERV: +16.5% drift",
+    "CRGY: +27.0% drift",
+    "SOUN: +5.7% drift",
+    "CYTK: +8.8% drift"
+  ],
+  "benchmarks": {
+    "SPY": 627.969970703125,
+    "IWM": 220.85000610351562,
+    "VIX": NaN
+  },
+  "portfolio_metrics": {
+    "total_positions": 8,
+    "positions_profitable": 5,
+    "largest_position_weight": 90.67452989068993,
+    "concentration_risk": 212.4815703642867
+  }
+}
+
+Key questions:
+- Any positions need rebalancing?
+- Should I take profits/cut losses?
+- Any new catalysts or news affecting holdings?
+- Market outlook for tomorrow/this week?
+
+Additional context:
+- Portfolio total investment: $1,964.58
+- Cash available: $35.42
+- Investment timeframe: August 5, 2025 to December 27, 2025
+- Strategy: Catalyst-driven momentum with concentrated positions
+
+Risk management parameters:
+- Stop-loss triggers: CYTK (-18%), AMD (-13%), IONS (-19%), Others (-20%)
+- Profit targets: High-growth (50%), Binary catalysts (40%), Speculative (100%), Value/Cyclical (30-40%)
+
+Please provide analysis and trading recommendations based on this data.
