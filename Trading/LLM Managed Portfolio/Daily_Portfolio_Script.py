@@ -554,70 +554,6 @@ class AutomatedTradingSystem:
         
         return "\n".join(report)
 
-# Extension to existing DailyPortfolioReport class
-def add_automated_trading_to_portfolio_reporter():
-    """
-    Add this method to your existing DailyPortfolioReport class
-    """
-    def _handle_insufficient_cash(self, order: TradeOrder, current_price: float, 
-                              available_cash: float, timestamp: datetime) -> TradeResult:
-        """Handle insufficient cash scenarios based on configuration"""
-    
-        required_cash = order.shares * current_price
-        max_affordable_shares = int(available_cash / current_price) if available_cash >= current_price else 0
-        affordability_ratio = (max_affordable_shares * current_price) / required_cash if required_cash > 0 else 0
-        
-        print(f"⚠️  INSUFFICIENT CASH for {order.ticker}:")
-        print(f"   Requested: {order.shares} shares (${required_cash:.2f})")
-        print(f"   Available: ${available_cash:.2f} (after ${self.min_cash_reserve:.2f} reserve)")
-        print(f"   Max affordable: {max_affordable_shares} shares ({affordability_ratio:.1%} of order)")
-        
-        # Check if partial fills are disabled for this order
-        if not order.allow_partial_fill:
-            return TradeResult(
-                order=order, executed=False, execution_price=current_price,
-                executed_shares=0, execution_value=0, timestamp=timestamp,
-                error_message=f"Order does not allow partial fills. Need ${required_cash:.2f}, have ${available_cash:.2f}"
-            )
-        
-        # Handle based on partial fill mode
-        if self.partial_fill_mode == PartialFillMode.REJECT:
-            return TradeResult(
-                order=order, executed=False, execution_price=current_price,
-                executed_shares=0, execution_value=0, timestamp=timestamp,
-                error_message=f"Partial fills disabled. Need ${required_cash:.2f}, have ${available_cash:.2f}"
-            )
-        
-        elif self.partial_fill_mode == PartialFillMode.AUTOMATIC:
-            if max_affordable_shares > 0:
-                print(f"✅ AUTO-FILLING: {max_affordable_shares} shares")
-                return self._execute_partial_fill(order, max_affordable_shares, current_price, timestamp)
-            else:
-                return TradeResult(
-                    order=order, executed=False, execution_price=current_price,
-                    executed_shares=0, execution_value=0, timestamp=timestamp,
-                    error_message=f"Cannot afford even 1 share. Need ${current_price:.2f}, have ${available_cash:.2f}"
-                )
-        
-        elif self.partial_fill_mode == PartialFillMode.SMART:
-            if affordability_ratio >= self.partial_fill_threshold:
-                print(f"✅ SMART AUTO-FILL: {max_affordable_shares} shares ({affordability_ratio:.1%} ≥ {self.partial_fill_threshold:.1%})")
-                return self._execute_partial_fill(order, max_affordable_shares, current_price, timestamp)
-            else:
-                return self._ask_partial_fill_confirmation(order, max_affordable_shares, current_price, 
-                                                        available_cash, affordability_ratio, timestamp)
-        
-        elif self.partial_fill_mode == PartialFillMode.ASK_CONFIRMATION:
-            return self._ask_partial_fill_confirmation(order, max_affordable_shares, current_price,
-                                                    available_cash, affordability_ratio, timestamp)
-        
-        # Fallback to reject
-        return TradeResult(
-            order=order, executed=False, execution_price=current_price,
-            executed_shares=0, execution_value=0, timestamp=timestamp,
-            error_message=f"Unknown partial fill mode: {self.partial_fill_mode}"
-        )
-
 def _execute_partial_fill(self, order: TradeOrder, shares: int, price: float, timestamp: datetime) -> TradeResult:
     """Execute a partial fill order"""
     if shares <= 0:
@@ -787,26 +723,8 @@ def set_partial_fill_mode(self, mode: PartialFillMode, min_cash_reserve: float =
         print(f"\n❌ Some trades cannot be executed due to insufficient cash")
     
     return validation_results
-        """Execute automated trading from document"""
-        trading_system = AutomatedTradingSystem(self)
-        results = trading_system.execute_from_document(document_path)
-        
-        if results:
-            report = trading_system.generate_execution_report(results)
-            print(report)
-            
-            # Save execution report
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            report_filename = f'trade_execution_report_{timestamp}.txt'
-            with open(report_filename, 'w') as f:
-                f.write(report)
-            
-            trade_logger.info(f"Execution report saved to {report_filename}")
-        
-        return results
 
-# Test function to demonstrate parsing of the uploaded document
-def test_claude_document_parsing():
+
     """Test parsing of Claude's analytical document format"""
     
     # Sample text from your uploaded document
@@ -1573,8 +1491,6 @@ Please provide analysis and trading recommendations based on this data."""
 
 # Usage 
 if __name__ == "__main__":
-    # Test the parsing
-    test_orders = test_claude_document_parsing()
     
     print("\n" + "=" * 60)
     print("INTEGRATION WITH YOUR PORTFOLIO SCRIPT:")
