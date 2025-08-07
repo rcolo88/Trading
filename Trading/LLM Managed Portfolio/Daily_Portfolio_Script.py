@@ -785,58 +785,123 @@ class DailyPortfolioReport:
         self.total_investment = 1964.58  # Unchanged - original investment
         self.cash = 2.34  # Minimal cash remaining
     
-    def fetch_data_individually(self, tickers):
-        """Fallback method to fetch data for each ticker individually"""
+    def set_partial_fill_mode(self, mode: PartialFillMode, min_cash_reserve: float = None, 
+                          threshold: float = None):
+        """Configure partial fill behavior"""
+        self.partial_fill_mode = mode
+        if min_cash_reserve is not None:
+            self.min_cash_reserve = min_cash_reserve
+        if threshold is not None:
+            self.partial_fill_threshold = threshold
         
-        print("🔄 Fetching tickers individually...")
+        print(f"📊 Partial Fill Configuration Updated:")
+        print(f"   Mode: {mode.value}")
+        print(f"   Cash Reserve: ${self.min_cash_reserve:.2f}")
+        if mode == PartialFillMode.SMART:
+            print(f"   Auto-fill threshold: {self.partial_fill_threshold:.1%}")
+
+        """Validate cash flow before executing trades"""
+        print(f"\n💰 CASH FLOW ANALYSIS:")
+        print("=" * 40)
         
-        price_data_dict = {}
-        successful_tickers = []
+        simulated_cash = self.cash
+        validation_results = {
+            'feasible': True,
+            'total_sells': 0,
+            'total_buys': 0,
+            'final_cash': 0,
+            'warnings': [],
+            'phase_results': {}
+        }
         
-        for ticker in tickers:
-            # Use ^VIX for VIX data
-            fetch_ticker = '^VIX' if ticker == 'VIX' else ticker
-            
-            try:
-                print(f"   Fetching {ticker}...")
-                start_fetch_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
-                ticker_data = yf.download(fetch_ticker, start=start_fetch_date, progress=False, auto_adjust=True)
+        execution_phases = self._prioritize_orders_for_cash_flow(orders)
+        
+        for phase_name, phase_orders in execution_phases.items():
+            if not phase_orders or "HOLD" in phase_name:
+                continue
                 
-                if not ticker_data.empty:
-                    if 'Close' in ticker_data.columns:
-                        price_data_dict[ticker] = ticker_data['Close']
-                    elif 'Adj Close' in ticker_data.columns:
-                        price_data_dict[ticker] = ticker_data['Adj Close']
+            phase_sells = 0
+            phase_buys = 0
+            phase_warnings = []
+            
+            print(f"\n📋 {phase_name}:")
+            
+            for order in phase_orders:
+                if order.ticker not in current_prices:
+                    phase_warnings.append(f"No price data for {order.ticker}")
+                    continue
+                    
+                current_price = current_prices[order.ticker]
+                
+                if order.action in [OrderType.SELL, OrderType.REDUCE]:
+                    if order.ticker not in self.holdings:
+                        phase_warnings.append(f"Cannot sell {order.ticker} - no position")
+                        continue
+                    
+                    available_shares = self.holdings[order.ticker]['shares']
+                    
+                    if order.action == OrderType.REDUCE and order.target_weight:
+                        shares_to_sell = available_shares - int(available_shares * order.target_weight / 100)
                     else:
-                        numeric_cols = ticker_data.select_dtypes(include=[np.number]).columns
-                        if len(numeric_cols) > 0:
-                            price_data_dict[ticker] = ticker_data[numeric_cols[0]]
+                        shares_to_sell = min(order.shares or available_shares, available_shares)
                     
-                    successful_tickers.append(ticker)
-                else:
-                    print(f"   ⚠️  No data for {ticker}")
+                    proceeds = shares_to_sell * current_price
+                    simulated_cash += proceeds
+                    phase_sells += proceeds
                     
-            except Exception as e:
-                print(f"   ❌ Failed to fetch {ticker}: {e}")
+                    print(f"   📤 Sell {shares_to_sell} {order.ticker}: +${proceeds:.2f} → ${simulated_cash:.2f}")
+                    
+                elif order.action == OrderType.BUY:
+                    required_cash = order.shares * current_price
+                    
+                    if required_cash > simulated_cash:
+                        # Check if partial fill is possible
+                        if simulated_cash >= current_price:
+                            max_shares = int(simulated_cash / current_price)
+                            partial_cost = max_shares * current_price
+                            phase_warnings.append(f"Partial fill for {order.ticker}: {max_shares}/{order.shares} shares")
+                            simulated_cash -= partial_cost
+                            phase_buys += partial_cost
+                            print(f"   📥 Buy {max_shares} {order.ticker} (partial): -${partial_cost:.2f} → ${simulated_cash:.2f}")
+                        else:
+                            validation_results['feasible'] = False
+                            phase_warnings.append(f"Cannot afford any {order.ticker} shares")
+                            print(f"   ❌ Cannot buy {order.ticker}: Need ${required_cash:.2f}, have ${simulated_cash:.2f}")
+                    else:
+                        simulated_cash -= required_cash
+                        phase_buys += required_cash
+                        print(f"   📥 Buy {order.shares} {order.ticker}: -${required_cash:.2f} → ${simulated_cash:.2f}")
+            
+            validation_results['phase_results'][phase_name] = {
+                'sells': phase_sells,
+                'buys': phase_buys, 
+                'warnings': phase_warnings
+            }
+            
+            validation_results['total_sells'] += phase_sells
+            validation_results['total_buys'] += phase_buys
+            validation_results['warnings'].extend(phase_warnings)
         
-        if price_data_dict:
-            self.price_data = pd.DataFrame(price_data_dict)
-            self.price_data = self.price_data.fillna(method='ffill').fillna(method='bfill')
-            
-            # Initialize empty volume data
-            self.volume_data = pd.DataFrame()
-            
-            print(f"✅ Successfully fetched {len(successful_tickers)} out of {len(tickers)} tickers")
-            print(f"📊 Available data: {successful_tickers}")
-            
-            if len(self.price_data) > 0:
-                print(f"📅 Data range: {self.price_data.index[0].date()} to {self.price_data.index[-1].date()}")
-                return True  # Keep returning True for success
+        validation_results['final_cash'] = simulated_cash
         
-        print("❌ Could not fetch any valid data")
-        self.price_data = pd.DataFrame()  # Ensure empty DataFrame
-        self.volume_data = pd.DataFrame()  # Ensure empty DataFrame
-        return False
+        print(f"\n💰 CASH FLOW SUMMARY:")
+        print(f"   Starting cash: ${self.cash:.2f}")
+        print(f"   Total from sells: +${validation_results['total_sells']:.2f}")
+        print(f"   Total for buys: -${validation_results['total_buys']:.2f}")
+        print(f"   Final cash: ${validation_results['final_cash']:.2f}")
+        print(f"   Net change: ${validation_results['final_cash'] - self.cash:+.2f}")
+        
+        if validation_results['warnings']:
+            print(f"\n⚠️  WARNINGS ({len(validation_results['warnings'])}):")
+            for warning in validation_results['warnings']:
+                print(f"   • {warning}")
+        
+        if validation_results['feasible']:
+            print(f"\n✅ All trades are feasible with current cash flow strategy")
+        else:
+            print(f"\n❌ Some trades cannot be executed due to insufficient cash")
+        
+        return validation_results
 
     def fetch_current_data(self):
         """Fetch current price data for all holdings and benchmarks"""
@@ -939,6 +1004,59 @@ class DailyPortfolioReport:
                 return current_prices, self.volume_data, self.price_data
             else:
                 return None, None, None
+
+    def fetch_data_individually(self, tickers):
+        """Fallback method to fetch data for each ticker individually"""
+        
+        print("🔄 Fetching tickers individually...")
+        
+        price_data_dict = {}
+        successful_tickers = []
+        
+        for ticker in tickers:
+            # Use ^VIX for VIX data
+            fetch_ticker = '^VIX' if ticker == 'VIX' else ticker
+            
+            try:
+                print(f"   Fetching {ticker}...")
+                start_fetch_date = (datetime.now() - timedelta(days=5)).strftime('%Y-%m-%d')
+                ticker_data = yf.download(fetch_ticker, start=start_fetch_date, progress=False, auto_adjust=True)
+                
+                if not ticker_data.empty:
+                    if 'Close' in ticker_data.columns:
+                        price_data_dict[ticker] = ticker_data['Close']
+                    elif 'Adj Close' in ticker_data.columns:
+                        price_data_dict[ticker] = ticker_data['Adj Close']
+                    else:
+                        numeric_cols = ticker_data.select_dtypes(include=[np.number]).columns
+                        if len(numeric_cols) > 0:
+                            price_data_dict[ticker] = ticker_data[numeric_cols[0]]
+                    
+                    successful_tickers.append(ticker)
+                else:
+                    print(f"   ⚠️  No data for {ticker}")
+                    
+            except Exception as e:
+                print(f"   ❌ Failed to fetch {ticker}: {e}")
+        
+        if price_data_dict:
+            self.price_data = pd.DataFrame(price_data_dict)
+            self.price_data = self.price_data.fillna(method='ffill').fillna(method='bfill')
+            
+            # Initialize empty volume data
+            self.volume_data = pd.DataFrame()
+            
+            print(f"✅ Successfully fetched {len(successful_tickers)} out of {len(tickers)} tickers")
+            print(f"📊 Available data: {successful_tickers}")
+            
+            if len(self.price_data) > 0:
+                print(f"📅 Data range: {self.price_data.index[0].date()} to {self.price_data.index[-1].date()}")
+                return True  # Keep returning True for success
+        
+        print("❌ Could not fetch any valid data")
+        self.price_data = pd.DataFrame()  # Ensure empty DataFrame
+        self.volume_data = pd.DataFrame()  # Ensure empty DataFrame
+        return False
 
     def calculate_position_metrics(self, current_prices):
         """Calculate key metrics for each position"""
