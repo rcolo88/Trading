@@ -8,13 +8,24 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import json
-import re
 import json
 from enum import Enum
 from dataclasses import dataclass
 from typing import List, Optional, Dict
 import logging
+import glob
+import re
 
+# PDF support (add to your existing imports)
+try:
+    import pdfplumber
+    PDF_AVAILABLE = True
+except ImportError:
+    try:
+        import PyPDF2
+        PDF_AVAILABLE = True
+    except ImportError:
+        PDF_AVAILABLE = False
 
 # Configure logging for trade execution
 trade_logger = logging.getLogger('trade_execution')
@@ -427,6 +438,8 @@ class DailyPortfolioReport:
         self.total_investment = 1964.58  # Unchanged - original investment
         self.cash = 2.34  # Minimal cash remaining
     
+
+
     # == 2. CONFIGURATION METHODS ==
     def set_partial_fill_mode(self, mode: PartialFillMode, min_cash_reserve: float = None, 
                           threshold: float = None):
@@ -546,6 +559,8 @@ class DailyPortfolioReport:
         
         return validation_results
 
+
+
     # == 3. DATA FETCHING METHODS ==
     def fetch_current_data(self):
         """Fetch current price data for all holdings and benchmarks"""
@@ -648,6 +663,7 @@ class DailyPortfolioReport:
                 return current_prices, self.volume_data, self.price_data
             else:
                 return None, None, None
+    
     def fetch_data_individually(self, tickers):
         """Fallback method to fetch data for each ticker individually"""
         
@@ -700,6 +716,8 @@ class DailyPortfolioReport:
         self.price_data = pd.DataFrame()  # Ensure empty DataFrame
         self.volume_data = pd.DataFrame()  # Ensure empty DataFrame
         return False
+
+
 
     # == 4. ANALYSIS & CALCULATION METHODS ==
     def calculate_position_metrics(self, current_prices):
@@ -759,6 +777,7 @@ class DailyPortfolioReport:
                 })
         
         return positions, total_current_value, total_cost_basis
+    
     def check_alerts(self, positions):
         """Check for stop-loss and profit target alerts"""
         alerts = []
@@ -784,6 +803,7 @@ class DailyPortfolioReport:
                 alerts.append(f"🟢 PROFIT TARGET: {ticker} at {pnl_pct:.1f}% (target: {profit_targets[ticker]}%)")
         
         return alerts
+    
     def get_volume_alerts(self, volume_data, price_data):
         """Check for unusual volume activity"""
         volume_alerts = []
@@ -810,9 +830,847 @@ class DailyPortfolioReport:
         
         return volume_alerts
     
+
+
     # == 5. DOCUMENT PROCESSING METHODS ==
+    def find_trading_document(self):
+        """Auto-detect trading recommendation document"""
+        
+        # Search patterns for trading recommendation files
+        search_patterns = [
+            'trading_recommendation*.md',
+            'trading_recommendation*.pdf', 
+            'trading_recommendations*.md',
+            'trading_recommendations*.pdf',
+            'claude_recommendation*.md',
+            'claude_recommendation*.pdf',
+            'portfolio_analysis*.md',
+            'portfolio_analysis*.pdf'
+        ]
+        
+        found_files = []
+        
+        for pattern in search_patterns:
+            matches = glob.glob(pattern)
+            for match in matches:
+                # Get file modification time to find most recent
+                mod_time = os.path.getmtime(match)
+                found_files.append((match, mod_time))
+        
+        if not found_files:
+            print("❌ No trading recommendation files found!")
+            print("🔍 Searched for patterns:")
+            for pattern in search_patterns:
+                print(f"   • {pattern}")
+            return None
+        
+        # Sort by modification time (most recent first)
+        found_files.sort(key=lambda x: x[1], reverse=True)
+        
+        if len(found_files) == 1:
+            selected_file = found_files[0][0]
+            print(f"📄 Found document: {selected_file}")
+            return selected_file
+        
+        # Multiple files found - show options
+        print(f"📄 Found {len(found_files)} trading documents:")
+        for i, (filename, mod_time) in enumerate(found_files[:5], 1):  # Show top 5
+            mod_date = datetime.fromtimestamp(mod_time).strftime('%Y-%m-%d %H:%M')
+            print(f"   {i}. {filename} (modified: {mod_date})")
+        
+        # Auto-select most recent
+        selected_file = found_files[0][0]
+        print(f"✅ Auto-selecting most recent: {selected_file}")
+        
+        return selected_file
+    
+    def parse_document(self, file_path: str):
+        """Parse trading orders from markdown or PDF document"""
+        
+        if not os.path.exists(file_path):
+            print(f"❌ File not found: {file_path}")
+            return []
+        
+        file_ext = os.path.splitext(file_path)[1].lower()
+        
+        try:
+            if file_ext == '.md':
+                return self.parse_markdown_document(file_path)
+            elif file_ext == '.pdf':
+                return self.parse_pdf_document(file_path)
+            else:
+                # Try to parse as text anyway
+                print(f"⚠️ Unknown file type {file_ext}, attempting text parsing...")
+                return self.parse_markdown_document(file_path)
+                
+        except Exception as e:
+            print(f"❌ Error parsing document: {e}")
+            return []
+    
+    def parse_pdf_document(self, file_path: str):
+        """Extract text from PDF and parse orders"""
+        
+        if not PDF_AVAILABLE:
+            print("❌ PDF parsing not available. Please install PyPDF2 or pdfplumber:")
+            print("   pip install pdfplumber")
+            return []
+        
+        print(f"📖 Extracting text from PDF: {file_path}")
+        
+        try:
+            # Try pdfplumber first (better text extraction)
+            if 'pdfplumber' in globals():
+                text_content = self._extract_with_pdfplumber(file_path)
+            else:
+                text_content = self._extract_with_pypdf2(file_path)
+            
+            if not text_content.strip():
+                print("❌ No text extracted from PDF")
+                return []
+            
+            print(f"✅ Extracted {len(text_content)} characters from PDF")
+            print(f"📝 First 200 characters: {text_content[:200]}...")
+            
+            # Parse the extracted text as markdown
+            return self.parse_text_content(text_content)
+            
+        except Exception as e:
+            print(f"❌ Error extracting PDF text: {e}")
+            return []
+    
+    def parse_markdown_document(self, file_path: str):
+        """Parse trading orders from markdown document"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            return self.parse_text_content(content)
+            
+        except FileNotFoundError:
+            print(f"❌ Markdown file not found: {file_path}")
+            return []
+        except Exception as e:
+            print(f"❌ Error reading markdown file: {e}")
+            return []
+    
+    def parse_text_content(self, content: str):
+        """Parse trading orders from text content (works for both MD and PDF)"""
+        orders = []
+        
+        # Extract ORDERS section
+        orders_section = self._extract_orders_section(content)
+        if not orders_section:
+            print("⚠️ No ORDERS section found, searching entire document...")
+            orders_section = content  # Search entire document as fallback
+        
+        # Parse individual order lines
+        lines = orders_section.split('\n')
+        current_priority = OrderPriority.MEDIUM
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Check for priority headers
+            if 'HIGH PRIORITY' in line.upper() or 'IMMEDIATE' in line.upper():
+                current_priority = OrderPriority.HIGH
+                continue
+            elif 'MEDIUM PRIORITY' in line.upper() or 'POSITION MANAGEMENT' in line.upper():
+                current_priority = OrderPriority.MEDIUM
+                continue
+            elif 'LOW PRIORITY' in line.upper():
+                current_priority = OrderPriority.LOW
+                continue
+            
+            # Parse order lines
+            order = self._parse_order_line(line, current_priority)
+            if order:
+                orders.append(order)
+        
+        return orders
+    
+    def _extract_orders_section(self, content: str):
+        """Extract the ORDERS section from markdown"""
+        # Look for ## ORDERS section
+        pattern = r'##\s+ORDERS\s*\n(.*?)(?=\n##|\Z)'
+        match = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
+        return match.group(1) if match else ""
+    
+    def _parse_order_line(self, line: str, priority: OrderPriority):
+        """Parse a single order line"""
+        line = line.strip('*- ')  # Remove markdown formatting
+        
+        # Pattern 1: "SELL all 19 shares of SOUN"
+        sell_all_match = re.search(r'sell\s+all\s+(\d+)\s+shares?\s+of\s+([A-Z]+)', line, re.IGNORECASE)
+        if sell_all_match:
+            shares, ticker = sell_all_match.groups()
+            reason = self._extract_reason(line)
+            return TradeOrder(
+                ticker=ticker,
+                action=OrderType.SELL,
+                shares=int(shares),
+                reason=reason,
+                priority=priority
+            )
+        
+        # Pattern 2: "SELL 3 shares of CYTK"
+        sell_match = re.search(r'sell\s+(\d+)\s+shares?\s+of\s+([A-Z]+)', line, re.IGNORECASE)
+        if sell_match:
+            shares, ticker = sell_match.groups()
+            reason = self._extract_reason(line)
+            return TradeOrder(
+                ticker=ticker,
+                action=OrderType.SELL,
+                shares=int(shares),
+                reason=reason,
+                priority=priority
+            )
+        
+        # Pattern 3: "BUY 15 shares of NVDA"
+        buy_match = re.search(r'buy\s+(\d+)\s+shares?\s+of\s+([A-Z]+)', line, re.IGNORECASE)
+        if buy_match:
+            shares, ticker = buy_match.groups()
+            reason = self._extract_reason(line)
+            return TradeOrder(
+                ticker=ticker,
+                action=OrderType.BUY,
+                shares=int(shares),
+                reason=reason,
+                priority=priority
+            )
+        
+        # Pattern 4: "HOLD all 3 shares of IONS"
+        hold_match = re.search(r'hold\s+(?:all\s+)?(\d+)?\s*shares?\s+of\s+([A-Z]+)', line, re.IGNORECASE)
+        if hold_match:
+            shares, ticker = hold_match.groups()
+            return TradeOrder(
+                ticker=ticker,
+                action=OrderType.HOLD,
+                shares=int(shares) if shares else None,
+                reason="Hold position",
+                priority=priority
+            )
+        
+        return None
+    
+    def _extract_reason(self, line: str):
+        """Extract reason from order line"""
+        # Look for text after "Reason:" 
+        reason_match = re.search(r'reason[:\s]+([^*\n]+)', line, re.IGNORECASE)
+        if reason_match:
+            return reason_match.group(1).strip()
+        
+        # Fallback: take everything after the ticker
+        parts = line.split('-', 1)
+        if len(parts) > 1:
+            return parts[1].strip()
+        
+        return "No specific reason provided"
+    
+    def _extract_with_pdfplumber(self, file_path: str):
+        """Extract text using pdfplumber (recommended)"""
+        import pdfplumber
+        
+        text_content = ""
+        with pdfplumber.open(file_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_content += page_text + "\n"
+        
+        return text_content
+    
+    def _extract_with_pypdf2(self, file_path: str):
+        """Extract text using PyPDF2 (fallback)"""
+        import PyPDF2
+        
+        text_content = ""
+        with open(file_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            for page in pdf_reader.pages:
+                text_content += page.extract_text() + "\n"
+        return text_content
 
 
+
+    # == 6. CASH FLOW VALIDATION ==
+    def validate_cash_flow(self, orders, current_prices):
+        """Validate cash flow before executing trades"""
+        print(f"\n💰 CASH FLOW ANALYSIS:")
+        print("=" * 40)
+        
+        simulated_cash = self.cash
+        validation_results = {
+            'feasible': True,
+            'total_sells': 0,
+            'total_buys': 0,
+            'final_cash': 0,
+            'warnings': [],
+            'phase_results': {}
+        }
+        
+        execution_phases = self._prioritize_orders_for_cash_flow(orders)
+        
+        for phase_name, phase_orders in execution_phases.items():
+            if not phase_orders or "HOLD" in phase_name:
+                continue
+                
+            phase_sells = 0
+            phase_buys = 0
+            phase_warnings = []
+            
+            print(f"\n📋 {phase_name}:")
+            
+            for order in phase_orders:
+                if order.ticker not in current_prices:
+                    phase_warnings.append(f"No price data for {order.ticker}")
+                    continue
+                    
+                current_price = current_prices[order.ticker]
+                
+                if order.action in [OrderType.SELL, OrderType.REDUCE]:
+                    if order.ticker not in self.holdings:
+                        phase_warnings.append(f"Cannot sell {order.ticker} - no position")
+                        continue
+                    
+                    available_shares = self.holdings[order.ticker]['shares']
+                    
+                    if order.action == OrderType.REDUCE and order.target_weight:
+                        shares_to_sell = available_shares - int(available_shares * order.target_weight / 100)
+                    else:
+                        shares_to_sell = min(order.shares or available_shares, available_shares)
+                    
+                    proceeds = shares_to_sell * current_price
+                    simulated_cash += proceeds
+                    phase_sells += proceeds
+                    
+                    print(f"   📤 Sell {shares_to_sell} {order.ticker}: +${proceeds:.2f} → ${simulated_cash:.2f}")
+                    
+                elif order.action == OrderType.BUY:
+                    required_cash = order.shares * current_price
+                    
+                    if required_cash > simulated_cash:
+                        # Check if partial fill is possible
+                        if simulated_cash >= current_price:
+                            max_shares = int(simulated_cash / current_price)
+                            partial_cost = max_shares * current_price
+                            phase_warnings.append(f"Partial fill for {order.ticker}: {max_shares}/{order.shares} shares")
+                            simulated_cash -= partial_cost
+                            phase_buys += partial_cost
+                            print(f"   📥 Buy {max_shares} {order.ticker} (partial): -${partial_cost:.2f} → ${simulated_cash:.2f}")
+                        else:
+                            validation_results['feasible'] = False
+                            phase_warnings.append(f"Cannot afford any {order.ticker} shares")
+                            print(f"   ❌ Cannot buy {order.ticker}: Need ${required_cash:.2f}, have ${simulated_cash:.2f}")
+                    else:
+                        simulated_cash -= required_cash
+                        phase_buys += required_cash
+                        print(f"   📥 Buy {order.shares} {order.ticker}: -${required_cash:.2f} → ${simulated_cash:.2f}")
+            
+            validation_results['phase_results'][phase_name] = {
+                'sells': phase_sells,
+                'buys': phase_buys, 
+                'warnings': phase_warnings
+            }
+            
+            validation_results['total_sells'] += phase_sells
+            validation_results['total_buys'] += phase_buys
+            validation_results['warnings'].extend(phase_warnings)
+        
+        validation_results['final_cash'] = simulated_cash
+        
+        print(f"\n💰 CASH FLOW SUMMARY:")
+        print(f"   Starting cash: ${self.cash:.2f}")
+        print(f"   Total from sells: +${validation_results['total_sells']:.2f}")
+        print(f"   Total for buys: -${validation_results['total_buys']:.2f}")
+        print(f"   Final cash: ${validation_results['final_cash']:.2f}")
+        print(f"   Net change: ${validation_results['final_cash'] - self.cash:+.2f}")
+        
+        if validation_results['warnings']:
+            print(f"\n⚠️  WARNINGS ({len(validation_results['warnings'])}):")
+            for warning in validation_results['warnings']:
+                print(f"   • {warning}")
+        
+        if validation_results['feasible']:
+            print(f"\n✅ All trades are feasible with current cash flow strategy")
+        else:
+            print(f"\n❌ Some trades cannot be executed due to insufficient cash")
+        
+        return validation_results
+    
+    def _prioritize_orders_for_cash_flow(self, orders):
+        """Prioritize orders to ensure proper cash flow management"""
+        
+        # Separate orders by type and priority
+        high_sells = []
+        high_buys = []
+        medium_sells = []
+        medium_buys = []
+        low_sells = []
+        low_buys = []
+        holds = []
+        
+        for order in orders:
+            if order.action == OrderType.HOLD:
+                holds.append(order)
+            elif order.action in [OrderType.SELL, OrderType.REDUCE]:
+                if order.priority == OrderPriority.HIGH:
+                    high_sells.append(order)
+                elif order.priority == OrderPriority.MEDIUM:
+                    medium_sells.append(order)
+                else:
+                    low_sells.append(order)
+            elif order.action == OrderType.BUY:
+                if order.priority == OrderPriority.HIGH:
+                    high_buys.append(order)
+                elif order.priority == OrderPriority.MEDIUM:
+                    medium_buys.append(order)
+                else:
+                    low_buys.append(order)
+        
+        # Return execution phases in proper cash-flow order
+        return {
+            "HIGH Priority SELLS (Generate Cash)": high_sells,
+            "HIGH Priority BUYS (Use Generated Cash)": high_buys,
+            "MEDIUM Priority SELLS": medium_sells,
+            "MEDIUM Priority BUYS": medium_buys,
+            "LOW Priority SELLS": low_sells,
+            "LOW Priority BUYS": low_buys,
+            "HOLD Orders": holds
+        }
+    
+
+
+    # == 7. TRADE EXECUTION METHODS ==
+    def execute_orders(self, orders):
+        """Execute parsed trading orders with proper cash flow management"""
+        results = []
+        
+        # Get current market data
+        current_prices, _, _ = self.fetch_current_data()
+        if not current_prices:
+            print("❌ Failed to fetch current market data")
+            return []
+        
+        print(f"💰 Starting cash balance: ${self.cash:.2f}")
+        
+        # Execute orders using cash-flow-aware prioritization
+        execution_phases = self._prioritize_orders_for_cash_flow(orders)
+        
+        for phase_name, phase_orders in execution_phases.items():
+            if not phase_orders:
+                continue
+                
+            print(f"\n📋 Executing {phase_name}:")
+            print("-" * 30)
+            
+            for order in phase_orders:
+                if order.action == OrderType.HOLD:
+                    print(f"👍 HOLD {order.ticker} - No execution needed")
+                    continue
+                
+                # Show cash before each trade
+                print(f"💵 Cash available: ${self.cash:.2f}")
+                
+                result = self._execute_single_order(order, current_prices)
+                results.append(result)
+                
+                if result.executed:
+                    old_cash = self.cash
+                    self._update_portfolio_holdings(result)
+                    cash_change = self.cash - old_cash
+                    print(f"💰 Cash change: ${cash_change:+.2f} → New balance: ${self.cash:.2f}")
+                else:
+                    print(f"❌ Failed: {result.error_message}")
+        
+        return results
+    
+    def execute_automated_trading(self, document_path: Optional[str] = None):
+        """Main method to execute automated trading from document"""
+        print(f"\n{'='*60}")
+        print(f"🤖 AUTOMATED TRADE EXECUTION")
+        print(f"{'='*60}")
+        print(f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Auto-detect document if not provided
+        if document_path is None:
+            document_path = self.find_trading_document()
+            if not document_path:
+                return []
+        
+        # Validate file exists
+        if not os.path.exists(document_path):
+            print(f"❌ File not found: {document_path}")
+            return []
+        
+        print(f"📄 Document: {document_path}")
+        file_ext = os.path.splitext(document_path)[1].lower()
+        print(f"📋 File type: {file_ext.upper()}")
+        
+        # Parse orders from document
+        orders = self.parse_document(document_path)
+        
+        if not orders:
+            print("❌ No valid orders found in document")
+            return []
+        
+        print(f"\n📋 PARSED ORDERS ({len(orders)}):")
+        print("-" * 40)
+        for i, order in enumerate(orders, 1):
+            if order.action == OrderType.HOLD:
+                print(f"{i}. {order.action.value} {order.ticker} - {order.reason}")
+            else:
+                shares_text = f"{order.shares} shares of" if order.shares else "position in"
+                print(f"{i}. {order.action.value} {shares_text} {order.ticker} ({order.priority.value})")
+                print(f"   Reason: {order.reason}")
+        
+        # Get current market data for validation
+        current_prices, _, _ = self.fetch_current_data()
+        if not current_prices:
+            print("❌ Failed to fetch current market data")
+            return []
+        
+        # CASH FLOW VALIDATION
+        validation = self.validate_cash_flow(orders, current_prices)
+        
+        # Ask for confirmation if there are issues
+        if not validation['feasible'] or validation['warnings']:
+            print(f"\n⚠️  EXECUTION CONCERNS DETECTED!")
+            response = input("Do you want to proceed anyway? (y/n): ").lower().strip()
+            if response not in ['y', 'yes']:
+                print("❌ Execution cancelled by user")
+                return []
+        
+        # Execute orders
+        print(f"\n⚡ EXECUTING TRADES...")
+        print("-" * 40)
+        
+        results = self.execute_orders(orders)
+        
+        # Generate execution report
+        executed_count = sum(1 for r in results if r.executed)
+        failed_count = len(results) - executed_count
+        
+        print(f"\n📊 EXECUTION SUMMARY:")
+        print("-" * 40)
+        print(f"✅ Executed: {executed_count}")
+        print(f"❌ Failed: {failed_count}")
+        
+        total_proceeds = 0
+        total_invested = 0
+        
+        for result in results:
+            if result.executed:
+                if result.order.action in [OrderType.SELL, OrderType.REDUCE]:
+                    total_proceeds += result.execution_value
+                    print(f"💰 Proceeds from {result.order.ticker}: ${result.execution_value:.2f}")
+                elif result.order.action == OrderType.BUY:
+                    total_invested += result.execution_value
+                    print(f"💸 Invested in {result.order.ticker}: ${result.execution_value:.2f}")
+            else:
+                print(f"⚠️  Failed {result.order.ticker}: {result.error_message}")
+        
+        print(f"\n💰 ACTUAL CASH IMPACT:")
+        print(f"   Proceeds from sales: +${total_proceeds:.2f}")
+        print(f"   Invested in buys: -${total_invested:.2f}")
+        print(f"   Net cash change: ${total_proceeds - total_invested:+.2f}")
+        print(f"   Final cash balance: ${self.cash:.2f}")
+        
+        # Compare with validation
+        predicted_final = validation['final_cash']
+        actual_final = self.cash
+        variance = actual_final - predicted_final
+        
+        if abs(variance) > 0.01:  # More than 1 cent difference
+            print(f"   Variance from prediction: ${variance:+.2f}")
+            if abs(variance) > 1.00:  # More than $1 difference
+                print(f"   ⚠️  Significant variance - may indicate execution issues")
+        else:
+            print(f"   ✅ Matches cash flow prediction exactly")
+        
+        # Save execution log
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        log_filename = f'trade_execution_{timestamp}.json'
+        
+        execution_log = {
+            'timestamp': datetime.now().isoformat(),
+            'document': document_path,
+            'file_type': file_ext,
+            'validation': validation,
+            'orders_parsed': len(orders),
+            'orders_executed': executed_count,
+            'orders_failed': failed_count,
+            'total_proceeds': total_proceeds,
+            'total_invested': total_invested,
+            'predicted_cash': predicted_final,
+            'actual_cash': actual_final,
+            'cash_variance': variance,
+            'updated_holdings': dict(self.holdings)
+        }
+        
+        with open(log_filename, 'w') as f:
+            json.dump(execution_log, f, indent=2)
+        
+        print(f"\n📄 Execution log saved: {log_filename}")
+        
+        # Show updated portfolio summary
+        print(f"\n📈 UPDATED PORTFOLIO SUMMARY:")
+        print("-" * 40)
+        print(f"   Cash: ${self.cash:.2f}")
+        print(f"   Positions ({len(self.holdings)}):")
+        for ticker, pos in self.holdings.items():
+            print(f"     {ticker}: {pos['shares']} shares @ ${pos['entry_price']:.2f}")
+        
+        print(f"{'='*60}")
+        
+        return results
+    
+    def _execute_single_order(self, order, current_prices):
+        """Execute a single trading order with enhanced cash management"""
+        timestamp = datetime.now()
+        
+        # Validate ticker exists
+        if order.ticker not in current_prices:
+            return TradeResult(
+                order=order,
+                executed=False,
+                execution_price=None,
+                executed_shares=None,
+                execution_value=None,
+                error_message=f"No market data for {order.ticker}",
+                timestamp=timestamp
+            )
+        
+        current_price = current_prices[order.ticker]
+        
+        # Handle SELL/REDUCE orders
+        if order.action in [OrderType.SELL, OrderType.REDUCE]:
+            if order.ticker not in self.holdings:
+                return TradeResult(
+                    order=order,
+                    executed=False,
+                    execution_price=current_price,
+                    executed_shares=0,
+                    execution_value=0,
+                    error_message=f"No position in {order.ticker} to sell",
+                    timestamp=timestamp
+                )
+            
+            available_shares = self.holdings[order.ticker]['shares']
+            
+            # For REDUCE orders, calculate shares to sell based on target weight
+            if order.action == OrderType.REDUCE and order.target_weight is not None:
+                target_percentage = order.target_weight / 100
+                shares_to_keep = int(available_shares * target_percentage)
+                shares_to_sell = available_shares - shares_to_keep
+            else:
+                # For SELL orders, use specified shares or all shares
+                shares_to_sell = min(order.shares or available_shares, available_shares)
+            
+            if shares_to_sell <= 0:
+                return TradeResult(
+                    order=order,
+                    executed=False,
+                    execution_price=current_price,
+                    executed_shares=0,
+                    execution_value=0,
+                    error_message=f"No shares to sell (calculated: {shares_to_sell})",
+                    timestamp=timestamp
+                )
+            
+            execution_value = shares_to_sell * current_price
+            print(f"📤 PAPER TRADE: SOLD {shares_to_sell} shares of {order.ticker} at ${current_price:.2f} = ${execution_value:.2f}")
+            
+            return TradeResult(
+                order=order,
+                executed=True,
+                execution_price=current_price,
+                executed_shares=shares_to_sell,
+                execution_value=execution_value,
+                error_message=None,
+                timestamp=timestamp
+            )
+        
+        # Handle BUY orders with enhanced partial fill management
+        elif order.action == OrderType.BUY:
+            shares_to_buy = order.shares
+            required_cash = shares_to_buy * current_price
+            available_cash = max(0, self.cash - getattr(self, 'min_cash_reserve', 10.0))
+            
+            # Check if we have enough cash (considering cash reserve)
+            if required_cash > available_cash:
+                return self._handle_insufficient_cash(order, current_price, available_cash, timestamp)
+            
+            execution_value = shares_to_buy * current_price
+            print(f"📥 PAPER TRADE: BOUGHT {shares_to_buy} shares of {order.ticker} at ${current_price:.2f} = ${execution_value:.2f}")
+            
+            return TradeResult(
+                order=order,
+                executed=True,
+                execution_price=current_price,
+                executed_shares=shares_to_buy,
+                execution_value=execution_value,
+                error_message=None,
+                timestamp=timestamp
+            )
+        
+        return TradeResult(
+            order=order,
+            executed=False,
+            execution_price=current_price,
+            executed_shares=0,
+            execution_value=0,
+            error_message=f"Unknown order action: {order.action}",
+            timestamp=timestamp
+        )
+    
+    def _handle_insufficient_cash(self, order, current_price, available_cash, timestamp):
+        """Handle insufficient cash scenarios based on configuration"""
+        
+        required_cash = order.shares * current_price
+        max_affordable_shares = int(available_cash / current_price) if available_cash >= current_price else 0
+        affordability_ratio = (max_affordable_shares * current_price) / required_cash if required_cash > 0 else 0
+        
+        print(f"⚠️  INSUFFICIENT CASH for {order.ticker}:")
+        print(f"   Requested: {order.shares} shares (${required_cash:.2f})")
+        print(f"   Available: ${available_cash:.2f} (after ${getattr(self, 'min_cash_reserve', 10.0):.2f} reserve)")
+        print(f"   Max affordable: {max_affordable_shares} shares ({affordability_ratio:.1%} of order)")
+        
+        # Handle based on partial fill mode
+        if getattr(self, 'partial_fill_mode', PartialFillMode.AUTOMATIC) == PartialFillMode.AUTOMATIC:
+            if max_affordable_shares > 0:
+                print(f"✅ AUTO-FILLING: {max_affordable_shares} shares")
+                return self._execute_partial_fill(order, max_affordable_shares, current_price, timestamp)
+            else:
+                return TradeResult(
+                    order=order, executed=False, execution_price=current_price,
+                    executed_shares=0, execution_value=0, timestamp=timestamp,
+                    error_message=f"Cannot afford even 1 share. Need ${current_price:.2f}, have ${available_cash:.2f}"
+                )
+        
+        # Fallback to reject
+        return TradeResult(
+            order=order, executed=False, execution_price=current_price,
+            executed_shares=0, execution_value=0, timestamp=timestamp,
+            error_message=f"Insufficient cash: Need ${required_cash:.2f}, have ${available_cash:.2f}"
+        )
+
+    # == 8. PARTIAL FILL HELPERS ==
+    def _execute_partial_fill(self, order, shares, price, timestamp):
+        """Execute a partial fill order"""
+        if shares <= 0:
+            return TradeResult(
+                order=order, executed=False, execution_price=price,
+                executed_shares=0, execution_value=0, timestamp=timestamp,
+                error_message="No shares affordable for partial fill"
+            )
+        
+        execution_value = shares * price
+        print(f"📥 PAPER TRADE: BOUGHT {shares} shares of {order.ticker} at ${price:.2f} = ${execution_value:.2f} (PARTIAL FILL)")
+        
+        return TradeResult(
+            order=order,
+            executed=True,
+            execution_price=price,
+            executed_shares=shares,
+            execution_value=execution_value,
+            error_message=None,
+            timestamp=timestamp
+        )
+
+    def _ask_partial_fill_confirmation(self, order, max_shares, price, available_cash, affordability_ratio, timestamp):
+        """Ask user for confirmation on partial fill"""
+        
+        if max_shares <= 0:
+            return TradeResult(
+                order=order, executed=False, execution_price=price,
+                executed_shares=0, execution_value=0, timestamp=timestamp,
+                error_message=f"Cannot afford even 1 share: ${available_cash:.2f} available, ${price:.2f} needed"
+            )
+        
+        print(f"🤔 PARTIAL FILL DECISION NEEDED:")
+        print(f"   Can afford {max_shares}/{order.shares} shares ({affordability_ratio:.1%} of requested)")
+        print(f"   Cost: ${max_shares * price:.2f} of ${available_cash:.2f} available")
+        
+        while True:
+            response = input(f"   Execute partial fill of {max_shares} {order.ticker} shares? (y/n/s=skip): ").lower().strip()
+            
+            if response in ['y', 'yes']:
+                return self._execute_partial_fill(order, max_shares, price, timestamp)
+            elif response in ['n', 'no', 's', 'skip']:
+                return TradeResult(
+                    order=order, executed=False, execution_price=price,
+                    executed_shares=0, execution_value=0, timestamp=timestamp,
+                    error_message=f"Partial fill declined by user"
+                )
+            else:
+                print("   Please enter 'y' for yes, 'n' for no, or 's' to skip")
+
+
+
+    # == 9. PORTFOLIO UPDATE METHODS ==
+    def _update_portfolio_holdings(self, result):
+        """Update portfolio holdings after successful trade"""
+        if not result.executed:
+            return
+        
+        order = result.order
+        ticker = order.ticker
+        shares = result.executed_shares
+        price = result.execution_price
+        value = result.execution_value
+        
+        if order.action in [OrderType.SELL, OrderType.REDUCE]:
+            if ticker in self.holdings:
+                current_shares = self.holdings[ticker]['shares']
+                remaining_shares = current_shares - shares
+                
+                if remaining_shares <= 0:
+                    # Sold entire position
+                    del self.holdings[ticker]
+                    print(f"🗑️  Removed {ticker} position entirely")
+                else:
+                    # Reduce position
+                    self.holdings[ticker]['shares'] = remaining_shares
+                    # Adjust allocation proportionally
+                    original_allocation = self.holdings[ticker]['allocation']
+                    self.holdings[ticker]['allocation'] = original_allocation * (remaining_shares / current_shares)
+                    print(f"📉 Reduced {ticker} to {remaining_shares} shares")
+                
+                # Add cash from sale
+                self.cash += value
+                
+        elif order.action == OrderType.BUY:
+            if ticker in self.holdings:
+                # Add to existing position
+                current_shares = self.holdings[ticker]['shares']
+                current_basis = self.holdings[ticker]['shares'] * self.holdings[ticker]['entry_price']
+                new_basis = current_basis + value
+                new_shares = current_shares + shares
+                new_avg_price = new_basis / new_shares
+                
+                self.holdings[ticker].update({
+                    'shares': new_shares,
+                    'entry_price': new_avg_price,
+                    'allocation': new_basis
+                })
+                print(f"📈 Increased {ticker} to {new_shares} shares")
+            else:
+                # New position
+                self.holdings[ticker] = {
+                    'shares': shares,
+                    'entry_price': price,
+                    'allocation': value
+                }
+                print(f"🆕 Added new {ticker} position: {shares} shares")
+            
+            # Reduce cash
+            self.cash -= value
+
+
+
+    # == 10. REPORTING AND VISUALIZATION == 
     def generate_report(self):
         """Generate complete daily report"""
         print("=" * 60)
@@ -939,7 +1797,6 @@ class DailyPortfolioReport:
         print(json.dumps(report_data, indent=2))
         
         return report_data
-    
     def generate_analysis_file(self, report_data):
         """Generate formatted text file for AI analysis"""
         
@@ -979,7 +1836,6 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"❌ Error creating analysis file: {e}")
         
         return content
-    
     def plot_performance_chart(self, save_path=None):
         """Create performance chart matching the reference style"""
         
@@ -1088,7 +1944,6 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"📊 Chart saved to {save_path}")
         
         plt.show()
-    
     def plot_position_details(self, positions, total_value, save_path=None):
         """Create position details chart showing portfolio breakdown and performance"""
         
@@ -1200,7 +2055,6 @@ Please provide analysis and trading recommendations based on this data."""
         
         plt.show()
         # plt.close()  # Clean up to prevent memory issues
-        
     def export_historical_metrics(self, report_data):
         """Export daily metrics to CSV for historical tracking"""
         
