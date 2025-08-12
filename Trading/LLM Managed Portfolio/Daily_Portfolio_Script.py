@@ -35,6 +35,45 @@ class OrderPriority(Enum):
     MEDIUM = "MEDIUM"
     LOW = "LOW"
 
+class PartialFillMode(Enum):
+    """Configuration options for handling partial fills when insufficient cash"""
+    AUTOMATIC = "AUTOMATIC"        # Always fill max affordable shares
+    ASK_CONFIRMATION = "ASK"       # Ask user for each partial fill  
+    REJECT = "REJECT"              # Reject orders that can't be filled completely
+    SMART = "SMART"                # Auto-fill if >threshold% affordable, ask if below
+
+    def __str__(self):
+        """String representation for logging"""
+        return self.value
+    
+    def __repr__(self):
+        """Developer representation"""
+        return f"PartialFillMode.{self.name}"
+    
+    @classmethod
+    def from_string(cls, value: str):
+        """Create enum from string value"""
+        value = value.upper()
+        for mode in cls:
+            if mode.value == value:
+                return mode
+        raise ValueError(f"Invalid PartialFillMode: {value}")
+    
+    @property
+    def description(self):
+        """Human-readable description of the mode"""
+        descriptions = {
+            self.AUTOMATIC: "Automatically fills maximum affordable shares",
+            self.ASK_CONFIRMATION: "Asks for confirmation before partial fills",
+            self.REJECT: "Rejects any orders that cannot be filled completely", 
+            self.SMART: "Auto-fills if >80% affordable, asks confirmation if <80%"
+        }
+        return descriptions[self]
+    
+    @property
+    def requires_user_input(self):
+        """Whether this mode may require user interaction"""
+        return self in [self.ASK_CONFIRMATION, self.SMART]
 @dataclass
 class TradeOrder:
     """Represents a single trade order"""
@@ -60,404 +99,6 @@ class TradeResult:
     error_message: Optional[str]
     timestamp: datetime
 
-class DocumentParser:
-    """Parse trading recommendations from various document formats"""
-    
-    def __init__(self):
-        # Enhanced patterns to match Claude's analytical language
-        self.order_patterns = {
-            # Direct action patterns
-            'exit_completely': r'(?i)exit\s+([A-Z]+)\s+completely|sell\s+all\s+([A-Z]+)',
-            'reduce_position': r'(?i)(?:reduce|trim)\s+([A-Z]+)\s+(?:by\s+)?(\d+)%|([A-Z]+)\s+requires?\s+(?:a\s+)?(\d+)%\s+(?:position\s+)?reduction',
-            'hold_position': r'(?i)hold\s+(?:your\s+)?(?:full\s+)?position\s+(?:in\s+)?([A-Z]+)|maintain\s+(?:your\s+)?position\s+(?:in\s+)?([A-Z]+)',
-            'take_profits': r'(?i)(?:consider\s+)?taking?\s+(?:partial\s+)?profits?\s+(?:at\s+\d+%\s+gains?\s+)?(?:on\s+|in\s+)?([A-Z]+)|trimming?\s+(\d+)%\s+of\s+(?:this\s+position|([A-Z]+))',
-            
-            # Traditional patterns
-            'buy_pattern': r'(?i)buy\s+(\d+)\s+shares?\s+of\s+([A-Z]+)|buy\s+([A-Z]+)\s+(\d+)\s+shares?',
-            'sell_pattern': r'(?i)sell\s+(\d+)\s+shares?\s+of\s+([A-Z]+)|sell\s+([A-Z]+)\s+(\d+)\s+shares?',
-            'weight_pattern': r'(?i)(?:set|adjust|rebalance)\s+([A-Z]+)\s+to\s+(\d+(?:\.\d+)?)%',
-            
-            # Priority actions (Claude often uses this structure)
-            'priority_actions': r'(?i)(?:priority\s+)?(?:rebalancing\s+)?actions?[:\s]*\n(?:.*\n)*?(?:\d+\.?\s*)?([A-Z]+)[^a-z]*?(\d+)%',
-        }
-    
-    def parse_text_document(self, text: str) -> List[TradeOrder]:
-        """Parse trading orders from analytical text (Claude format)"""
-        orders = []
-        
-        # Claude's analytical format - search entire document
-        full_text = text.lower()
-        
-        # 1. Parse "Exit completely" orders
-        exit_matches = re.findall(self.order_patterns['exit_completely'], full_text, re.IGNORECASE)
-        for match in exit_matches:
-            ticker = match[0] or match[1]  # Handle either pattern match
-            if ticker:
-                orders.append(TradeOrder(
-                    ticker=ticker.upper(),
-                    action=OrderType.SELL,
-                    shares=None,  # Will sell all shares
-                    reason=f"Exit {ticker.upper()} completely - risk management",
-                    priority=OrderPriority.HIGH
-                ))
-        
-        # 2. Parse percentage reduction orders
-        reduce_matches = re.findall(self.order_patterns['reduce_position'], full_text, re.IGNORECASE)
-        for match in reduce_matches:
-            if match[0] and match[1]:  # "reduce TICKER by X%"
-                ticker, percentage = match[0], match[1]
-            elif match[2] and match[3]:  # "TICKER requires X% reduction"
-                ticker, percentage = match[2], match[3]
-            else:
-                continue
-                
-            orders.append(TradeOrder(
-                ticker=ticker.upper(),
-                action=OrderType.REDUCE,
-                target_weight=100 - float(percentage),  # Reduce by X% means keep (100-X)%
-                reason=f"Reduce {ticker.upper()} by {percentage}% - position sizing",
-                priority=OrderPriority.HIGH
-            ))
-        
-        # 3. Parse profit-taking orders
-        profit_matches = re.findall(self.order_patterns['take_profits'], full_text, re.IGNORECASE)
-        for match in profit_matches:
-            ticker = match[0] or match[2]  # Handle different match groups
-            percentage = match[1] if match[1] else "50"  # Default to 50% if not specified
-            
-            if ticker:
-                orders.append(TradeOrder(
-                    ticker=ticker.upper(),
-                    action=OrderType.REDUCE,
-                    target_weight=100 - float(percentage),
-                    reason=f"Take partial profits on {ticker.upper()}",
-                    priority=OrderPriority.MEDIUM
-                ))
-        
-        # 4. Traditional buy/sell patterns
-        buy_matches = re.findall(self.order_patterns['buy_pattern'], full_text, re.IGNORECASE)
-        for match in buy_matches:
-            if match[0] and match[1]:
-                shares, ticker = int(match[0]), match[1]
-            elif match[2] and match[3]:
-                ticker, shares = match[2], int(match[3])
-            else:
-                continue
-            
-            orders.append(TradeOrder(
-                ticker=ticker.upper(),
-                action=OrderType.BUY,
-                shares=shares,
-                reason="Buy recommendation from document",
-                priority=OrderPriority.MEDIUM
-            ))
-        
-        # 5. Extract priority actions section if it exists
-        priority_section = self._extract_priority_actions(text)
-        if priority_section:
-            priority_orders = self._parse_priority_section(priority_section)
-            orders.extend(priority_orders)
-        
-        return orders
-    
-    def parse_json_document(self, json_text: str) -> List[TradeOrder]:
-        """Parse trading orders from JSON format"""
-        try:
-            data = json.loads(json_text)
-            orders = []
-            
-            # Expected JSON structure
-            for order_data in data.get('orders', []):
-                order = TradeOrder(
-                    ticker=order_data['ticker'],
-                    action=OrderType(order_data['action'].upper()),
-                    shares=order_data.get('shares'),
-                    target_weight=order_data.get('target_weight'),
-                    target_value=order_data.get('target_value'),
-                    reason=order_data.get('reason', ''),
-                    priority=OrderPriority(order_data.get('priority', 'MEDIUM').upper()),
-                    limit_price=order_data.get('limit_price'),
-                    stop_loss=order_data.get('stop_loss'),
-                    profit_target=order_data.get('profit_target')
-                )
-                orders.append(order)
-            
-            return orders
-        except json.JSONDecodeError as e:
-            trade_logger.error(f"Failed to parse JSON document: {e}")
-            return []
-    
-    def _extract_priority_actions(self, text: str) -> str:
-        """Extract the priority actions section from Claude's analysis"""
-        # Look for sections like "Priority rebalancing actions:"
-        patterns = [
-            r'priority\s+(?:rebalancing\s+)?actions?[:\s]*\n(.*?)(?=\n\n|\n###|\nTarget|\Z)',
-            r'immediate\s+action\s+required[:\s]*\n(.*?)(?=\n\n|\n###|\Z)',
-            r'rebalancing\s+recommendations[:\s]*\n(.*?)(?=\n\n|\n###|\Z)'
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
-            if match:
-                return match.group(1)
-        return ""
-    
-    def _parse_priority_section(self, section_text: str) -> List[TradeOrder]:
-        """Parse the priority actions section for specific orders"""
-        orders = []
-        lines = section_text.split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-            
-            # Parse lines like "1. Exit SOUN completely (+$202 in proceeds)"
-            exit_match = re.search(r'(?:\d+\.\s*)?exit\s+([A-Z]+)\s+completely', line, re.IGNORECASE)
-            if exit_match:
-                ticker = exit_match.group(1)
-                orders.append(TradeOrder(
-                    ticker=ticker,
-                    action=OrderType.SELL,
-                    shares=None,
-                    reason="Priority action: Exit completely",
-                    priority=OrderPriority.HIGH
-                ))
-                continue
-            
-            # Parse lines like "2. Reduce CYTK by 50% (+$104 in proceeds)"
-            reduce_match = re.search(r'(?:\d+\.\s*)?reduce\s+([A-Z]+)\s+by\s+(\d+)%', line, re.IGNORECASE)
-            if reduce_match:
-                ticker, percentage = reduce_match.groups()
-                orders.append(TradeOrder(
-                    ticker=ticker,
-                    action=OrderType.REDUCE,
-                    target_weight=100 - float(percentage),
-                    reason=f"Priority action: Reduce by {percentage}%",
-                    priority=OrderPriority.HIGH
-                ))
-                continue
-            
-            # Parse lines like "3. Trim QS by 50% (+$100 in proceeds)"
-            trim_match = re.search(r'(?:\d+\.\s*)?trim\s+([A-Z]+)\s+by\s+(\d+)%', line, re.IGNORECASE)
-            if trim_match:
-                ticker, percentage = trim_match.groups()
-                orders.append(TradeOrder(
-                    ticker=ticker,
-                    action=OrderType.REDUCE,
-                    target_weight=100 - float(percentage),
-                    reason=f"Priority action: Trim by {percentage}%",
-                    priority=OrderPriority.HIGH
-                ))
-        
-        return orders
-
-class TradeExecutor:
-    """Execute trades based on parsed orders"""
-    
-    def __init__(self, portfolio_reporter):
-        self.portfolio = portfolio_reporter
-        self.paper_trading = True  # Set to False for live trading
-        self.executed_trades = []
-        self.failed_trades = []
-    
-    def execute_orders(self, orders: List[TradeOrder]) -> List[TradeResult]:
-        """Execute a list of trade orders"""
-        results = []
-        
-        # Sort orders by priority (HIGH -> MEDIUM -> LOW)
-        sorted_orders = sorted(orders, key=lambda x: x.priority.value)
-        
-        # Get current market data
-        current_prices, _, _ = self.portfolio.fetch_current_data()
-        if not current_prices:
-            trade_logger.error("Failed to fetch current market data")
-            return []
-        
-        for order in sorted_orders:
-            result = self._execute_single_order(order, current_prices)
-            results.append(result)
-            
-            if result.executed:
-                self.executed_trades.append(result)
-                # Update portfolio holdings
-                self._update_portfolio_holdings(result)
-            else:
-                self.failed_trades.append(result)
-        
-        return results
-    
-    def _execute_single_order(self, order: TradeOrder, current_prices: Dict) -> TradeResult:
-        """Execute a single trade order"""
-        timestamp = datetime.now()
-        
-        # Validate ticker exists in market data
-        if order.ticker not in current_prices:
-            return TradeResult(
-                order=order,
-                executed=False,
-                execution_price=None,
-                executed_shares=None,
-                execution_value=None,
-                error_message=f"No market data for {order.ticker}",
-                timestamp=timestamp
-            )
-        
-        current_price = current_prices[order.ticker]
-        
-        # Calculate shares to trade
-        shares_to_trade = self._calculate_shares_to_trade(order, current_price)
-        if shares_to_trade == 0:
-            return TradeResult(
-                order=order,
-                executed=False,
-                execution_price=current_price,
-                executed_shares=0,
-                execution_value=0,
-                error_message="No shares to trade",
-                timestamp=timestamp
-            )
-        
-        # Validate sufficient funds/shares
-        validation_error = self._validate_order(order, shares_to_trade, current_price)
-        if validation_error:
-            return TradeResult(
-                order=order,
-                executed=False,
-                execution_price=current_price,
-                executed_shares=0,
-                execution_value=0,
-                error_message=validation_error,
-                timestamp=timestamp
-            )
-        
-        # Execute the trade (paper trading for now)
-        if self.paper_trading:
-            execution_price = current_price
-            execution_value = shares_to_trade * execution_price
-            
-            trade_logger.info(f"PAPER TRADE: {order.action.value} {shares_to_trade} shares of {order.ticker} at ${execution_price:.2f}")
-            
-            return TradeResult(
-                order=order,
-                executed=True,
-                execution_price=execution_price,
-                executed_shares=shares_to_trade,
-                execution_value=execution_value,
-                error_message=None,
-                timestamp=timestamp
-            )
-        else:
-            # TODO: Implement live trading through broker API
-            return TradeResult(
-                order=order,
-                executed=False,
-                execution_price=current_price,
-                executed_shares=0,
-                execution_value=0,
-                error_message="Live trading not implemented",
-                timestamp=timestamp
-            )
-    
-    def _calculate_shares_to_trade(self, order: TradeOrder, current_price: float) -> int:
-        """Calculate the number of shares to trade"""
-        if order.shares is not None:
-            return abs(order.shares)
-        
-        if order.target_weight is not None:
-            total_value = self.portfolio.cash + sum(
-                pos['shares'] * current_price 
-                for ticker, pos in self.portfolio.holdings.items() 
-                if ticker in [order.ticker] # This needs current prices for all holdings
-            )
-            target_value = total_value * (order.target_weight / 100)
-            current_position_value = 0
-            
-            if order.ticker in self.portfolio.holdings:
-                current_position_value = self.portfolio.holdings[order.ticker]['shares'] * current_price
-            
-            value_difference = target_value - current_position_value
-            return abs(int(value_difference / current_price))
-        
-        if order.target_value is not None:
-            return int(order.target_value / current_price)
-        
-        # For sell all orders
-        if order.action == OrderType.SELL and order.ticker in self.portfolio.holdings:
-            return self.portfolio.holdings[order.ticker]['shares']
-        
-        return 0
-    
-    def _validate_order(self, order: TradeOrder, shares: int, price: float) -> Optional[str]:
-        """Validate if order can be executed"""
-        if order.action in [OrderType.BUY, OrderType.INCREASE]:
-            required_cash = shares * price
-            if required_cash > self.portfolio.cash:
-                return f"Insufficient funds: Need ${required_cash:.2f}, have ${self.portfolio.cash:.2f}"
-        
-        elif order.action in [OrderType.SELL, OrderType.REDUCE]:
-            if order.ticker not in self.portfolio.holdings:
-                return f"No position in {order.ticker} to sell"
-            
-            available_shares = self.portfolio.holdings[order.ticker]['shares']
-            if shares > available_shares:
-                return f"Insufficient shares: Need {shares}, have {available_shares}"
-        
-        return None
-    
-    def _update_portfolio_holdings(self, result: TradeResult):
-        """Update portfolio holdings after successful trade"""
-        if not result.executed:
-            return
-        
-        order = result.order
-        shares = result.executed_shares
-        price = result.execution_price
-        value = result.execution_value
-        
-        if order.action in [OrderType.BUY, OrderType.INCREASE]:
-            # Add to or create position
-            if order.ticker in self.portfolio.holdings:
-                current_shares = self.portfolio.holdings[order.ticker]['shares']
-                current_basis = self.portfolio.holdings[order.ticker]['shares'] * self.portfolio.holdings[order.ticker]['entry_price']
-                new_basis = current_basis + value
-                new_shares = current_shares + shares
-                new_avg_price = new_basis / new_shares
-                
-                self.portfolio.holdings[order.ticker].update({
-                    'shares': new_shares,
-                    'entry_price': new_avg_price,
-                    'allocation': new_basis
-                })
-            else:
-                self.portfolio.holdings[order.ticker] = {
-                    'shares': shares,
-                    'entry_price': price,
-                    'allocation': value
-                }
-            
-            # Reduce cash
-            self.portfolio.cash -= value
-            
-        elif order.action in [OrderType.SELL, OrderType.REDUCE]:
-            if order.ticker in self.portfolio.holdings:
-                current_shares = self.portfolio.holdings[order.ticker]['shares']
-                
-                if shares >= current_shares:
-                    # Sell entire position
-                    del self.portfolio.holdings[order.ticker]
-                else:
-                    # Reduce position
-                    remaining_shares = current_shares - shares
-                    self.portfolio.holdings[order.ticker]['shares'] = remaining_shares
-                    # Allocation adjusts proportionally
-                    original_allocation = self.portfolio.holdings[order.ticker]['allocation']
-                    self.portfolio.holdings[order.ticker]['allocation'] = original_allocation * (remaining_shares / current_shares)
-                
-                # Add cash from sale
-                self.portfolio.cash += value
-
-class AutomatedTradingSystem:
     """Main system that orchestrates document parsing and trade execution"""
     
     def __init__(self, portfolio_reporter):
@@ -766,6 +407,7 @@ def set_partial_fill_mode(self, mode: PartialFillMode, min_cash_reserve: float =
     return orders
 
 class DailyPortfolioReport:
+    # == 1. INITIALIZATION ==
     def __init__(self):
         # Updated portfolio holdings (from your corrected allocation)
         self.holdings = {
@@ -785,6 +427,7 @@ class DailyPortfolioReport:
         self.total_investment = 1964.58  # Unchanged - original investment
         self.cash = 2.34  # Minimal cash remaining
     
+    # == 2. CONFIGURATION METHODS ==
     def set_partial_fill_mode(self, mode: PartialFillMode, min_cash_reserve: float = None, 
                           threshold: float = None):
         """Configure partial fill behavior"""
@@ -903,6 +546,7 @@ class DailyPortfolioReport:
         
         return validation_results
 
+    # == 3. DATA FETCHING METHODS ==
     def fetch_current_data(self):
         """Fetch current price data for all holdings and benchmarks"""
         
@@ -1004,7 +648,6 @@ class DailyPortfolioReport:
                 return current_prices, self.volume_data, self.price_data
             else:
                 return None, None, None
-
     def fetch_data_individually(self, tickers):
         """Fallback method to fetch data for each ticker individually"""
         
@@ -1058,6 +701,7 @@ class DailyPortfolioReport:
         self.volume_data = pd.DataFrame()  # Ensure empty DataFrame
         return False
 
+    # == 4. ANALYSIS & CALCULATION METHODS ==
     def calculate_position_metrics(self, current_prices):
         """Calculate key metrics for each position"""
         positions = []
@@ -1115,7 +759,6 @@ class DailyPortfolioReport:
                 })
         
         return positions, total_current_value, total_cost_basis
-
     def check_alerts(self, positions):
         """Check for stop-loss and profit target alerts"""
         alerts = []
@@ -1141,7 +784,6 @@ class DailyPortfolioReport:
                 alerts.append(f"🟢 PROFIT TARGET: {ticker} at {pnl_pct:.1f}% (target: {profit_targets[ticker]}%)")
         
         return alerts
-    
     def get_volume_alerts(self, volume_data, price_data):
         """Check for unusual volume activity"""
         volume_alerts = []
@@ -1168,6 +810,9 @@ class DailyPortfolioReport:
         
         return volume_alerts
     
+    # == 5. DOCUMENT PROCESSING METHODS ==
+
+
     def generate_report(self):
         """Generate complete daily report"""
         print("=" * 60)
