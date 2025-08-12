@@ -1,0 +1,74 @@
+{
+  "timestamp": "2025-08-12T16:54:45.509068",
+  "document": "trading_recommendations_aug7.md",
+  "file_type": ".md",
+  "validation": {
+    "feasible": true,
+    "total_sells": 406.5499954223633,
+    "total_buys": 0,
+    "final_cash": 408.88999542236326,
+    "warnings": [],
+    "phase_results": {
+      "HIGH Priority SELLS (Generate Cash)": {
+        "sells": 406.5499954223633,
+        "buys": 0,
+        "warnings": []
+      }
+    }
+  },
+  "orders_parsed": 2,
+  "orders_executed": 2,
+  "orders_failed": 0,
+  "total_proceeds": 406.5499954223633,
+  "total_invested": 0,
+  "predicted_cash": 408.88999542236326,
+  "actual_cash": 408.88999542236326,
+  "cash_variance": 0.0,
+  "updated_holdings": {
+    "IONS": {
+      "shares": 3,
+      "entry_price": 37.01,
+      "allocation": 111.03
+    },
+    "CRGY": {
+      "shares": 26,
+      "entry_price": 9.1,
+      "allocation": 236.6
+    },
+    "SERV": {
+      "shares": 23,
+      "entry_price": 10.15,
+      "allocation": 233.45
+    },
+    "CYTK": {
+      "shares": 3,
+      "entry_price": 36.58,
+      "allocation": 109.74
+    },
+    "QS": {
+      "shares": 23,
+      "entry_price": 8.5,
+      "allocation": 138.0
+    },
+    "RIG": {
+      "shares": 65,
+      "entry_price": 3.0,
+      "allocation": 195.0
+    },
+    "AMD": {
+      "shares": 1,
+      "entry_price": 176.78,
+      "allocation": 176.78
+    },
+    "NVDA": {
+      "shares": 1,
+      "entry_price": 175.0,
+      "allocation": 135.0
+    },
+    "GOOGL": {
+      "shares": 1,
+      "entry_price": 193.0,
+      "allocation": 193.0
+    }
+  }
+}

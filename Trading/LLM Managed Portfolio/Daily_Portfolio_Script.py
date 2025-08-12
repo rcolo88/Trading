@@ -39,7 +39,7 @@ class OrderType(Enum):
     BUY = "BUY"
     SELL = "SELL"
     REDUCE = "REDUCE"
-    INCREASE = "INCREASE"
+    HOLD = "HOLD"
 
 class OrderPriority(Enum):
     HIGH = "HIGH"
@@ -132,7 +132,6 @@ class DailyPortfolioReport:
         self.total_investment = 1964.58  # Unchanged - original investment
         self.cash = 2.34  # Minimal cash remaining
     
-
 
     # == 2. CONFIGURATION METHODS ==
     def set_partial_fill_mode(self, mode: PartialFillMode, min_cash_reserve: float = None, 
@@ -252,7 +251,6 @@ class DailyPortfolioReport:
             print(f"\n❌ Some trades cannot be executed due to insufficient cash")
         
         return validation_results
-
 
 
     # == 3. DATA FETCHING METHODS ==
@@ -410,7 +408,6 @@ class DailyPortfolioReport:
         self.price_data = pd.DataFrame()  # Ensure empty DataFrame
         self.volume_data = pd.DataFrame()  # Ensure empty DataFrame
         return False
-
 
 
     # == 4. ANALYSIS & CALCULATION METHODS ==
