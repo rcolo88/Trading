@@ -252,7 +252,7 @@ class PerformanceValidator:
         
         try:
             # Find most recent trade execution log
-            trade_logs = glob.glob('trade_execution_*.json')
+            trade_logs = glob.glob('trade_executions/trade_execution_*.json')
             if trade_logs:
                 latest_log = max(trade_logs, key=os.path.getmtime)
                 
@@ -1606,7 +1606,7 @@ class DailyPortfolioReport:
         
         # Save execution log
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        log_filename = f'trade_execution_{timestamp}.json'
+        log_filename = f'trade_executions/trade_execution_{timestamp}.json'
         
         execution_log = {
             'timestamp': datetime.now().isoformat(),
@@ -2669,7 +2669,9 @@ Please provide analysis and trading recommendations based on this data."""
                 # Check if today's date already exists (avoid duplicates)
                 if today_date in df_existing['date'].values:
                     # Update today's record instead of adding duplicate
-                    df_existing.loc[df_existing['date'] == today_date] = performance_record
+                    mask = df_existing['date'] == today_date
+                    for key, value in performance_record.items():
+                        df_existing.loc[mask, key] = value
                     df_combined = df_existing
                     print(f"📊 Updated today's record in {filename}")
                 else:
@@ -2870,8 +2872,23 @@ Please provide analysis and trading recommendations based on this data."""
         total_pnl_dollar = account_value - initial_investment
         total_pnl_percentage = (total_pnl_dollar / initial_investment) * 100
         
-        # Get current prices for benchmark calculation
-        current_prices = self.get_current_prices(['SPY', 'IWM'])
+        # Get current prices for benchmark calculation using price_data
+        current_prices = {}
+        if hasattr(self, 'price_data') and self.price_data is not None:
+            for ticker in ['SPY', 'IWM']:
+                if ticker in self.price_data.columns:
+                    current_prices[ticker] = self.price_data[ticker].iloc[-1] if not self.price_data[ticker].empty else 0
+                else:
+                    current_prices[ticker] = 0
+        else:
+            # Fallback: fetch current prices directly
+            try:
+                for ticker in ['SPY', 'IWM']:
+                    ticker_obj = yf.Ticker(ticker)
+                    hist = ticker_obj.history(period="1d")
+                    current_prices[ticker] = hist['Close'].iloc[-1] if not hist.empty else 0
+            except:
+                current_prices = {'SPY': 0, 'IWM': 0}
         
         # Get benchmark prices
         spy_price = current_prices.get('SPY', 0)
@@ -2908,7 +2925,9 @@ Please provide analysis and trading recommendations based on this data."""
                 today_date = datetime.now().strftime('%Y-%m-%d')
                 if today_date in df_existing['date'].values:
                     # Update today's record instead of adding duplicate
-                    df_existing.loc[df_existing['date'] == today_date] = performance_record
+                    mask = df_existing['date'] == today_date
+                    for key, value in performance_record.items():
+                        df_existing.loc[mask, key] = value
                     df_combined = df_existing
                     print(f"📊 Updated today's record in {filename}")
                 else:
