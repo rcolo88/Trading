@@ -1,140 +1,140 @@
 Daily portfolio update for 2025-08-13. Here's the data:
 
 {
-  "date": "2025-08-13T09:56:44.058478",
-  "account_value": 2101.794400777817,
+  "date": "2025-08-13T15:56:15.634756",
+  "account_value": 2084.8548029327394,
   "initial_investment": 2000.0,
-  "cash_available": 511.8199995422363,
-  "total_pnl_dollar": 101.79440077781692,
-  "total_pnl_percent": 5.089720038890846,
-  "account_growth_percent": 5.089720038890855,
+  "cash_available": 156.0199964904785,
+  "total_pnl_dollar": 84.8548029327394,
+  "total_pnl_percent": 4.2427401466369705,
+  "account_growth_percent": 4.24274014663697,
   "positions": [
-    {
-      "ticker": "IONS",
-      "shares": 3,
-      "entry_price": 37.01,
-      "current_price": 42.15999984741211,
-      "current_value": 126.47999954223633,
-      "cost_basis": 111.03,
-      "pnl_dollar": 15.449999542236327,
-      "pnl_percent": 13.915157653099458,
-      "daily_change": 13.915157653099463,
-      "current_weight": 6.017715124534993,
-      "target_weight": 7.3221398612466695,
-      "weight_drift": -1.3044247367116766
-    },
     {
       "ticker": "QS",
       "shares": 23,
       "entry_price": 8.5,
-      "current_price": 9.368599891662598,
-      "current_value": 215.47779750823975,
+      "current_price": 9.414999961853027,
+      "current_value": 216.54499912261963,
       "cost_basis": 195.5,
-      "pnl_dollar": 19.977797508239746,
-      "pnl_percent": 10.218822254854091,
-      "daily_change": 10.218822254854091,
-      "current_weight": 10.252087332067173,
-      "target_weight": 12.892716769104961,
-      "weight_drift": -2.640629437037788
-    },
-    {
-      "ticker": "GOOGL",
-      "shares": 1,
-      "entry_price": 193.0,
-      "current_price": 203.3000030517578,
-      "current_value": 203.3000030517578,
-      "cost_basis": 193.0,
-      "pnl_dollar": 10.300003051757812,
-      "pnl_percent": 5.336789145988504,
-      "daily_change": 5.336789145988504,
-      "current_weight": 9.67268744157478,
-      "target_weight": 12.727848268221265,
-      "weight_drift": -3.0551608266464854
-    },
-    {
-      "ticker": "NVDA",
-      "shares": 1,
-      "entry_price": 175.0,
-      "current_price": 183.32000732421875,
-      "current_value": 183.32000732421875,
-      "cost_basis": 175.0,
-      "pnl_dollar": 8.32000732421875,
-      "pnl_percent": 4.754289899553572,
-      "daily_change": 4.754289899553572,
-      "current_weight": 8.722071352763,
-      "target_weight": 11.540795061858661,
-      "weight_drift": -2.8187237090956607
-    },
-    {
-      "ticker": "AMD",
-      "shares": 1,
-      "entry_price": 176.78,
-      "current_price": 184.3350067138672,
-      "current_value": 184.3350067138672,
-      "cost_basis": 176.78,
-      "pnl_dollar": 7.555006713867186,
-      "pnl_percent": 4.273677290342339,
-      "daily_change": 4.273677290342339,
-      "current_weight": 8.770363392615844,
-      "target_weight": 11.658181434487853,
-      "weight_drift": -2.887818041872009
+      "pnl_dollar": 21.04499912261963,
+      "pnl_percent": 10.764705433565029,
+      "daily_change": 10.764705433565029,
+      "current_weight": 10.386574586297735,
+      "target_weight": 10.442483531392654,
+      "weight_drift": -0.055908945094918394
     },
     {
       "ticker": "CRGY",
       "shares": 26,
       "entry_price": 9.1,
-      "current_price": 9.460000038146973,
-      "current_value": 245.9600009918213,
+      "current_price": 9.5600004196167,
+      "current_value": 248.56001091003418,
       "cost_basis": 236.6,
-      "pnl_dollar": 9.360000991821295,
-      "pnl_percent": 3.9560443752414605,
-      "daily_change": 3.956044375241462,
-      "current_weight": 11.702381588836577,
-      "target_weight": 15.603154923632909,
-      "weight_drift": -3.900773334796332
+      "pnl_dollar": 11.960010910034185,
+      "pnl_percent": 5.054949666117577,
+      "daily_change": 5.054949666117578,
+      "current_weight": 11.922173695759911,
+      "target_weight": 12.63780871369566,
+      "weight_drift": -0.7156350179357496
+    },
+    {
+      "ticker": "GOOGL",
+      "shares": 1,
+      "entry_price": 193.0,
+      "current_price": 202.02000427246094,
+      "current_value": 202.02000427246094,
+      "cost_basis": 193.0,
+      "pnl_dollar": 9.020004272460938,
+      "pnl_percent": 4.673577343244009,
+      "daily_change": 4.673577343244009,
+      "current_weight": 9.689883630662525,
+      "target_weight": 10.308947936362058,
+      "weight_drift": -0.6190643056995331
     },
     {
       "ticker": "SERV",
       "shares": 23,
       "entry_price": 10.15,
-      "current_price": 10.3641996383667,
-      "current_value": 238.37659168243408,
+      "current_price": 10.375,
+      "current_value": 238.625,
       "cost_basis": 233.45000000000002,
-      "pnl_dollar": 4.926591682434065,
-      "pnl_percent": 2.1103412646965367,
-      "daily_change": 2.1103412646965403,
-      "current_weight": 11.3415751604542,
-      "target_weight": 15.395420612519453,
-      "weight_drift": -4.053845452065254
+      "pnl_dollar": 5.174999999999983,
+      "pnl_percent": 2.216748768472899,
+      "daily_change": 2.2167487684729026,
+      "current_weight": 11.445641186346846,
+      "target_weight": 12.469553863957112,
+      "weight_drift": -1.0239126776102658
+    },
+    {
+      "ticker": "IONS",
+      "shares": 7,
+      "entry_price": 40.52428562709263,
+      "current_price": 41.40999984741211,
+      "current_value": 289.86999893188477,
+      "cost_basis": 283.6699993896484,
+      "pnl_dollar": 6.199999542236355,
+      "pnl_percent": 2.185638084949565,
+      "daily_change": 2.185638084949563,
+      "current_weight": 13.903606070030788,
+      "target_weight": 15.15201686433027,
+      "weight_drift": -1.248410794299481
+    },
+    {
+      "ticker": "NVDA",
+      "shares": 2,
+      "entry_price": 179.0800018310547,
+      "current_price": 181.4698944091797,
+      "current_value": 362.9397888183594,
+      "cost_basis": 358.1600036621094,
+      "pnl_dollar": 4.77978515625,
+      "pnl_percent": 1.3345390628148648,
+      "daily_change": 1.3345390628148648,
+      "current_weight": 17.408396417238095,
+      "target_weight": 19.13084368207217,
+      "weight_drift": -1.7224472648340772
     },
     {
       "ticker": "RIG",
       "shares": 65,
       "entry_price": 3.0,
-      "current_price": 2.9649999141693115,
-      "current_value": 192.72499442100525,
+      "current_price": 3.005000114440918,
+      "current_value": 195.32500743865967,
       "cost_basis": 195.0,
-      "pnl_dollar": -2.275005578994751,
-      "pnl_percent": -1.1666695276896157,
-      "daily_change": -1.1666695276896157,
-      "current_weight": 9.169545524989646,
-      "target_weight": 12.859743068928223,
-      "weight_drift": -3.6901975439385772
+      "pnl_dollar": 0.32500743865966797,
+      "pnl_percent": 0.1666704813639323,
+      "daily_change": 0.1666704813639323,
+      "current_weight": 9.36875830220399,
+      "target_weight": 10.415776412386535,
+      "weight_drift": -1.0470181101825453
+    },
+    {
+      "ticker": "AMD",
+      "shares": 1,
+      "entry_price": 176.78,
+      "current_price": 174.9499969482422,
+      "current_value": 174.9499969482422,
+      "cost_basis": 176.78,
+      "pnl_dollar": -1.8300030517578136,
+      "pnl_percent": -1.0351867019786252,
+      "daily_change": -1.0351867019786252,
+      "current_weight": 8.391471516488448,
+      "target_weight": 9.442568995803546,
+      "weight_drift": -1.0510974793150982
     }
   ],
   "alerts": [],
   "volume_alerts": [],
   "rebalancing_alerts": [],
   "benchmarks": {
-    "SPY": 646.094970703125,
-    "IWM": 228.8000030517578,
-    "VIX": 14.40999984741211
+    "SPY": 644.9849853515625,
+    "IWM": 226.80999755859375,
+    "VIX": 14.470000267028809
   },
   "portfolio_metrics": {
     "total_positions": 8,
     "positions_profitable": 7,
-    "largest_position_weight": 11.702381588836577,
-    "concentration_risk": 0
+    "largest_position_weight": 17.408396417238095,
+    "concentration_risk": 17.408396417238095
   }
 }
 
@@ -146,7 +146,7 @@ Key questions:
 
 Additional context:
 - Portfolio total investment: $1,964.58
-- Cash available: $511.82
+- Cash available: $156.02
 - Investment timeframe: August 5, 2025 to December 27, 2025
 - Strategy: Catalyst-driven momentum with concentrated positions
 

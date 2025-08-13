@@ -1,11 +1,11 @@
 {
-  "timestamp": "2025-08-12T22:57:23.303316",
-  "cash": 511.8199995422363,
+  "timestamp": "2025-08-13T15:56:14.709404",
+  "cash": 156.0199964904785,
   "holdings": {
     "IONS": {
-      "shares": 3,
-      "entry_price": 37.01,
-      "allocation": 111.03
+      "shares": 7,
+      "entry_price": 40.52428562709263,
+      "allocation": 283.6699993896484
     },
     "CRGY": {
       "shares": 26,
@@ -33,9 +33,9 @@
       "allocation": 176.78
     },
     "NVDA": {
-      "shares": 1,
-      "entry_price": 175.0,
-      "allocation": 135.0
+      "shares": 2,
+      "entry_price": 179.0800018310547,
+      "allocation": 358.1600036621094
     },
     "GOOGL": {
       "shares": 1,
@@ -44,5 +44,5 @@
     }
   },
   "total_investment": 1964.58,
-  "last_update": "2025-08-12 22:57:23"
+  "last_update": "2025-08-13 15:56:14"
 }

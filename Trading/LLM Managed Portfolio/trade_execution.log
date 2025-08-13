@@ -1080,3 +1080,147 @@
 2025-08-13 09:56:43,127 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
 2025-08-13 09:56:43,127 - INFO - ============================================================
 2025-08-13 09:56:43,127 - INFO - ============================================================
+2025-08-13 15:55:43,468 - INFO - ============================================================
+2025-08-13 15:55:43,468 - INFO - ============================================================
+2025-08-13 15:55:43,468 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 15:55:43,468 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 15:55:43,469 - INFO - ============================================================
+2025-08-13 15:55:43,469 - INFO - ============================================================
+2025-08-13 15:55:43,470 - INFO - Processing document: trading_recommendations_aug13.md (Type: .MD)
+2025-08-13 15:55:43,470 - INFO - Processing document: trading_recommendations_aug13.md (Type: .MD)
+2025-08-13 15:55:43,471 - INFO - Successfully parsed 5 orders from document
+2025-08-13 15:55:43,471 - INFO - Successfully parsed 5 orders from document
+2025-08-13 15:55:43,471 - INFO - Order 1: BUY 4 shares of IONS (HIGH) - Increase from 3 to 7 shares (target 20% allocation). FDA PDUFA August 21, 2025 carries 85-90% approval probability with exceptional clinical data showing 96% reduction in HAE attacks. Binary catalyst offers 40-45% upside potential with limited downside given strong fundamentals.
+2025-08-13 15:55:43,471 - INFO - Order 1: BUY 4 shares of IONS (HIGH) - Increase from 3 to 7 shares (target 20% allocation). FDA PDUFA August 21, 2025 carries 85-90% approval probability with exceptional clinical data showing 96% reduction in HAE attacks. Binary catalyst offers 40-45% upside potential with limited downside given strong fundamentals.
+2025-08-13 15:55:43,471 - INFO - Order 2: BUY 4 shares of NVDA (HIGH) - Increase from 1 to 5 shares (target 15-18% allocation). August 27 earnings catalyst plus China H20 business restoration could unlock $8B revenue opportunity. Blackwell architecture momentum and dominant 92% data center GPU market share positions for significant reacceleration.
+2025-08-13 15:55:43,471 - INFO - Order 2: BUY 4 shares of NVDA (HIGH) - Increase from 1 to 5 shares (target 15-18% allocation). August 27 earnings catalyst plus China H20 business restoration could unlock $8B revenue opportunity. Blackwell architecture momentum and dominant 92% data center GPU market share positions for significant reacceleration.
+2025-08-13 15:55:43,472 - INFO - Order 3: BUY 3 shares of AMD (HIGH) - Increase from 1 to 4 shares (target 12-15% allocation). Data center revenue up 57% YoY with MI350 series launch providing 4x computing power improvement. Undervalued at 40x forward P/E given trajectory toward 30% market share in $500B data center GPU market.
+2025-08-13 15:55:43,472 - INFO - Order 3: BUY 3 shares of AMD (HIGH) - Increase from 1 to 4 shares (target 12-15% allocation). Data center revenue up 57% YoY with MI350 series launch providing 4x computing power improvement. Undervalued at 40x forward P/E given trajectory toward 30% market share in $500B data center GPU market.
+2025-08-13 15:55:43,472 - INFO - Order 4: BUY 150 shares of ALAB (HIGH) - New position targeting 15% allocation (~$28,800 at $192). Pure-play AI infrastructure leader with 150% YoY revenue growth. PCIe 6.0 rollout and NVIDIA Blackwell integration provide near-term catalysts with 30-56% upside potential.
+2025-08-13 15:55:43,472 - INFO - Order 4: BUY 150 shares of ALAB (HIGH) - New position targeting 15% allocation (~$28,800 at $192). Pure-play AI infrastructure leader with 150% YoY revenue growth. PCIe 6.0 rollout and NVIDIA Blackwell integration provide near-term catalysts with 30-56% upside potential.
+2025-08-13 15:55:43,472 - INFO - Order 5: BUY 700 shares of RKLB (HIGH) - New position targeting 12% allocation (~$30,100 at $43). Space commercialization leader with proven Electron rocket (90%+ success rate) and Neutron heavy-lift debut mid-2025. NASA Mars contract and national security expansion drive 50-85% upside potential.
+2025-08-13 15:55:43,472 - INFO - Order 5: BUY 700 shares of RKLB (HIGH) - New position targeting 12% allocation (~$30,100 at $43). Space commercialization leader with proven Electron rocket (90%+ success rate) and Neutron heavy-lift debut mid-2025. NASA Mars contract and national security expansion drive 50-85% upside potential.
+2025-08-13 15:55:44,697 - INFO - Market data fetched for 11 securities
+2025-08-13 15:55:44,697 - INFO - Market data fetched for 11 securities
+2025-08-13 15:55:44,698 - WARNING - Cash flow validation FAILED - some trades not feasible
+2025-08-13 15:55:44,698 - WARNING - Cash flow validation FAILED - some trades not feasible
+2025-08-13 15:55:44,698 - WARNING - Validation warning: Partial fill for NVDA: 1/4 shares
+2025-08-13 15:55:44,698 - WARNING - Validation warning: Partial fill for NVDA: 1/4 shares
+2025-08-13 15:55:44,698 - WARNING - Validation warning: Cannot afford any AMD shares
+2025-08-13 15:55:44,698 - WARNING - Validation warning: Cannot afford any AMD shares
+2025-08-13 15:55:44,698 - WARNING - Validation warning: No price data for ALAB
+2025-08-13 15:55:44,698 - WARNING - Validation warning: No price data for ALAB
+2025-08-13 15:55:44,698 - WARNING - Validation warning: No price data for RKLB
+2025-08-13 15:55:44,698 - WARNING - Validation warning: No price data for RKLB
+2025-08-13 15:56:13,687 - INFO - User chose to proceed despite warnings
+2025-08-13 15:56:13,687 - INFO - User chose to proceed despite warnings
+2025-08-13 15:56:13,687 - INFO - Beginning trade execution phase
+2025-08-13 15:56:13,687 - INFO - Beginning trade execution phase
+2025-08-13 15:56:14,704 - INFO - Executing order: BUY IONS
+2025-08-13 15:56:14,704 - INFO - Executing order: BUY IONS
+2025-08-13 15:56:14,704 - INFO - IONS current market price: $43.16
+2025-08-13 15:56:14,704 - INFO - IONS current market price: $43.16
+2025-08-13 15:56:14,704 - INFO - BUY order: 4 shares x $43.16 = $172.64 required
+2025-08-13 15:56:14,704 - INFO - BUY order: 4 shares x $43.16 = $172.64 required
+2025-08-13 15:56:14,704 - INFO - Available cash: $501.82 (after $10.00 reserve)
+2025-08-13 15:56:14,704 - INFO - Available cash: $501.82 (after $10.00 reserve)
+2025-08-13 15:56:14,704 - INFO - TRADE EXECUTED: BOUGHT 4 shares of IONS at $43.16 = $172.64
+2025-08-13 15:56:14,704 - INFO - TRADE EXECUTED: BOUGHT 4 shares of IONS at $43.16 = $172.64
+2025-08-13 15:56:14,704 - INFO - Updating portfolio holdings for IONS
+2025-08-13 15:56:14,704 - INFO - Updating portfolio holdings for IONS
+2025-08-13 15:56:14,704 - INFO - Before: IONS had 3 shares @ $37.01
+2025-08-13 15:56:14,704 - INFO - Before: IONS had 3 shares @ $37.01
+2025-08-13 15:56:14,704 - INFO - POSITION INCREASED: IONS now has 7 shares @ $40.52 avg (was 3 @ $40.52)
+2025-08-13 15:56:14,704 - INFO - POSITION INCREASED: IONS now has 7 shares @ $40.52 avg (was 3 @ $40.52)
+2025-08-13 15:56:14,705 - INFO - Cash updated: $511.82 - $172.64 = $339.18
+2025-08-13 15:56:14,705 - INFO - Cash updated: $511.82 - $172.64 = $339.18
+2025-08-13 15:56:14,705 - INFO - Portfolio update complete for IONS
+2025-08-13 15:56:14,705 - INFO - Portfolio update complete for IONS
+2025-08-13 15:56:14,705 - INFO - Executing order: BUY NVDA
+2025-08-13 15:56:14,705 - INFO - Executing order: BUY NVDA
+2025-08-13 15:56:14,705 - INFO - NVDA current market price: $183.16
+2025-08-13 15:56:14,705 - INFO - NVDA current market price: $183.16
+2025-08-13 15:56:14,705 - INFO - BUY order: 4 shares x $183.16 = $732.64 required
+2025-08-13 15:56:14,705 - INFO - BUY order: 4 shares x $183.16 = $732.64 required
+2025-08-13 15:56:14,705 - INFO - Available cash: $329.18 (after $10.00 reserve)
+2025-08-13 15:56:14,705 - INFO - Available cash: $329.18 (after $10.00 reserve)
+2025-08-13 15:56:14,705 - WARNING - Insufficient cash for full order - handling partial fill
+2025-08-13 15:56:14,705 - WARNING - Insufficient cash for full order - handling partial fill
+2025-08-13 15:56:14,705 - WARNING - Insufficient cash for NVDA: need $732.64, have $329.18
+2025-08-13 15:56:14,705 - WARNING - Insufficient cash for NVDA: need $732.64, have $329.18
+2025-08-13 15:56:14,705 - INFO - Max affordable: 1/4 shares (25.0%)
+2025-08-13 15:56:14,705 - INFO - Max affordable: 1/4 shares (25.0%)
+2025-08-13 15:56:14,705 - INFO - AUTO-FILL: executing 1 shares of NVDA
+2025-08-13 15:56:14,705 - INFO - AUTO-FILL: executing 1 shares of NVDA
+2025-08-13 15:56:14,705 - INFO - Updating portfolio holdings for NVDA
+2025-08-13 15:56:14,705 - INFO - Updating portfolio holdings for NVDA
+2025-08-13 15:56:14,705 - INFO - Before: NVDA had 1 shares @ $175.00
+2025-08-13 15:56:14,705 - INFO - Before: NVDA had 1 shares @ $175.00
+2025-08-13 15:56:14,705 - INFO - POSITION INCREASED: NVDA now has 2 shares @ $179.08 avg (was 1 @ $179.08)
+2025-08-13 15:56:14,705 - INFO - POSITION INCREASED: NVDA now has 2 shares @ $179.08 avg (was 1 @ $179.08)
+2025-08-13 15:56:14,706 - INFO - Cash updated: $339.18 - $183.16 = $156.02
+2025-08-13 15:56:14,706 - INFO - Cash updated: $339.18 - $183.16 = $156.02
+2025-08-13 15:56:14,706 - INFO - Portfolio update complete for NVDA
+2025-08-13 15:56:14,706 - INFO - Portfolio update complete for NVDA
+2025-08-13 15:56:14,706 - INFO - Executing order: BUY AMD
+2025-08-13 15:56:14,706 - INFO - Executing order: BUY AMD
+2025-08-13 15:56:14,706 - INFO - AMD current market price: $174.95
+2025-08-13 15:56:14,706 - INFO - AMD current market price: $174.95
+2025-08-13 15:56:14,706 - INFO - BUY order: 3 shares x $174.95 = $524.85 required
+2025-08-13 15:56:14,706 - INFO - BUY order: 3 shares x $174.95 = $524.85 required
+2025-08-13 15:56:14,706 - INFO - Available cash: $146.02 (after $10.00 reserve)
+2025-08-13 15:56:14,706 - INFO - Available cash: $146.02 (after $10.00 reserve)
+2025-08-13 15:56:14,706 - WARNING - Insufficient cash for full order - handling partial fill
+2025-08-13 15:56:14,706 - WARNING - Insufficient cash for full order - handling partial fill
+2025-08-13 15:56:14,706 - WARNING - Insufficient cash for AMD: need $524.85, have $146.02
+2025-08-13 15:56:14,706 - WARNING - Insufficient cash for AMD: need $524.85, have $146.02
+2025-08-13 15:56:14,706 - INFO - Max affordable: 0/3 shares (0.0%)
+2025-08-13 15:56:14,706 - INFO - Max affordable: 0/3 shares (0.0%)
+2025-08-13 15:56:14,706 - ERROR - Partial fill failed - Cannot afford even 1 share. Need $174.95, have $146.02
+2025-08-13 15:56:14,706 - ERROR - Partial fill failed - Cannot afford even 1 share. Need $174.95, have $146.02
+2025-08-13 15:56:14,706 - INFO - Executing order: BUY ALAB
+2025-08-13 15:56:14,706 - INFO - Executing order: BUY ALAB
+2025-08-13 15:56:14,706 - ERROR - Order failed - No market data for ALAB
+2025-08-13 15:56:14,706 - ERROR - Order failed - No market data for ALAB
+2025-08-13 15:56:14,707 - INFO - Executing order: BUY RKLB
+2025-08-13 15:56:14,707 - INFO - Executing order: BUY RKLB
+2025-08-13 15:56:14,707 - ERROR - Order failed - No market data for RKLB
+2025-08-13 15:56:14,707 - ERROR - Order failed - No market data for RKLB
+2025-08-13 15:56:14,707 - INFO - EXECUTION COMPLETE - 2 executed, 3 failed
+2025-08-13 15:56:14,707 - INFO - EXECUTION COMPLETE - 2 executed, 3 failed
+2025-08-13 15:56:14,707 - ERROR - Failed AMD: Cannot afford even 1 share. Need $174.95, have $146.02
+2025-08-13 15:56:14,707 - ERROR - Failed AMD: Cannot afford even 1 share. Need $174.95, have $146.02
+2025-08-13 15:56:14,707 - ERROR - Failed ALAB: No market data for ALAB
+2025-08-13 15:56:14,707 - ERROR - Failed ALAB: No market data for ALAB
+2025-08-13 15:56:14,707 - ERROR - Failed RKLB: No market data for RKLB
+2025-08-13 15:56:14,707 - ERROR - Failed RKLB: No market data for RKLB
+2025-08-13 15:56:14,707 - INFO - Cash impact: +$0.00 proceeds, -$355.80 invested, net: $-355.80
+2025-08-13 15:56:14,707 - INFO - Cash impact: +$0.00 proceeds, -$355.80 invested, net: $-355.80
+2025-08-13 15:56:14,707 - INFO - Final cash balance: $156.02
+2025-08-13 15:56:14,707 - INFO - Final cash balance: $156.02
+2025-08-13 15:56:14,707 - WARNING - Significant cash variance: $-8.71 from prediction
+2025-08-13 15:56:14,707 - WARNING - Significant cash variance: $-8.71 from prediction
+2025-08-13 15:56:14,708 - INFO - Detailed execution log saved to: trade_executions/trade_execution_20250813_155614.json
+2025-08-13 15:56:14,708 - INFO - Detailed execution log saved to: trade_executions/trade_execution_20250813_155614.json
+2025-08-13 15:56:14,708 - INFO - Final position - IONS: 7 shares @ $40.52
+2025-08-13 15:56:14,708 - INFO - Final position - IONS: 7 shares @ $40.52
+2025-08-13 15:56:14,708 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 15:56:14,708 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 15:56:14,708 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 15:56:14,708 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 15:56:14,708 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 15:56:14,708 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 15:56:14,708 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 15:56:14,708 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 15:56:14,709 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 15:56:14,709 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 15:56:14,709 - INFO - Final position - NVDA: 2 shares @ $179.08
+2025-08-13 15:56:14,709 - INFO - Final position - NVDA: 2 shares @ $179.08
+2025-08-13 15:56:14,709 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 15:56:14,709 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 15:56:14,711 - INFO - Portfolio state saved to portfolio_state.json
+2025-08-13 15:56:14,711 - INFO - Portfolio state saved to portfolio_state.json
+2025-08-13 15:56:14,712 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 15:56:14,712 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 15:56:14,712 - INFO - ============================================================
+2025-08-13 15:56:14,712 - INFO - ============================================================

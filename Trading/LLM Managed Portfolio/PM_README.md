@@ -32,3 +32,19 @@ Good Examples:
 * ✅ "SELL all AMD"
 * ✅ "REDUCE SERV by 8 shares"
 * ✅ "Set IONS to 12% weight"
+
+**Request Format**: Provide recommendations in this format:
+```
+"Please provide your trading recommendations in the structured ORDERS format with explicit BUY/SELL commands and share quantities using the following structure:
+
+## ORDERS
+
+### IMMEDIATE EXECUTION (HIGH PRIORITY)
+**SELL all 19 shares of SOUN** - Risk management
+**SELL 3 shares of CYTK** - Reduce exposure before earnings
+
+### POSITION MANAGEMENT (MEDIUM PRIORITY)
+**HOLD all 3 shares of IONS** - FDA catalyst upcoming
+**BUY 15 shares of NVDA** - AI infrastructure play
+"
+```
