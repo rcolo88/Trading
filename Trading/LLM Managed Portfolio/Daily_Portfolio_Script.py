@@ -131,6 +131,7 @@ class DailyPortfolioReport:
         self.benchmarks = ['SPY', 'IWM', 'VIX']
         self.total_investment = 1964.58  # Unchanged - original investment
         self.cash = 2.34  # Minimal cash remaining
+        self.load_portfolio_state()
     
 
     # == 2. CONFIGURATION METHODS ==
@@ -254,6 +255,40 @@ class DailyPortfolioReport:
 
 
     # == 3. DATA FETCHING METHODS ==
+    def save_portfolio_state(self):
+        """Save current portfolio state to external JSON file"""
+        state_data = {
+            'timestamp': datetime.now().isoformat(),
+            'cash': self.cash,
+            'holdings': dict(self.holdings),
+            'total_investment': getattr(self, 'total_investment', 2000.00),
+            'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        with open('portfolio_state.json', 'w') as f:
+            json.dump(state_data, f, indent=2)
+        
+        print(f"💾 Portfolio state saved to portfolio_state.json")
+
+    def load_portfolio_state(self):
+        """Load portfolio state from external file if it exists"""
+        try:
+            if os.path.exists('portfolio_state.json'):
+                with open('portfolio_state.json', 'r') as f:
+                    state_data = json.load(f)
+                
+                self.cash = state_data['cash']
+                self.holdings = state_data['holdings']
+                
+                print(f"📂 Portfolio state loaded from portfolio_state.json")
+                print(f"   Last updated: {state_data['last_update']}")
+                return True
+        except Exception as e:
+            print(f"⚠️ Error loading portfolio state: {e}")
+            print("📝 Using default holdings from __init__")
+        
+        return False
+    
     def fetch_current_data(self):
         """Fetch current price data for all holdings and benchmarks"""
         
@@ -1114,6 +1149,10 @@ class DailyPortfolioReport:
             print(f"     {ticker}: {pos['shares']} shares @ ${pos['entry_price']:.2f}")
         
         print(f"{'='*60}")
+
+        # Save state after successful trades
+        if executed_count > 0:
+            self.save_portfolio_state()
         
         return results
     
@@ -1377,17 +1416,18 @@ class DailyPortfolioReport:
         # Calculate positions
         positions, total_value, total_cost_basis = self.calculate_position_metrics(current_prices)
 
-        # Also update the P&L calculations to use the actual cost basis:
-        total_pnl = total_value - total_cost_basis  # Use actual cost basis, not self.total_investment
-        total_pnl_pct = (total_pnl / total_cost_basis) * 100
+        # FIXED: Use actual initial investment of $2000
+        initial_investment = 2000.00  # Your real starting amount
+        total_pnl = total_value - initial_investment  # Fixed calculation
+        total_pnl_pct = (total_pnl / initial_investment) * 100  # Fixed percentage
+        account_growth_percent = ((total_value / initial_investment) - 1) * 100  # Fixed growth
 
-        # Update the account summary print statements:
         print(f"\n💰 ACCOUNT VALUE SUMMARY:")
         print(f"   Total Account Value:    ${total_value:,.2f}")
-        print(f"   Total Cost Basis:       ${total_cost_basis:,.2f}")  # Show actual cost basis
+        print(f"   Initial Investment:     ${initial_investment:,.2f}")
         print(f"   Cash Available:         ${self.cash:.2f}")
         print(f"   Total P&L:              ${total_pnl:+,.2f} ({total_pnl_pct:+.2f}%)")
-        print(f"   Account Growth:         {((total_value / (total_cost_basis + self.cash)) - 1) * 100:+.2f}%")
+        print(f"   Account Growth:         {account_growth_percent:+.2f}%")
         
         # Benchmark performance
         print(f"\n📈 BENCHMARK PERFORMANCE:")
@@ -1420,8 +1460,8 @@ class DailyPortfolioReport:
                 rebalance_alerts.append(f"{pos['ticker']}: {pos['weight_drift']:+.1f}% drift")
             
             print(f"{pos['ticker']:<6} {pos['shares']:<7} ${pos['entry_price']:<7.2f} ${pos['current_price']:<7.2f} "
-                  f"${pos['current_value']:<9.2f} ${pos['pnl_dollar']:<9.2f} {pos['pnl_percent']:+.1f}%   "
-                  f"{pos['current_weight']:.1f}%   {pos['target_weight']:.1f}%   {pos['weight_drift']:+.1f}%{drift_alert}")
+                f"${pos['current_value']:<9.2f} ${pos['pnl_dollar']:<9.2f} {pos['pnl_percent']:+.1f}%   "
+                f"{pos['current_weight']:.1f}%   {pos['target_weight']:.1f}%   {pos['weight_drift']:+.1f}%{drift_alert}")
             
         alerts = self.check_alerts(positions)
         volume_alerts = self.get_volume_alerts(volumes, price_history)
@@ -1448,11 +1488,11 @@ class DailyPortfolioReport:
         report_data = {
             'date': datetime.now().isoformat(),
             'account_value': total_value,
-            'initial_investment': self.total_investment,
+            'initial_investment': initial_investment,
             'cash_available': self.cash,
             'total_pnl_dollar': total_pnl,
             'total_pnl_percent': total_pnl_pct,
-            'account_growth_percent': ((total_value / (self.total_investment + self.cash)) - 1) * 100,
+            'account_growth_percent': account_growth_percent,
             'positions': positions,
             'alerts': alerts,
             'volume_alerts': volume_alerts,
@@ -1488,6 +1528,7 @@ class DailyPortfolioReport:
         print(json.dumps(report_data, indent=2))
         
         return report_data
+    
     def generate_analysis_file(self, report_data):
         """Generate formatted text file for AI analysis"""
         
@@ -1527,6 +1568,7 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"❌ Error creating analysis file: {e}")
         
         return content
+   
     def plot_performance_chart(self, save_path=None):
         """Create performance chart matching the reference style"""
         
@@ -1537,13 +1579,14 @@ Please provide analysis and trading recommendations based on this data."""
         # Create the plot
         fig, ax = plt.subplots(figsize=(14, 8))
         
+        # FIXED: Use actual initial investment
+        initial_investment = 2000.00  # Your real starting amount
+        
         # Calculate portfolio performance over time
         portfolio_values = []
         spy_values = []
         iwm_values = []
         dates = self.price_data.index
-        
-        initial_portfolio_value = self.total_investment + self.cash
         
         for date in dates:
             # Calculate daily portfolio value
@@ -1560,31 +1603,31 @@ Please provide analysis and trading recommendations based on this data."""
             
             portfolio_values.append(daily_portfolio_value)
         
-        # Calculate benchmark values (normalized to start at same dollar amount)
+        # FIXED: Calculate benchmark values normalized to $2000 starting point
         if 'SPY' in self.price_data.columns:
             spy_start = self.price_data['SPY'].iloc[0]
-            spy_values = (self.price_data['SPY'] / spy_start) * initial_portfolio_value
+            spy_values = (self.price_data['SPY'] / spy_start) * initial_investment
         
         if 'IWM' in self.price_data.columns:
             iwm_start = self.price_data['IWM'].iloc[0]
-            iwm_values = (self.price_data['IWM'] / iwm_start) * initial_portfolio_value
+            iwm_values = (self.price_data['IWM'] / iwm_start) * initial_investment
         
         # Plot lines
         ax.plot(dates, portfolio_values, color='#1f77b4', linewidth=2.5, marker='o', markersize=3,
-                label=f'Portfolio (${initial_portfolio_value:,.0f} Invested)', zorder=3)
+                label=f'Portfolio (${initial_investment:,.0f} Invested)', zorder=3)
         
         if len(spy_values) > 0:
             ax.plot(dates, spy_values, color='#ff7f0e', linewidth=2, linestyle='-',
-                    label=f'S&P 500 (${initial_portfolio_value:,.0f} Invested)', zorder=2)
+                    label=f'S&P 500 (${initial_investment:,.0f} Invested)', zorder=2)
         
         if len(iwm_values) > 0:
             ax.plot(dates, iwm_values, color='#2ca02c', linewidth=2, linestyle='--',
-                    label=f'Russell 2000 (${initial_portfolio_value:,.0f} Invested)', zorder=1)
+                    label=f'Russell 2000 (${initial_investment:,.0f} Invested)', zorder=1)
         
         # Formatting
         ax.set_title('LLM Portfolio vs. S&P 500 vs. Russell 2000', fontsize=16, fontweight='bold', pad=20)
         ax.set_xlabel('Date', fontsize=12)
-        ax.set_ylabel(f'Value of ${initial_portfolio_value:,.0f} Investment', fontsize=12)
+        ax.set_ylabel(f'Value of ${initial_investment:,.0f} Investment', fontsize=12)
         ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
         ax.legend(loc='upper left', fontsize=11)
         
@@ -1593,7 +1636,7 @@ Please provide analysis and trading recommendations based on this data."""
         
         # Add performance annotations
         if len(portfolio_values) > 0:
-            portfolio_return = ((portfolio_values[-1] - initial_portfolio_value) / initial_portfolio_value) * 100
+            portfolio_return = ((portfolio_values[-1] - initial_investment) / initial_investment) * 100
             ax.annotate(f'{portfolio_return:+.1f}%', 
                     xy=(dates[-1], portfolio_values[-1]),
                     xytext=(10, 10), textcoords='offset points',
@@ -1601,7 +1644,7 @@ Please provide analysis and trading recommendations based on this data."""
                     bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
         
         if len(spy_values) > 0:
-            spy_return = ((spy_values.iloc[-1] - initial_portfolio_value) / initial_portfolio_value) * 100
+            spy_return = ((spy_values.iloc[-1] - initial_investment) / initial_investment) * 100
             ax.annotate(f'{spy_return:+.1f}%', 
                     xy=(dates[-1], spy_values.iloc[-1]),
                     xytext=(10, -10), textcoords='offset points',
@@ -1609,7 +1652,7 @@ Please provide analysis and trading recommendations based on this data."""
                     bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
         
         if len(iwm_values) > 0:
-            iwm_return = ((iwm_values.iloc[-1] - initial_portfolio_value) / initial_portfolio_value) * 100
+            iwm_return = ((iwm_values.iloc[-1] - initial_investment) / initial_investment) * 100
             ax.annotate(f'{iwm_return:+.1f}%', 
                     xy=(dates[-1], iwm_values.iloc[-1]),
                     xytext=(10, 0), textcoords='offset points',
@@ -1635,6 +1678,7 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"📊 Chart saved to {save_path}")
         
         plt.show()
+        
     def plot_position_details(self, positions, total_value, save_path=None):
         """Create position details chart showing portfolio breakdown and performance"""
         
@@ -1746,7 +1790,8 @@ Please provide analysis and trading recommendations based on this data."""
         
         plt.show()
         # plt.close()  # Clean up to prevent memory issues
-    def export_historical_metrics(self, report_data):
+    
+    
         """Export daily metrics to CSV for historical tracking"""
         
         filename = 'portfolio_historical_metrics.csv'
@@ -1792,6 +1837,59 @@ Please provide analysis and trading recommendations based on this data."""
         except Exception as e:
             print(f"❌ Error saving historical metrics: {e}")
 
+    def export_historical_metrics(self, report_data):
+        """Export enhanced daily metrics to CSV for historical tracking"""
+        
+        filename = 'portfolio_historical_metrics.csv'
+        
+        # Enhanced metrics to track
+        current_metrics = {
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'time': datetime.now().strftime('%H:%M:%S'),
+            'account_value': report_data['account_value'],
+            'initial_investment': report_data['initial_investment'],
+            'cash_available': report_data['cash_available'],
+            'total_pnl_dollar': report_data['total_pnl_dollar'],
+            'total_pnl_percent': report_data['total_pnl_percent'],
+            'account_growth_percent': report_data['account_growth_percent'],
+            'spy_price': report_data['benchmarks']['SPY'],
+            'iwm_price': report_data['benchmarks']['IWM'],
+            'vix_level': report_data['benchmarks']['VIX'],
+            'positions_profitable': report_data['portfolio_metrics']['positions_profitable'],
+            'total_positions': report_data['portfolio_metrics']['total_positions'],
+            'largest_position_weight': report_data['portfolio_metrics']['largest_position_weight'],
+            'concentration_risk': report_data['portfolio_metrics']['concentration_risk'],
+            'total_alerts': len(report_data['alerts']) + len(report_data['volume_alerts']) + len(report_data['rebalancing_alerts'])
+        }
+        
+        # Add individual position details (enhanced)
+        for pos in report_data['positions']:
+            ticker = pos['ticker']
+            current_metrics[f"{ticker}_shares"] = pos['shares']
+            current_metrics[f"{ticker}_entry_price"] = pos['entry_price']
+            current_metrics[f"{ticker}_current_price"] = pos['current_price']
+            current_metrics[f"{ticker}_current_value"] = pos['current_value']
+            current_metrics[f"{ticker}_pnl_dollar"] = pos['pnl_dollar']
+            current_metrics[f"{ticker}_pnl_pct"] = pos['pnl_percent']
+            current_metrics[f"{ticker}_weight"] = pos['current_weight']
+            current_metrics[f"{ticker}_weight_drift"] = pos['weight_drift']
+        
+        # Create DataFrame
+        df_new = pd.DataFrame([current_metrics])
+        
+        # Append to existing file or create new one
+        try:
+            if os.path.exists(filename):
+                df_existing = pd.read_csv(filename)
+                df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+            else:
+                df_combined = df_new
+            
+            df_combined.to_csv(filename, index=False)
+            print(f"📈 Enhanced historical metrics saved to {filename}")
+            
+        except Exception as e:
+            print(f"❌ Error saving historical metrics: {e}")
 # Usage
 # if __name__ == "__main__":
 #     reporter = DailyPortfolioReport()
