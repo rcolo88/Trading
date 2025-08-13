@@ -2246,8 +2246,166 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"❌ Error creating current performance chart: {e}")
             return False
 
+    # def plot_performance_chart(self, save_path=None):
+    #     """Create performance chart with FIXED date handling"""
+        
+    #     print("\n📊 GENERATING PERFORMANCE CHART")
+        
+    #     filename = 'portfolio_performance_history.csv'
+    #     chart_created = False
+        
+    #     # Try to create chart from historical data
+    #     if os.path.exists(filename):
+    #         try:
+    #             # Load historical performance data
+    #             df = pd.read_csv(filename)
+                
+    #             if len(df) >= 2:  # Need at least 2 points for a line chart
+    #                 # 🔧 FIXED: Proper date parsing and debugging
+    #                 print(f"📂 Raw date data: {df['date'].iloc[0]} to {df['date'].iloc[-1]}")
+                    
+    #                 # Convert dates properly
+    #                 dates = pd.to_datetime(df['date'], format='%Y-%m-%d')
+                    
+    #                 # 🔧 DEBUG: Check what dates look like
+    #                 print(f"📅 Parsed dates: {dates.iloc[0]} to {dates.iloc[-1]}")
+    #                 print(f"📊 Date range: {len(dates)} days")
+                    
+    #                 portfolio_returns = df['total_pnl_percentage'].values
+    #                 spy_returns = df['spy_return_pct'].values if 'spy_return_pct' in df.columns else None
+    #                 iwm_returns = df['iwm_return_pct'].values if 'iwm_return_pct' in df.columns else None
+                    
+    #                 print(f"📂 Loaded {len(df)} days of performance data")
+                    
+    #                 # Create the time-series chart
+    #                 fig, ax = plt.subplots(figsize=(14, 8))
+                    
+    #                 # Plot portfolio performance
+    #                 ax.plot(dates, portfolio_returns, color='#1f77b4', linewidth=3, 
+    #                     marker='o', markersize=4, label='LLM Portfolio', zorder=3)
+                    
+    #                 # Plot S&P 500 if available
+    #                 if spy_returns is not None and len(spy_returns) > 0:
+    #                     ax.plot(dates, spy_returns, color='#ff7f0e', linewidth=2, 
+    #                         linestyle='-', label='S&P 500', zorder=2)
+                    
+    #                 # Plot Russell 2000 if available
+    #                 if iwm_returns is not None and len(iwm_returns) > 0:
+    #                     ax.plot(dates, iwm_returns, color='#2ca02c', linewidth=2, 
+    #                         linestyle='--', label='Russell 2000', zorder=1)
+                    
+    #                 # Add performance annotations for latest values
+    #                 latest_portfolio = portfolio_returns[-1]
+    #                 ax.annotate(f'{latest_portfolio:+.1f}%', 
+    #                         xy=(dates.iloc[-1], latest_portfolio),
+    #                         xytext=(10, 10), textcoords='offset points',
+    #                         fontsize=12, fontweight='bold', color='#1f77b4',
+    #                         bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+                    
+    #                 if spy_returns is not None and len(spy_returns) > 0:
+    #                     latest_spy = spy_returns[-1]
+    #                     ax.annotate(f'{latest_spy:+.1f}%', 
+    #                             xy=(dates.iloc[-1], latest_spy),
+    #                             xytext=(10, -15), textcoords='offset points',
+    #                             fontsize=11, fontweight='bold', color='#ff7f0e',
+    #                             bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+                    
+    #                 if iwm_returns is not None and len(iwm_returns) > 0:
+    #                     latest_iwm = iwm_returns[-1]
+    #                     ax.annotate(f'{latest_iwm:+.1f}%', 
+    #                             xy=(dates.iloc[-1], latest_iwm),
+    #                             xytext=(10, -30), textcoords='offset points',
+    #                             fontsize=11, fontweight='bold', color='#2ca02c',
+    #                             bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+                    
+    #                 # Chart formatting
+    #                 ax.set_title('Portfolio Performance vs. Market Benchmarks', fontsize=16, fontweight='bold', pad=20)
+    #                 ax.set_xlabel('Date', fontsize=12)
+    #                 ax.set_ylabel('Total Return (%)', fontsize=12)
+    #                 ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+    #                 ax.legend(loc='upper left', fontsize=11)
+                    
+    #                 # Format y-axis as percentages
+    #                 ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}%'))
+                    
+    #                 # Add zero line
+    #                 ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.7)
+                    
+    #                 # 🔧 FIXED: Proper date axis formatting to prevent tick overflow
+    #                 import matplotlib.dates as mdates
+                    
+    #                 # Calculate date range
+    #                 date_range = (dates.max() - dates.min()).days
+    #                 print(f"📅 Date range span: {date_range} days")
+                    
+    #                 # Set appropriate date locators based on data range
+    #                 if date_range <= 7:
+    #                     # Daily ticks for week or less
+    #                     ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+    #                     ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+    #                 elif date_range <= 30:
+    #                     # Every few days for a month
+    #                     ax.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, date_range // 7)))
+    #                     ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+    #                 elif date_range <= 90:
+    #                     # Weekly ticks for 3 months
+    #                     ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
+    #                     ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+    #                 else:
+    #                     # Monthly ticks for longer periods
+    #                     ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+    #                     ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+                    
+    #                 # 🔧 CRITICAL: Limit maximum number of ticks
+    #                 ax.xaxis.set_major_locator(plt.MaxNLocator(nbins=10))  # Max 10 ticks
+                    
+    #                 plt.xticks(rotation=45)
+    #                 plt.tight_layout()
+                    
+    #                 # Save the chart
+    #                 if save_path:
+    #                     # Ensure .png extension
+    #                     if not save_path.endswith('.png'):
+    #                         save_path += '.png'
+    #                     plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    #                     print(f"📊 Historical chart saved to {save_path}")
+                    
+    #                 plt.show()
+    #                 chart_created = True
+                    
+    #                 # Performance summary
+    #                 print(f"\n📈 PERFORMANCE SUMMARY ({len(df)} days):")
+    #                 print(f"   Portfolio:    {latest_portfolio:+.2f}%")
+    #                 if spy_returns is not None and len(spy_returns) > 0:
+    #                     print(f"   S&P 500:      {latest_spy:+.2f}%")
+    #                     outperformance_spy = latest_portfolio - latest_spy
+    #                     print(f"   vs S&P 500:   {outperformance_spy:+.2f}% {'✅' if outperformance_spy > 0 else '❌'}")
+                    
+    #                 if iwm_returns is not None and len(iwm_returns) > 0:
+    #                     print(f"   Russell 2000: {latest_iwm:+.2f}%")
+    #                     outperformance_iwm = latest_portfolio - latest_iwm
+    #                     print(f"   vs Russell:   {outperformance_iwm:+.2f}% {'✅' if outperformance_iwm > 0 else '❌'}")
+                
+    #             elif len(df) == 1:
+    #                 print(f"📊 Only 1 day of data available - need at least 2 days for time-series chart")
+    #                 # Create single-day bar chart instead
+    #                 chart_created = self._create_single_day_chart(df, save_path)
+                
+    #         except Exception as e:
+    #             print(f"❌ Error creating historical chart: {e}")
+    #             import traceback
+    #             traceback.print_exc()  # Show full error for debugging
+        
+    #     # If no chart created yet, create a current performance bar chart
+    #     if not chart_created:
+    #         print("📊 Creating current performance comparison chart")
+    #         chart_created = self._create_current_performance_chart(save_path)
+        
+    #     if not chart_created:
+    #         print("❌ Could not create any performance chart")
+
     def plot_performance_chart(self, save_path=None):
-        """Create performance chart with FIXED date handling"""
+        """Create performance chart with ROBUST date handling for mixed formats"""
         
         print("\n📊 GENERATING PERFORMANCE CHART")
         
@@ -2261,19 +2419,30 @@ Please provide analysis and trading recommendations based on this data."""
                 df = pd.read_csv(filename)
                 
                 if len(df) >= 2:  # Need at least 2 points for a line chart
-                    # 🔧 FIXED: Proper date parsing and debugging
+                    # 🔧 FIXED: Robust date parsing for mixed formats
                     print(f"📂 Raw date data: {df['date'].iloc[0]} to {df['date'].iloc[-1]}")
                     
-                    # Convert dates properly
-                    dates = pd.to_datetime(df['date'], format='%Y-%m-%d')
+                    # Method 1: Try flexible pandas parsing first
+                    try:
+                        dates = pd.to_datetime(df['date'], format='mixed', dayfirst=False)
+                        print("✅ Used pandas mixed format parsing")
+                    except (ValueError, TypeError):
+                        # Method 2: Custom parsing for mixed formats
+                        print("🔄 Using custom date parsing for mixed formats...")
+                        dates = self._parse_mixed_date_formats(df['date'])
                     
-                    # 🔧 DEBUG: Check what dates look like
+                    # 🔧 DEBUG: Validate parsed dates
                     print(f"📅 Parsed dates: {dates.iloc[0]} to {dates.iloc[-1]}")
-                    print(f"📊 Date range: {len(dates)} days")
+                    print(f"📊 Date range: {len(dates)} days, span: {(dates.max() - dates.min()).days} days")
                     
-                    portfolio_returns = df['total_pnl_percentage'].values
-                    spy_returns = df['spy_return_pct'].values if 'spy_return_pct' in df.columns else None
-                    iwm_returns = df['iwm_return_pct'].values if 'iwm_return_pct' in df.columns else None
+                    # Ensure dates are sorted chronologically
+                    sort_idx = dates.argsort()
+                    dates = dates.iloc[sort_idx]
+                    df = df.iloc[sort_idx]
+                    
+                    portfolio_returns = df['total_pnl_percentage'].iloc[sort_idx].values
+                    spy_returns = df['spy_return_pct'].iloc[sort_idx].values if 'spy_return_pct' in df.columns else None
+                    iwm_returns = df['iwm_return_pct'].iloc[sort_idx].values if 'iwm_return_pct' in df.columns else None
                     
                     print(f"📂 Loaded {len(df)} days of performance data")
                     
@@ -2331,7 +2500,7 @@ Please provide analysis and trading recommendations based on this data."""
                     # Add zero line
                     ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.7)
                     
-                    # 🔧 FIXED: Proper date axis formatting to prevent tick overflow
+                    # 🔧 FIXED: Robust date axis formatting
                     import matplotlib.dates as mdates
                     
                     # Calculate date range
@@ -2356,8 +2525,8 @@ Please provide analysis and trading recommendations based on this data."""
                         ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
                         ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
                     
-                    # 🔧 CRITICAL: Limit maximum number of ticks
-                    ax.xaxis.set_major_locator(plt.MaxNLocator(nbins=10))  # Max 10 ticks
+                    # 🔧 CRITICAL: Limit maximum number of ticks to prevent overflow
+                    ax.xaxis.set_major_locator(plt.MaxNLocator(nbins=min(10, len(dates))))
                     
                     plt.xticks(rotation=45)
                     plt.tight_layout()
@@ -2403,6 +2572,176 @@ Please provide analysis and trading recommendations based on this data."""
         
         if not chart_created:
             print("❌ Could not create any performance chart")
+
+    def _parse_mixed_date_formats(self, date_series):
+        """Helper method to parse mixed date formats in the CSV"""
+        import dateutil.parser
+        
+        parsed_dates = []
+        
+        for date_str in date_series:
+            try:
+                # Try different parsing strategies
+                date_str = str(date_str).strip()
+                
+                if '/' in date_str:
+                    # Handle MM/DD/YY or MM/D/YY formats
+                    parts = date_str.split('/')
+                    if len(parts) == 3:
+                        month, day, year = parts
+                        
+                        # Handle 2-digit years
+                        if len(year) == 2:
+                            year_int = int(year)
+                            # Assume 20xx for years 00-50, 19xx for 51-99
+                            if year_int <= 50:
+                                year = '20' + year
+                            else:
+                                year = '19' + year
+                        
+                        # Reconstruct as YYYY-MM-DD
+                        standardized = f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+                        parsed_date = pd.to_datetime(standardized)
+                    else:
+                        # Fallback to dateutil parser
+                        parsed_date = pd.to_datetime(dateutil.parser.parse(date_str))
+                else:
+                    # Assume it's already in ISO format or use pandas default
+                    parsed_date = pd.to_datetime(date_str)
+                
+                parsed_dates.append(parsed_date)
+                
+            except Exception as e:
+                print(f"⚠️ Could not parse date '{date_str}': {e}")
+                # Fallback to today's date
+                parsed_dates.append(pd.to_datetime('today'))
+        
+        return pd.Series(parsed_dates)
+
+    def export_historical_performance(self, report_data, current_prices):
+        """Export simplified historical performance data with STANDARDIZED date format"""
+        
+        filename = 'portfolio_performance_history.csv'
+        
+        # Calculate portfolio performance
+        account_value = report_data['account_value']
+        initial_investment = 2000.00
+        total_pnl_dollar = account_value - initial_investment
+        total_pnl_percentage = (total_pnl_dollar / initial_investment) * 100
+        
+        # Get benchmark prices
+        spy_price = report_data['benchmarks'].get('SPY', 0)
+        iwm_price = report_data['benchmarks'].get('IWM', 0)
+        
+        # Calculate benchmark returns using the new function
+        benchmark_returns = self.calculate_benchmark_returns(current_prices)
+        
+        spy_return_pct = benchmark_returns.get('SPY', {}).get('return_pct', 0)
+        iwm_return_pct = benchmark_returns.get('IWM', {}).get('return_pct', 0)
+        
+        # 🔧 FIXED: Use STANDARDIZED date format YYYY-MM-DD
+        today_date = datetime.now().strftime('%Y-%m-%d')  # Always use this format
+        
+        # Create today's record
+        performance_record = {
+            'date': today_date,  # 🔧 STANDARDIZED FORMAT
+            'time': datetime.now().strftime('%H:%M:%S'),
+            'account_value': account_value,
+            'total_pnl_dollar': total_pnl_dollar,
+            'total_pnl_percentage': total_pnl_percentage,
+            'spy_price': spy_price,
+            'iwm_price': iwm_price,
+            'spy_return_pct': spy_return_pct,
+            'iwm_return_pct': iwm_return_pct
+        }
+        
+        # Create DataFrame
+        df_new = pd.DataFrame([performance_record])
+        
+        # Append to existing file or create new one
+        try:
+            if os.path.exists(filename):
+                df_existing = pd.read_csv(filename)
+                
+                # 🔧 STANDARDIZE existing dates in the CSV
+                df_existing['date'] = df_existing['date'].apply(self._standardize_date_format)
+                
+                # Check if today's date already exists (avoid duplicates)
+                if today_date in df_existing['date'].values:
+                    # Update today's record instead of adding duplicate
+                    df_existing.loc[df_existing['date'] == today_date] = performance_record
+                    df_combined = df_existing
+                    print(f"📊 Updated today's record in {filename}")
+                else:
+                    # Add new record
+                    df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+                    print(f"📊 Added new record to {filename}")
+            else:
+                # Create new file
+                df_combined = df_new
+                print(f"📊 Created new performance history file: {filename}")
+            
+            # 🔧 ENSURE all dates are in YYYY-MM-DD format before saving
+            df_combined['date'] = df_combined['date'].apply(self._standardize_date_format)
+            
+            # Save the file
+            df_combined.to_csv(filename, index=False)
+            print(f"✅ All dates standardized to YYYY-MM-DD format")
+            
+            # Display summary
+            print(f"\n📈 PERFORMANCE SUMMARY:")
+            print(f"   Portfolio: {total_pnl_percentage:+.2f}% (${total_pnl_dollar:+,.2f})")
+            print(f"   S&P 500:   {spy_return_pct:+.2f}%")
+            print(f"   Russell 2000: {iwm_return_pct:+.2f}%")
+            
+            # Show outperformance
+            if spy_return_pct != 0:
+                spy_outperformance = total_pnl_percentage - spy_return_pct
+                print(f"   vs S&P 500: {spy_outperformance:+.2f}% {'✅' if spy_outperformance > 0 else '❌'}")
+            
+            if iwm_return_pct != 0:
+                iwm_outperformance = total_pnl_percentage - iwm_return_pct
+                print(f"   vs Russell: {iwm_outperformance:+.2f}% {'✅' if iwm_outperformance > 0 else '❌'}")
+            
+            print(f"📊 Historical records: {len(df_combined)} days")
+            
+        except Exception as e:
+            print(f"❌ Error saving performance history: {e}")
+
+    def _standardize_date_format(self, date_str):
+        """Convert any date format to YYYY-MM-DD standard"""
+        try:
+            date_str = str(date_str).strip()
+            
+            # If already in YYYY-MM-DD format, return as-is
+            if len(date_str) == 10 and date_str.count('-') == 2 and date_str[4] == '-':
+                return date_str
+            
+            # Parse using the mixed format parser and convert to standard
+            if '/' in date_str:
+                parts = date_str.split('/')
+                if len(parts) == 3:
+                    month, day, year = parts
+                    
+                    # Handle 2-digit years
+                    if len(year) == 2:
+                        year_int = int(year)
+                        if year_int <= 50:
+                            year = '20' + year
+                        else:
+                            year = '19' + year
+                    
+                    # Return standardized format
+                    return f"{year}-{month.zfill(2)}-{day.zfill(2)}"
+            
+            # Fallback: try to parse and reformat
+            parsed = pd.to_datetime(date_str)
+            return parsed.strftime('%Y-%m-%d')
+            
+        except Exception as e:
+            print(f"⚠️ Could not standardize date '{date_str}': {e}")
+            # Return today's date as fallback
+            return datetime.now().strftime('%Y-%m-%d')
 
     def plot_position_details(self, positions, total_value, save_path=None):
         """Create position details chart showing portfolio breakdown and performance"""
@@ -2521,20 +2860,22 @@ Please provide analysis and trading recommendations based on this data."""
         
         plt.show()
 
-    def export_historical_performance(self, report_data, current_prices):
         """Export simplified historical performance data for charting"""
         
         filename = 'portfolio_performance_history.csv'
         
-        # Calculate portfolio performance
-        account_value = report_data['account_value']
+        # Calculate portfolio performance using total_value (which includes cash + positions)
+        account_value = total_value
         initial_investment = 2000.00
         total_pnl_dollar = account_value - initial_investment
         total_pnl_percentage = (total_pnl_dollar / initial_investment) * 100
         
+        # Get current prices for benchmark calculation
+        current_prices = self.get_current_prices(['SPY', 'IWM'])
+        
         # Get benchmark prices
-        spy_price = report_data['benchmarks'].get('SPY', 0)
-        iwm_price = report_data['benchmarks'].get('IWM', 0)
+        spy_price = current_prices.get('SPY', 0)
+        iwm_price = current_prices.get('IWM', 0)
         
         # Calculate benchmark returns using the new function
         benchmark_returns = self.calculate_benchmark_returns(current_prices)

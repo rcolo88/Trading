@@ -1,0 +1,75 @@
+{
+  "timestamp": "2025-08-13T09:18:58.875612",
+  "document": "trading_recommendations_aug7.md",
+  "file_type": ".md",
+  "validation": {
+    "feasible": true,
+    "total_sells": 0,
+    "total_buys": 0,
+    "final_cash": 511.8199995422363,
+    "warnings": [
+      "No price data for SOUN",
+      "No price data for CYTK"
+    ],
+    "phase_results": {
+      "HIGH Priority SELLS (Generate Cash)": {
+        "sells": 0,
+        "buys": 0,
+        "warnings": [
+          "No price data for SOUN",
+          "No price data for CYTK"
+        ]
+      }
+    }
+  },
+  "orders_parsed": 2,
+  "orders_executed": 0,
+  "orders_failed": 2,
+  "total_proceeds": 0,
+  "total_invested": 0,
+  "predicted_cash": 511.8199995422363,
+  "actual_cash": 511.8199995422363,
+  "cash_variance": 0.0,
+  "updated_holdings": {
+    "IONS": {
+      "shares": 3,
+      "entry_price": 37.01,
+      "allocation": 111.03
+    },
+    "CRGY": {
+      "shares": 26,
+      "entry_price": 9.1,
+      "allocation": 236.6
+    },
+    "SERV": {
+      "shares": 23,
+      "entry_price": 10.15,
+      "allocation": 233.45
+    },
+    "QS": {
+      "shares": 23,
+      "entry_price": 8.5,
+      "allocation": 138.0
+    },
+    "RIG": {
+      "shares": 65,
+      "entry_price": 3.0,
+      "allocation": 195.0
+    },
+    "AMD": {
+      "shares": 1,
+      "entry_price": 176.78,
+      "allocation": 176.78
+    },
+    "NVDA": {
+      "shares": 1,
+      "entry_price": 175.0,
+      "allocation": 135.0
+    },
+    "GOOGL": {
+      "shares": 1,
+      "entry_price": 193.0,
+      "allocation": 193.0
+    }
+  }
+}
