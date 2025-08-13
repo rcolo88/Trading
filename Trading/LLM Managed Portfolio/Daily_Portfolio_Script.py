@@ -16,6 +16,17 @@ import logging
 import glob
 import re
 
+# Configure trade execution logger
+trade_logger = logging.getLogger('trade_execution')
+trade_logger.setLevel(logging.INFO)
+
+# Create file handler - this ensures the log file gets written
+if not trade_logger.handlers:  # Prevent duplicate handlers
+    handler = logging.FileHandler('trade_execution.log')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    trade_logger.addHandler(handler)
+
 # PDF support (add to your existing imports)
 try:
     import pdfplumber
@@ -967,7 +978,6 @@ class DailyPortfolioReport:
         }
     
 
-
     # == 7. TRADE EXECUTION METHODS ==
     def execute_orders(self, orders):
         """Execute parsed trading orders with proper cash flow management"""
@@ -1011,7 +1021,7 @@ class DailyPortfolioReport:
                     print(f"❌ Failed: {result.error_message}")
         
         return results
-    
+
     def execute_automated_trading(self, document_path: Optional[str] = None):
         """Main method to execute automated trading from document"""
         print(f"\n{'='*60}")
@@ -1019,58 +1029,98 @@ class DailyPortfolioReport:
         print(f"{'='*60}")
         print(f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
+        # LOG: Start of execution session
+        trade_logger.info("=" * 60)
+        trade_logger.info("AUTOMATED TRADE EXECUTION SESSION STARTED")
+        trade_logger.info("=" * 60)
+        
         # Auto-detect document if not provided
         if document_path is None:
             document_path = self.find_trading_document()
             if not document_path:
+                trade_logger.warning("No trading document found - execution cancelled")
                 return []
         
         # Validate file exists
         if not os.path.exists(document_path):
-            print(f"❌ File not found: {document_path}")
+            error_msg = f"File not found: {document_path}"
+            print(f"❌ {error_msg}")
+            trade_logger.error(error_msg)
             return []
         
         print(f"📄 Document: {document_path}")
         file_ext = os.path.splitext(document_path)[1].lower()
         print(f"📋 File type: {file_ext.upper()}")
         
+        # LOG: Document being processed
+        trade_logger.info(f"Processing document: {document_path} (Type: {file_ext.upper()})")
+        
         # Parse orders from document
         orders = self.parse_document(document_path)
         
         if not orders:
-            print("❌ No valid orders found in document")
+            error_msg = "No valid orders found in document"
+            print(f"❌ {error_msg}")
+            trade_logger.warning(error_msg)
             return []
+        
+        # LOG: Orders parsed
+        trade_logger.info(f"Successfully parsed {len(orders)} orders from document")
         
         print(f"\n📋 PARSED ORDERS ({len(orders)}):")
         print("-" * 40)
         for i, order in enumerate(orders, 1):
             if order.action == OrderType.HOLD:
-                print(f"{i}. {order.action.value} {order.ticker} - {order.reason}")
+                order_desc = f"{order.action.value} {order.ticker} - {order.reason}"
+                print(f"{i}. {order_desc}")
+                trade_logger.info(f"Order {i}: {order_desc}")
             else:
                 shares_text = f"{order.shares} shares of" if order.shares else "position in"
-                print(f"{i}. {order.action.value} {shares_text} {order.ticker} ({order.priority.value})")
+                order_desc = f"{order.action.value} {shares_text} {order.ticker} ({order.priority.value})"
+                print(f"{i}. {order_desc}")
                 print(f"   Reason: {order.reason}")
+                trade_logger.info(f"Order {i}: {order_desc} - {order.reason}")
         
         # Get current market data for validation
         current_prices, _, _ = self.fetch_current_data()
         if not current_prices:
-            print("❌ Failed to fetch current market data")
+            error_msg = "Failed to fetch current market data"
+            print(f"❌ {error_msg}")
+            trade_logger.error(error_msg)
             return []
+        
+        # LOG: Market data status
+        trade_logger.info(f"Market data fetched for {len(current_prices)} securities")
         
         # CASH FLOW VALIDATION
         validation = self.validate_cash_flow(orders, current_prices)
+        
+        # LOG: Validation results
+        if validation['feasible']:
+            trade_logger.info("Cash flow validation PASSED - all trades feasible")
+        else:
+            trade_logger.warning("Cash flow validation FAILED - some trades not feasible")
+        
+        if validation['warnings']:
+            for warning in validation['warnings']:
+                trade_logger.warning(f"Validation warning: {warning}")
         
         # Ask for confirmation if there are issues
         if not validation['feasible'] or validation['warnings']:
             print(f"\n⚠️  EXECUTION CONCERNS DETECTED!")
             response = input("Do you want to proceed anyway? (y/n): ").lower().strip()
             if response not in ['y', 'yes']:
-                print("❌ Execution cancelled by user")
+                cancel_msg = "Execution cancelled by user"
+                print(f"❌ {cancel_msg}")
+                trade_logger.info(cancel_msg)
                 return []
+            else:
+                trade_logger.info("User chose to proceed despite warnings")
         
         # Execute orders
         print(f"\n⚡ EXECUTING TRADES...")
         print("-" * 40)
+        trade_logger.info("Beginning trade execution phase")
         
         results = self.execute_orders(orders)
         
@@ -1082,6 +1132,9 @@ class DailyPortfolioReport:
         print("-" * 40)
         print(f"✅ Executed: {executed_count}")
         print(f"❌ Failed: {failed_count}")
+        
+        # LOG: Execution summary
+        trade_logger.info(f"EXECUTION COMPLETE - {executed_count} executed, {failed_count} failed")
         
         total_proceeds = 0
         total_invested = 0
@@ -1095,13 +1148,19 @@ class DailyPortfolioReport:
                     total_invested += result.execution_value
                     print(f"💸 Invested in {result.order.ticker}: ${result.execution_value:.2f}")
             else:
-                print(f"⚠️  Failed {result.order.ticker}: {result.error_message}")
+                failure_msg = f"Failed {result.order.ticker}: {result.error_message}"
+                print(f"⚠️  {failure_msg}")
+                trade_logger.error(failure_msg)
         
         print(f"\n💰 ACTUAL CASH IMPACT:")
         print(f"   Proceeds from sales: +${total_proceeds:.2f}")
         print(f"   Invested in buys: -${total_invested:.2f}")
         print(f"   Net cash change: ${total_proceeds - total_invested:+.2f}")
         print(f"   Final cash balance: ${self.cash:.2f}")
+        
+        # LOG: Cash impact summary
+        trade_logger.info(f"Cash impact: +${total_proceeds:.2f} proceeds, -${total_invested:.2f} invested, net: ${total_proceeds - total_invested:+.2f}")
+        trade_logger.info(f"Final cash balance: ${self.cash:.2f}")
         
         # Compare with validation
         predicted_final = validation['final_cash']
@@ -1112,8 +1171,12 @@ class DailyPortfolioReport:
             print(f"   Variance from prediction: ${variance:+.2f}")
             if abs(variance) > 1.00:  # More than $1 difference
                 print(f"   ⚠️  Significant variance - may indicate execution issues")
+                trade_logger.warning(f"Significant cash variance: ${variance:+.2f} from prediction")
+            else:
+                trade_logger.info(f"Minor cash variance: ${variance:+.2f} from prediction")
         else:
             print(f"   ✅ Matches cash flow prediction exactly")
+            trade_logger.info("Cash flow matches prediction exactly")
         
         # Save execution log
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -1139,6 +1202,7 @@ class DailyPortfolioReport:
             json.dump(execution_log, f, indent=2)
         
         print(f"\n📄 Execution log saved: {log_filename}")
+        trade_logger.info(f"Detailed execution log saved to: {log_filename}")
         
         # Show updated portfolio summary
         print(f"\n📈 UPDATED PORTFOLIO SUMMARY:")
@@ -1147,70 +1211,91 @@ class DailyPortfolioReport:
         print(f"   Positions ({len(self.holdings)}):")
         for ticker, pos in self.holdings.items():
             print(f"     {ticker}: {pos['shares']} shares @ ${pos['entry_price']:.2f}")
+            trade_logger.info(f"Final position - {ticker}: {pos['shares']} shares @ ${pos['entry_price']:.2f}")
         
         print(f"{'='*60}")
-
+        
         # Save state after successful trades
         if executed_count > 0:
             self.save_portfolio_state()
+            trade_logger.info("Portfolio state saved to portfolio_state.json")
+        
+        # LOG: End of session
+        trade_logger.info("AUTOMATED TRADE EXECUTION SESSION COMPLETED")
+        trade_logger.info("=" * 60)
         
         return results
-    
+
     def _execute_single_order(self, order, current_prices):
         """Execute a single trading order with enhanced cash management"""
         timestamp = datetime.now()
         
+        # LOG: Starting order execution
+        trade_logger.info(f"Executing order: {order.action.value} {order.ticker}")
+        
         # Validate ticker exists
         if order.ticker not in current_prices:
+            error_msg = f"No market data for {order.ticker}"
+            trade_logger.error(f"Order failed - {error_msg}")
             return TradeResult(
                 order=order,
                 executed=False,
                 execution_price=None,
                 executed_shares=None,
                 execution_value=None,
-                error_message=f"No market data for {order.ticker}",
+                error_message=error_msg,
                 timestamp=timestamp
             )
         
         current_price = current_prices[order.ticker]
+        trade_logger.info(f"{order.ticker} current market price: ${current_price:.2f}")
         
         # Handle SELL/REDUCE orders
         if order.action in [OrderType.SELL, OrderType.REDUCE]:
             if order.ticker not in self.holdings:
+                error_msg = f"No position in {order.ticker} to sell"
+                trade_logger.error(f"Sell order failed - {error_msg}")
                 return TradeResult(
                     order=order,
                     executed=False,
                     execution_price=current_price,
                     executed_shares=0,
                     execution_value=0,
-                    error_message=f"No position in {order.ticker} to sell",
+                    error_message=error_msg,
                     timestamp=timestamp
                 )
             
             available_shares = self.holdings[order.ticker]['shares']
+            trade_logger.info(f"Available shares for {order.ticker}: {available_shares}")
             
             # For REDUCE orders, calculate shares to sell based on target weight
             if order.action == OrderType.REDUCE and order.target_weight is not None:
                 target_percentage = order.target_weight / 100
                 shares_to_keep = int(available_shares * target_percentage)
                 shares_to_sell = available_shares - shares_to_keep
+                trade_logger.info(f"REDUCE order: keeping {shares_to_keep} shares ({target_percentage:.1%}), selling {shares_to_sell}")
             else:
                 # For SELL orders, use specified shares or all shares
                 shares_to_sell = min(order.shares or available_shares, available_shares)
+                trade_logger.info(f"SELL order: selling {shares_to_sell} shares")
             
             if shares_to_sell <= 0:
+                error_msg = f"No shares to sell (calculated: {shares_to_sell})"
+                trade_logger.error(f"Sell order failed - {error_msg}")
                 return TradeResult(
                     order=order,
                     executed=False,
                     execution_price=current_price,
                     executed_shares=0,
                     execution_value=0,
-                    error_message=f"No shares to sell (calculated: {shares_to_sell})",
+                    error_message=error_msg,
                     timestamp=timestamp
                 )
             
             execution_value = shares_to_sell * current_price
-            print(f"📤 PAPER TRADE: SOLD {shares_to_sell} shares of {order.ticker} at ${current_price:.2f} = ${execution_value:.2f}")
+            log_message = f"SOLD {shares_to_sell} shares of {order.ticker} at ${current_price:.2f} = ${execution_value:.2f}"
+            print(f"📤 PAPER TRADE: {log_message}")
+            trade_logger.info(f"TRADE EXECUTED: {log_message}")
             
             return TradeResult(
                 order=order,
@@ -1228,12 +1313,18 @@ class DailyPortfolioReport:
             required_cash = shares_to_buy * current_price
             available_cash = max(0, self.cash - getattr(self, 'min_cash_reserve', 10.0))
             
+            trade_logger.info(f"BUY order: {shares_to_buy} shares x ${current_price:.2f} = ${required_cash:.2f} required")
+            trade_logger.info(f"Available cash: ${available_cash:.2f} (after ${getattr(self, 'min_cash_reserve', 10.0):.2f} reserve)")
+            
             # Check if we have enough cash (considering cash reserve)
             if required_cash > available_cash:
+                trade_logger.warning(f"Insufficient cash for full order - handling partial fill")
                 return self._handle_insufficient_cash(order, current_price, available_cash, timestamp)
             
             execution_value = shares_to_buy * current_price
-            print(f"📥 PAPER TRADE: BOUGHT {shares_to_buy} shares of {order.ticker} at ${current_price:.2f} = ${execution_value:.2f}")
+            log_message = f"BOUGHT {shares_to_buy} shares of {order.ticker} at ${current_price:.2f} = ${execution_value:.2f}"
+            print(f"📥 PAPER TRADE: {log_message}")
+            trade_logger.info(f"TRADE EXECUTED: {log_message}")
             
             return TradeResult(
                 order=order,
@@ -1245,16 +1336,18 @@ class DailyPortfolioReport:
                 timestamp=timestamp
             )
         
+        error_msg = f"Unknown order action: {order.action}"
+        trade_logger.error(f"Order failed - {error_msg}")
         return TradeResult(
             order=order,
             executed=False,
             execution_price=current_price,
             executed_shares=0,
             execution_value=0,
-            error_message=f"Unknown order action: {order.action}",
+            error_message=error_msg,
             timestamp=timestamp
         )
-    
+
     def _handle_insufficient_cash(self, order, current_price, available_cash, timestamp):
         """Handle insufficient cash scenarios based on configuration"""
         
@@ -1267,23 +1360,32 @@ class DailyPortfolioReport:
         print(f"   Available: ${available_cash:.2f} (after ${getattr(self, 'min_cash_reserve', 10.0):.2f} reserve)")
         print(f"   Max affordable: {max_affordable_shares} shares ({affordability_ratio:.1%} of order)")
         
+        # LOG: Insufficient cash details
+        trade_logger.warning(f"Insufficient cash for {order.ticker}: need ${required_cash:.2f}, have ${available_cash:.2f}")
+        trade_logger.info(f"Max affordable: {max_affordable_shares}/{order.shares} shares ({affordability_ratio:.1%})")
+        
         # Handle based on partial fill mode
         if getattr(self, 'partial_fill_mode', PartialFillMode.AUTOMATIC) == PartialFillMode.AUTOMATIC:
             if max_affordable_shares > 0:
                 print(f"✅ AUTO-FILLING: {max_affordable_shares} shares")
+                trade_logger.info(f"AUTO-FILL: executing {max_affordable_shares} shares of {order.ticker}")
                 return self._execute_partial_fill(order, max_affordable_shares, current_price, timestamp)
             else:
+                error_msg = f"Cannot afford even 1 share. Need ${current_price:.2f}, have ${available_cash:.2f}"
+                trade_logger.error(f"Partial fill failed - {error_msg}")
                 return TradeResult(
                     order=order, executed=False, execution_price=current_price,
                     executed_shares=0, execution_value=0, timestamp=timestamp,
-                    error_message=f"Cannot afford even 1 share. Need ${current_price:.2f}, have ${available_cash:.2f}"
+                    error_message=error_msg
                 )
         
         # Fallback to reject
+        error_msg = f"Insufficient cash: Need ${required_cash:.2f}, have ${available_cash:.2f}"
+        trade_logger.info(f"Order rejected - {error_msg}")
         return TradeResult(
             order=order, executed=False, execution_price=current_price,
             executed_shares=0, execution_value=0, timestamp=timestamp,
-            error_message=f"Insufficient cash: Need ${required_cash:.2f}, have ${available_cash:.2f}"
+            error_message=error_msg
         )
 
     # == 8. PARTIAL FILL HELPERS ==
@@ -1338,7 +1440,6 @@ class DailyPortfolioReport:
                 print("   Please enter 'y' for yes, 'n' for no, or 's' to skip")
 
 
-
     # == 9. PORTFOLIO UPDATE METHODS ==
     def _update_portfolio_holdings(self, result):
         """Update portfolio holdings after successful trade"""
@@ -1351,15 +1452,21 @@ class DailyPortfolioReport:
         price = result.execution_price
         value = result.execution_value
         
+        # LOG: Starting portfolio update
+        trade_logger.info(f"Updating portfolio holdings for {ticker}")
+        
         if order.action in [OrderType.SELL, OrderType.REDUCE]:
             if ticker in self.holdings:
                 current_shares = self.holdings[ticker]['shares']
                 remaining_shares = current_shares - shares
                 
+                trade_logger.info(f"Before: {ticker} had {current_shares} shares")
+                
                 if remaining_shares <= 0:
                     # Sold entire position
                     del self.holdings[ticker]
                     print(f"🗑️  Removed {ticker} position entirely")
+                    trade_logger.info(f"POSITION CLOSED: Removed {ticker} position entirely")
                 else:
                     # Reduce position
                     self.holdings[ticker]['shares'] = remaining_shares
@@ -1367,11 +1474,16 @@ class DailyPortfolioReport:
                     original_allocation = self.holdings[ticker]['allocation']
                     self.holdings[ticker]['allocation'] = original_allocation * (remaining_shares / current_shares)
                     print(f"📉 Reduced {ticker} to {remaining_shares} shares")
+                    trade_logger.info(f"POSITION REDUCED: {ticker} now has {remaining_shares} shares (was {current_shares})")
                 
                 # Add cash from sale
+                old_cash = self.cash
                 self.cash += value
+                trade_logger.info(f"Cash updated: ${old_cash:.2f} + ${value:.2f} = ${self.cash:.2f}")
                 
         elif order.action == OrderType.BUY:
+            old_cash = self.cash
+            
             if ticker in self.holdings:
                 # Add to existing position
                 current_shares = self.holdings[ticker]['shares']
@@ -1380,12 +1492,15 @@ class DailyPortfolioReport:
                 new_shares = current_shares + shares
                 new_avg_price = new_basis / new_shares
                 
+                trade_logger.info(f"Before: {ticker} had {current_shares} shares @ ${self.holdings[ticker]['entry_price']:.2f}")
+                
                 self.holdings[ticker].update({
                     'shares': new_shares,
                     'entry_price': new_avg_price,
                     'allocation': new_basis
                 })
                 print(f"📈 Increased {ticker} to {new_shares} shares")
+                trade_logger.info(f"POSITION INCREASED: {ticker} now has {new_shares} shares @ ${new_avg_price:.2f} avg (was {current_shares} @ ${self.holdings[ticker]['entry_price']:.2f})")
             else:
                 # New position
                 self.holdings[ticker] = {
@@ -1394,10 +1509,13 @@ class DailyPortfolioReport:
                     'allocation': value
                 }
                 print(f"🆕 Added new {ticker} position: {shares} shares")
+                trade_logger.info(f"NEW POSITION: Added {ticker} - {shares} shares @ ${price:.2f}")
             
             # Reduce cash
             self.cash -= value
-
+            trade_logger.info(f"Cash updated: ${old_cash:.2f} - ${value:.2f} = ${self.cash:.2f}")
+        
+        trade_logger.info(f"Portfolio update complete for {ticker}")
 
 
     # == 10. REPORTING AND VISUALIZATION == 
