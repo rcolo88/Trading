@@ -122,6 +122,322 @@ class TradeResult:
     timestamp: datetime
 
 
+class PerformanceValidator:
+    """Foolproof performance validation system with multiple cross-checks"""
+    
+    def __init__(self, portfolio_instance):
+        self.portfolio = portfolio_instance
+        self.validation_results = {}
+        
+    def validate_performance(self, current_prices):
+        """Run comprehensive performance validation with multiple cross-checks"""
+        print("\n" + "="*60)
+        print("🔍 PERFORMANCE VALIDATION SYSTEM")
+        print("="*60)
+        
+        # Method 1: Manual Position-by-Position Calculation
+        manual_calc = self._manual_position_calculation(current_prices)
+        
+        # Method 2: State File Validation  
+        state_calc = self._state_file_validation(current_prices)
+        
+        # Method 3: Trade Log Reconciliation
+        trade_calc = self._trade_log_reconciliation()
+        
+        # Method 4: Simple Cash + Holdings Validation
+        simple_calc = self._simple_validation(current_prices)
+        
+        # Cross-check all methods
+        self._cross_validate_results(manual_calc, state_calc, trade_calc, simple_calc)
+        
+        return self.validation_results
+    
+    def _manual_position_calculation(self, current_prices):
+        """Method 1: Manual calculation from scratch"""
+        print("\n📊 METHOD 1: Manual Position-by-Position Calculation")
+        print("-" * 50)
+        
+        total_current_value = self.portfolio.cash
+        total_cost_basis = 0
+        
+        print(f"💰 Starting with cash: ${self.portfolio.cash:.2f}")
+        
+        for ticker, position in self.portfolio.holdings.items():
+            if ticker in current_prices:
+                shares = position['shares']
+                entry_price = position['entry_price']
+                current_price = current_prices[ticker]
+                
+                cost_basis = shares * entry_price
+                current_value = shares * current_price
+                pnl = current_value - cost_basis
+                
+                total_cost_basis += cost_basis
+                total_current_value += current_value
+                
+                print(f"   {ticker}: {shares} shares × ${current_price:.2f} = ${current_value:.2f} "
+                      f"(Cost: ${cost_basis:.2f}, P&L: ${pnl:+.2f})")
+        
+        total_pnl = total_current_value - 2000.00  # True initial investment
+        total_pnl_pct = (total_pnl / 2000.00) * 100
+        
+        print(f"\n📈 MANUAL CALCULATION RESULTS:")
+        print(f"   Total Portfolio Value: ${total_current_value:.2f}")
+        print(f"   Total Cost Basis: ${total_cost_basis:.2f}")
+        print(f"   Cash: ${self.portfolio.cash:.2f}")
+        print(f"   Initial Investment: $2,000.00")
+        print(f"   Total P&L: ${total_pnl:+.2f} ({total_pnl_pct:+.2f}%)")
+        
+        return {
+            'method': 'Manual Calculation',
+            'total_value': total_current_value,
+            'total_pnl': total_pnl,
+            'total_pnl_pct': total_pnl_pct,
+            'calculation_basis': '2000.00 initial investment'
+        }
+    
+    def _state_file_validation(self, current_prices):
+        """Method 2: Validate using portfolio_state.json"""
+        print("\n📂 METHOD 2: Portfolio State File Validation")
+        print("-" * 50)
+        
+        try:
+            if os.path.exists('portfolio_state.json'):
+                with open('portfolio_state.json', 'r') as f:
+                    state_data = json.load(f)
+                
+                state_cash = state_data['cash']
+                state_holdings = state_data['holdings']
+                
+                total_current_value = state_cash
+                
+                print(f"💰 State file cash: ${state_cash:.2f}")
+                print(f"🏢 State file holdings:")
+                
+                for ticker, position in state_holdings.items():
+                    if ticker in current_prices:
+                        shares = position['shares']
+                        current_price = current_prices[ticker]
+                        current_value = shares * current_price
+                        total_current_value += current_value
+                        
+                        print(f"   {ticker}: {shares} shares × ${current_price:.2f} = ${current_value:.2f}")
+                
+                total_pnl = total_current_value - 2000.00
+                total_pnl_pct = (total_pnl / 2000.00) * 100
+                
+                print(f"\n📈 STATE FILE VALIDATION:")
+                print(f"   Total Portfolio Value: ${total_current_value:.2f}")
+                print(f"   Total P&L: ${total_pnl:+.2f} ({total_pnl_pct:+.2f}%)")
+                
+                return {
+                    'method': 'State File Validation',
+                    'total_value': total_current_value,
+                    'total_pnl': total_pnl,
+                    'total_pnl_pct': total_pnl_pct,
+                    'calculation_basis': 'portfolio_state.json'
+                }
+            else:
+                print("❌ No portfolio_state.json file found")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error reading state file: {e}")
+            return None
+    
+    def _trade_log_reconciliation(self):
+        """Method 3: Reconcile using trade execution logs"""
+        print("\n📝 METHOD 3: Trade Log Reconciliation")
+        print("-" * 50)
+        
+        try:
+            # Find most recent trade execution log
+            trade_logs = glob.glob('trade_execution_*.json')
+            if trade_logs:
+                latest_log = max(trade_logs, key=os.path.getmtime)
+                
+                with open(latest_log, 'r') as f:
+                    log_data = json.load(f)
+                
+                actual_cash = log_data.get('actual_cash', 0)
+                updated_holdings = log_data.get('updated_holdings', {})
+                
+                print(f"📄 Using trade log: {latest_log}")
+                print(f"💰 Log shows cash: ${actual_cash:.2f}")
+                print(f"🏢 Log shows holdings: {len(updated_holdings)} positions")
+                
+                return {
+                    'method': 'Trade Log Reconciliation',
+                    'log_file': latest_log,
+                    'actual_cash': actual_cash,
+                    'holdings_count': len(updated_holdings),
+                    'calculation_basis': 'trade_execution_log'
+                }
+            else:
+                print("❌ No trade execution logs found")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error reading trade logs: {e}")
+            return None
+    
+    def _simple_validation(self, current_prices):
+        """Method 4: Simple cash + holdings validation"""
+        print("\n🧮 METHOD 4: Simple Validation (Cash + Holdings)")
+        print("-" * 50)
+        
+        # Just sum everything we have right now
+        total_value = self.portfolio.cash
+        
+        for ticker, position in self.portfolio.holdings.items():
+            if ticker in current_prices:
+                value = position['shares'] * current_prices[ticker]
+                total_value += value
+                print(f"   {ticker}: ${value:.2f}")
+        
+        gain_from_2000 = total_value - 2000.00
+        gain_pct = (gain_from_2000 / 2000.00) * 100
+        
+        print(f"\n📈 SIMPLE VALIDATION:")
+        print(f"   Total Value: ${total_value:.2f}")
+        print(f"   Gain from $2000: ${gain_from_2000:+.2f} ({gain_pct:+.2f}%)")
+        
+        return {
+            'method': 'Simple Validation',
+            'total_value': total_value,
+            'total_pnl': gain_from_2000,
+            'total_pnl_pct': gain_pct,
+            'calculation_basis': 'cash + current_holdings'
+        }
+    
+    def _cross_validate_results(self, manual, state, trade, simple):
+        """Cross-validate all calculation methods"""
+        print("\n🔍 CROSS-VALIDATION RESULTS")
+        print("="*60)
+        
+        methods = [manual, state, trade, simple]
+        valid_methods = [m for m in methods if m and 'total_value' in m]
+        
+        if len(valid_methods) < 2:
+            print("❌ Insufficient methods for cross-validation")
+            return
+        
+        # Compare total values
+        values = [m['total_value'] for m in valid_methods]
+        percentages = [m['total_pnl_pct'] for m in valid_methods]
+        
+        value_variance = max(values) - min(values)
+        pct_variance = max(percentages) - min(percentages)
+        
+        print(f"📊 VALUE COMPARISON:")
+        for method in valid_methods:
+            print(f"   {method['method']}: ${method['total_value']:.2f} ({method['total_pnl_pct']:+.2f}%)")
+        
+        print(f"\n📈 VARIANCE ANALYSIS:")
+        print(f"   Value variance: ${value_variance:.2f}")
+        print(f"   Percentage variance: {pct_variance:.2f}%")
+        
+        if value_variance < 1.00:  # Less than $1 difference
+            print("✅ VALIDATION PASSED: All methods agree (variance < $1)")
+            consensus_value = sum(values) / len(values)
+            consensus_pct = sum(percentages) / len(percentages)
+            
+            self.validation_results = {
+                'status': 'PASSED',
+                'consensus_value': consensus_value,
+                'consensus_performance': consensus_pct,
+                'variance': value_variance,
+                'methods_used': len(valid_methods)
+            }
+        else:
+            print(f"❌ VALIDATION FAILED: Methods disagree (variance ${value_variance:.2f})")
+            print(f"🚨 PERFORMANCE CALCULATION SYSTEM HAS BUGS!")
+            
+            self.validation_results = {
+                'status': 'FAILED',
+                'variance': value_variance,
+                'methods_used': len(valid_methods),
+                'issue': 'Multiple calculation methods give different results'
+            }
+        
+        return self.validation_results
+
+# Usage in DailyPortfolioReport
+def validate_performance_calculations(self):
+    """Add this method to DailyPortfolioReport class"""
+    
+    # Get current prices
+    current_prices, _, _ = self.fetch_current_data()
+    if not current_prices:
+        print("❌ Cannot validate - no price data")
+        return
+    
+    # Run validation
+    validator = PerformanceValidator(self)
+    results = validator.validate_performance(current_prices)
+    
+    # Store results for comparison with report
+    self.validation_results = results
+    
+    return results
+
+# FIXED Chart Function - Use Historical CSV Data Instead of Reconstruction
+def plot_performance_chart_fixed(self, save_path=None):
+    """Fixed chart that uses actual historical data instead of reconstruction"""
+    
+    print("\n📊 GENERATING FIXED PERFORMANCE CHART")
+    
+    # Try to load historical CSV data first
+    if os.path.exists('portfolio_historical_metrics.csv'):
+        print("📂 Using historical CSV data (most reliable)")
+        df = pd.read_csv('portfolio_historical_metrics.csv')
+        
+        if 'account_value' in df.columns and len(df) > 1:
+            dates = pd.to_datetime(df['date'])
+            portfolio_values = df['account_value'].values
+            
+            # Normalize to start at $2000
+            first_value = portfolio_values[0]
+            portfolio_normalized = (portfolio_values / first_value) * 2000
+            
+            fig, ax = plt.subplots(figsize=(14, 8))
+            
+            # Plot actual historical performance
+            ax.plot(dates, portfolio_normalized, color='#1f77b4', linewidth=2.5, 
+                   marker='o', markersize=3, label='LLM Portfolio (Actual History)', zorder=3)
+            
+            # Calculate and display actual return
+            actual_return = ((portfolio_normalized[-1] - 2000) / 2000) * 100
+            
+            ax.annotate(f'{actual_return:+.1f}%', 
+                       xy=(dates.iloc[-1], portfolio_normalized[-1]),
+                       xytext=(10, 10), textcoords='offset points',
+                       fontsize=11, fontweight='bold', color='#1f77b4',
+                       bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+            
+            # Add benchmark data if available
+            if hasattr(self, 'price_data') and 'SPY' in self.price_data.columns:
+                spy_start = self.price_data['SPY'].iloc[0]
+                spy_normalized = (self.price_data['SPY'] / spy_start) * 2000
+                ax.plot(self.price_data.index, spy_normalized, color='#ff7f0e', 
+                       linewidth=2, label='S&P 500', zorder=2)
+            
+            ax.set_title('Portfolio Performance (Historical Data)', fontsize=16, fontweight='bold', pad=20)
+            ax.set_ylabel('Value of $2,000 Investment', fontsize=12)
+            ax.grid(True, alpha=0.3)
+            ax.legend()
+            
+            plt.tight_layout()
+            if save_path:
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+            plt.show()
+            
+            print(f"✅ Chart shows actual performance: {actual_return:+.2f}%")
+            return
+    
+    print("❌ No reliable historical data - chart generation skipped")
+    print("💡 Run the system for a few more days to build historical data")
+
 class DailyPortfolioReport:
     # == 1. INITIALIZATION ==
     def __init__(self):
@@ -141,8 +457,9 @@ class DailyPortfolioReport:
 
         self.benchmarks = ['SPY', 'IWM', 'VIX']
         self.total_investment = 1964.58  # Unchanged - original investment
-        self.cash = 2.34  # Minimal cash remaining
-        self.load_portfolio_state()
+        if not self.load_portfolio_state():
+            # Only set default if state file doesn't exist
+            self.cash = 0.00
     
 
     # == 2. CONFIGURATION METHODS ==
@@ -264,6 +581,23 @@ class DailyPortfolioReport:
         
         return validation_results
 
+    def cleanup_sold_positions(self):
+        """Remove any positions that have been completely sold"""
+        positions_to_remove = []
+        
+        for ticker, position in self.holdings.items():
+            if position.get('shares', 0) <= 0:
+                positions_to_remove.append(ticker)
+        
+        for ticker in positions_to_remove:
+            print(f"🗑️  Cleaning up sold position: {ticker}")
+            del self.holdings[ticker]
+        
+        if positions_to_remove:
+            self.save_portfolio_state()  # Save the cleaned state
+            print(f"✅ Removed {len(positions_to_remove)} sold positions")
+        
+        return positions_to_remove
 
     # == 3. DATA FETCHING METHODS ==
     def save_portfolio_state(self):
@@ -288,18 +622,34 @@ class DailyPortfolioReport:
                 with open('portfolio_state.json', 'r') as f:
                     state_data = json.load(f)
                 
+                # COMPLETELY REPLACE holdings (don't merge with defaults)
                 self.cash = state_data['cash']
-                self.holdings = state_data['holdings']
+                self.holdings = state_data['holdings']  # This completely replaces __init__ holdings
                 
                 print(f"📂 Portfolio state loaded from portfolio_state.json")
                 print(f"   Last updated: {state_data['last_update']}")
+                print(f"   Loaded {len(self.holdings)} positions: {list(self.holdings.keys())}")
+                
+                # Remove any positions with 0 shares (cleanup)
+                positions_to_remove = []
+                for ticker, position in self.holdings.items():
+                    if position.get('shares', 0) <= 0:
+                        positions_to_remove.append(ticker)
+                
+                for ticker in positions_to_remove:
+                    print(f"🗑️  Removing {ticker} (0 shares)")
+                    del self.holdings[ticker]
+                
                 return True
+            else:
+                print("📝 No portfolio_state.json found - using default holdings from __init__")
+                return False
+                
         except Exception as e:
             print(f"⚠️ Error loading portfolio state: {e}")
             print("📝 Using default holdings from __init__")
-        
-        return False
-    
+            return False
+
     def fetch_current_data(self):
         """Fetch current price data for all holdings and benchmarks"""
         
@@ -567,6 +917,82 @@ class DailyPortfolioReport:
         
         return volume_alerts
     
+    def calculate_benchmark_returns(self, current_prices):
+        """
+        Calculate returns for SPY and IWM assuming $2,000 investment on August 5, 2025
+        Uses fractional shares and entry prices from August 5, 2025
+        """
+        
+        # Entry prices from August 5, 2025 (portfolio start date)
+        SPY_ENTRY_PRICE = 631.17  # SPY closing price on August 5, 2025
+        IWM_ENTRY_PRICE = 220.76  # IWM price on August 5, 2025
+        INITIAL_INVESTMENT = 2000.00
+        
+        benchmark_returns = {}
+        
+        # Calculate SPY return
+        if 'SPY' in current_prices:
+            spy_current_price = current_prices['SPY']
+            
+            # Calculate shares bought with $2,000 (fractional shares allowed)
+            spy_shares = INITIAL_INVESTMENT / SPY_ENTRY_PRICE
+            
+            # Calculate current value
+            spy_current_value = spy_shares * spy_current_price
+            
+            # Calculate return
+            spy_gain = spy_current_value - INITIAL_INVESTMENT
+            spy_return_pct = (spy_gain / INITIAL_INVESTMENT) * 100
+            
+            benchmark_returns['SPY'] = {
+                'entry_price': SPY_ENTRY_PRICE,
+                'current_price': spy_current_price,
+                'shares': spy_shares,
+                'current_value': spy_current_value,
+                'total_gain': spy_gain,
+                'return_pct': spy_return_pct
+            }
+            
+            print(f"📊 SPY Benchmark Calculation:")
+            print(f"   Entry Price (8/5/2025): ${SPY_ENTRY_PRICE:.2f}")
+            print(f"   Current Price: ${spy_current_price:.2f}")
+            print(f"   Shares Owned: {spy_shares:.4f}")
+            print(f"   Current Value: ${spy_current_value:.2f}")
+            print(f"   Total Gain: ${spy_gain:+.2f}")
+            print(f"   Return: {spy_return_pct:+.2f}%")
+        
+        # Calculate IWM return
+        if 'IWM' in current_prices:
+            iwm_current_price = current_prices['IWM']
+            
+            # Calculate shares bought with $2,000 (fractional shares allowed)
+            iwm_shares = INITIAL_INVESTMENT / IWM_ENTRY_PRICE
+            
+            # Calculate current value
+            iwm_current_value = iwm_shares * iwm_current_price
+            
+            # Calculate return
+            iwm_gain = iwm_current_value - INITIAL_INVESTMENT
+            iwm_return_pct = (iwm_gain / INITIAL_INVESTMENT) * 100
+            
+            benchmark_returns['IWM'] = {
+                'entry_price': IWM_ENTRY_PRICE,
+                'current_price': iwm_current_price,
+                'shares': iwm_shares,
+                'current_value': iwm_current_value,
+                'total_gain': iwm_gain,
+                'return_pct': iwm_return_pct
+            }
+            
+            print(f"\n📊 IWM Benchmark Calculation:")
+            print(f"   Entry Price (8/5/2025): ${IWM_ENTRY_PRICE:.2f}")
+            print(f"   Current Price: ${iwm_current_price:.2f}")
+            print(f"   Shares Owned: {iwm_shares:.4f}")
+            print(f"   Current Value: ${iwm_current_value:.2f}")
+            print(f"   Total Gain: ${iwm_gain:+.2f}")
+            print(f"   Return: {iwm_return_pct:+.2f}%")
+        
+        return benchmark_returns
 
 
     # == 5. DOCUMENT PROCESSING METHODS ==
@@ -1519,11 +1945,28 @@ class DailyPortfolioReport:
 
 
     # == 10. REPORTING AND VISUALIZATION == 
+    def validate_performance_calculations(self, current_prices):
+        """Validate performance using multiple cross-check methods"""
+        
+        # Run validation
+        validator = PerformanceValidator(self)
+        results = validator.validate_performance(current_prices)
+        
+        # Store results for comparison with report
+        self.validation_results = results
+        
+        return results
+
     def generate_report(self):
         """Generate complete daily report"""
         print("=" * 60)
         print(f"📊 DAILY PORTFOLIO REPORT - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
         print("=" * 60)
+        
+        # 🔧 ADD THIS: Clean up any sold positions
+        removed_positions = self.cleanup_sold_positions()
+        if removed_positions:
+            print(f"🗑️  Cleaned up {len(removed_positions)} sold positions: {removed_positions}")
         
         # Fetch data
         current_prices, volumes, price_history = self.fetch_current_data()
@@ -1533,6 +1976,17 @@ class DailyPortfolioReport:
         
         # Calculate positions
         positions, total_value, total_cost_basis = self.calculate_position_metrics(current_prices)
+
+        # 🔍 ADD THIS: Validate performance calculations
+        print("\n" + "="*60)
+        print("🔍 PERFORMANCE VALIDATION")
+        print("="*60)
+        validation_results = self.validate_performance_calculations(current_prices)
+
+        # Check if validation passed
+        if validation_results and validation_results.get('status') == 'FAILED':
+            print("🚨 WARNING: Performance calculation discrepancies detected!")
+            print("🔍 Review validation results above before trusting performance numbers")
 
         # FIXED: Use actual initial investment of $2000
         initial_investment = 2000.00  # Your real starting amount
@@ -1637,8 +2091,8 @@ class DailyPortfolioReport:
         # Generate position details chart
         self.plot_position_details(positions, total_value, save_path='LLM Position Details')
         
-        # Export historical metrics
-        self.export_historical_metrics(report_data)
+        # Export historical performance data
+        self.export_historical_performance(report_data, current_prices)
         
         print(f"\n" + "=" * 60)
         print("📋 JSON DATA FOR CLAUDE ANALYSIS:")
@@ -1686,117 +2140,270 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"❌ Error creating analysis file: {e}")
         
         return content
-   
-    def plot_performance_chart(self, save_path=None):
-        """Create performance chart matching the reference style"""
-        
-        if not hasattr(self, 'price_data') or self.price_data is None:
-            print("❌ No price data available for charting")
-            return
-        
-        # Create the plot
-        fig, ax = plt.subplots(figsize=(14, 8))
-        
-        # FIXED: Use actual initial investment
-        initial_investment = 2000.00  # Your real starting amount
-        
-        # Calculate portfolio performance over time
-        portfolio_values = []
-        spy_values = []
-        iwm_values = []
-        dates = self.price_data.index
-        
-        for date in dates:
-            # Calculate daily portfolio value
-            daily_portfolio_value = self.cash
-            for ticker, position in self.holdings.items():
-                if ticker in self.price_data.columns:
-                    current_price = self.price_data.loc[date, ticker]
-                    if not pd.isna(current_price):
-                        daily_portfolio_value += position['shares'] * current_price
-                    else:
-                        daily_portfolio_value += position['allocation']
-                else:
-                    daily_portfolio_value += position['allocation']
+
+    def _create_single_day_chart(self, df, save_path=None):
+        """Create a bar chart for single day of data"""
+        try:
+            record = df.iloc[0]
+            portfolio_return = record['total_pnl_percentage']
+            spy_return = record.get('spy_return_pct', 0)
+            iwm_return = record.get('iwm_return_pct', 0)
             
-            portfolio_values.append(daily_portfolio_value)
+            fig, ax = plt.subplots(figsize=(12, 6))
+            
+            categories = ['LLM Portfolio', 'S&P 500', 'Russell 2000']
+            returns = [portfolio_return, spy_return, iwm_return]
+            colors = ['#1f77b4', '#ff7f0e', '#2ca02c']
+            
+            bars = ax.bar(categories, returns, color=colors, alpha=0.7)
+            
+            # Add value labels on bars
+            for bar, ret in zip(bars, returns):
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height + (0.1 if height >= 0 else -0.3),
+                    f'{ret:+.1f}%', ha='center', va='bottom' if height >= 0 else 'top', 
+                    fontsize=12, fontweight='bold')
+            
+            ax.set_title(f'Performance Comparison - {record["date"]}', fontsize=16, fontweight='bold', pad=20)
+            ax.set_ylabel('Return (%)', fontsize=12)
+            ax.grid(axis='y', alpha=0.3)
+            ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+            
+            plt.tight_layout()
+            
+            if save_path:
+                if not save_path.endswith('.png'):
+                    save_path += '.png'
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+                print(f"📊 Single-day chart saved to {save_path}")
+            
+            plt.show()
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error creating single-day chart: {e}")
+            return False
+
+    def _create_current_performance_chart(self, save_path=None):
+        """Create a current performance chart when no historical data exists"""
+        try:
+            # Get current performance data
+            current_prices, _, _ = self.fetch_current_data()
+            if not current_prices:
+                return False
+            
+            positions, total_value, _ = self.calculate_position_metrics(current_prices)
+            portfolio_return = ((total_value - 2000) / 2000) * 100
+            
+            # Calculate benchmark returns
+            benchmark_returns = self.calculate_benchmark_returns(current_prices)
+            spy_return = benchmark_returns.get('SPY', {}).get('return_pct', 0)
+            iwm_return = benchmark_returns.get('IWM', {}).get('return_pct', 0)
+            
+            fig, ax = plt.subplots(figsize=(12, 6))
+            
+            categories = ['LLM Portfolio']
+            returns = [portfolio_return]
+            colors = ['#1f77b4']
+            
+            if spy_return != 0:
+                categories.append('S&P 500')
+                returns.append(spy_return)
+                colors.append('#ff7f0e')
+            
+            if iwm_return != 0:
+                categories.append('Russell 2000')
+                returns.append(iwm_return)
+                colors.append('#2ca02c')
+            
+            bars = ax.bar(categories, returns, color=colors, alpha=0.7)
+            
+            # Add value labels on bars
+            for bar, ret in zip(bars, returns):
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height + (0.1 if height >= 0 else -0.3),
+                    f'{ret:+.1f}%', ha='center', va='bottom' if height >= 0 else 'top', 
+                    fontsize=12, fontweight='bold')
+            
+            current_date = datetime.now().strftime('%Y-%m-%d')
+            ax.set_title(f'Current Performance Comparison - {current_date}', fontsize=16, fontweight='bold', pad=20)
+            ax.set_ylabel('Return (%)', fontsize=12)
+            ax.grid(axis='y', alpha=0.3)
+            ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
+            
+            plt.tight_layout()
+            
+            if save_path:
+                if not save_path.endswith('.png'):
+                    save_path += '.png'
+                plt.savefig(save_path, dpi=300, bbox_inches='tight')
+                print(f"📊 Current performance chart saved to {save_path}")
+            
+            plt.show()
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error creating current performance chart: {e}")
+            return False
+
+    def plot_performance_chart(self, save_path=None):
+        """Create performance chart with FIXED date handling"""
         
-        # FIXED: Calculate benchmark values normalized to $2000 starting point
-        if 'SPY' in self.price_data.columns:
-            spy_start = self.price_data['SPY'].iloc[0]
-            spy_values = (self.price_data['SPY'] / spy_start) * initial_investment
+        print("\n📊 GENERATING PERFORMANCE CHART")
         
-        if 'IWM' in self.price_data.columns:
-            iwm_start = self.price_data['IWM'].iloc[0]
-            iwm_values = (self.price_data['IWM'] / iwm_start) * initial_investment
+        filename = 'portfolio_performance_history.csv'
+        chart_created = False
         
-        # Plot lines
-        ax.plot(dates, portfolio_values, color='#1f77b4', linewidth=2.5, marker='o', markersize=3,
-                label=f'Portfolio (${initial_investment:,.0f} Invested)', zorder=3)
+        # Try to create chart from historical data
+        if os.path.exists(filename):
+            try:
+                # Load historical performance data
+                df = pd.read_csv(filename)
+                
+                if len(df) >= 2:  # Need at least 2 points for a line chart
+                    # 🔧 FIXED: Proper date parsing and debugging
+                    print(f"📂 Raw date data: {df['date'].iloc[0]} to {df['date'].iloc[-1]}")
+                    
+                    # Convert dates properly
+                    dates = pd.to_datetime(df['date'], format='%Y-%m-%d')
+                    
+                    # 🔧 DEBUG: Check what dates look like
+                    print(f"📅 Parsed dates: {dates.iloc[0]} to {dates.iloc[-1]}")
+                    print(f"📊 Date range: {len(dates)} days")
+                    
+                    portfolio_returns = df['total_pnl_percentage'].values
+                    spy_returns = df['spy_return_pct'].values if 'spy_return_pct' in df.columns else None
+                    iwm_returns = df['iwm_return_pct'].values if 'iwm_return_pct' in df.columns else None
+                    
+                    print(f"📂 Loaded {len(df)} days of performance data")
+                    
+                    # Create the time-series chart
+                    fig, ax = plt.subplots(figsize=(14, 8))
+                    
+                    # Plot portfolio performance
+                    ax.plot(dates, portfolio_returns, color='#1f77b4', linewidth=3, 
+                        marker='o', markersize=4, label='LLM Portfolio', zorder=3)
+                    
+                    # Plot S&P 500 if available
+                    if spy_returns is not None and len(spy_returns) > 0:
+                        ax.plot(dates, spy_returns, color='#ff7f0e', linewidth=2, 
+                            linestyle='-', label='S&P 500', zorder=2)
+                    
+                    # Plot Russell 2000 if available
+                    if iwm_returns is not None and len(iwm_returns) > 0:
+                        ax.plot(dates, iwm_returns, color='#2ca02c', linewidth=2, 
+                            linestyle='--', label='Russell 2000', zorder=1)
+                    
+                    # Add performance annotations for latest values
+                    latest_portfolio = portfolio_returns[-1]
+                    ax.annotate(f'{latest_portfolio:+.1f}%', 
+                            xy=(dates.iloc[-1], latest_portfolio),
+                            xytext=(10, 10), textcoords='offset points',
+                            fontsize=12, fontweight='bold', color='#1f77b4',
+                            bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+                    
+                    if spy_returns is not None and len(spy_returns) > 0:
+                        latest_spy = spy_returns[-1]
+                        ax.annotate(f'{latest_spy:+.1f}%', 
+                                xy=(dates.iloc[-1], latest_spy),
+                                xytext=(10, -15), textcoords='offset points',
+                                fontsize=11, fontweight='bold', color='#ff7f0e',
+                                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+                    
+                    if iwm_returns is not None and len(iwm_returns) > 0:
+                        latest_iwm = iwm_returns[-1]
+                        ax.annotate(f'{latest_iwm:+.1f}%', 
+                                xy=(dates.iloc[-1], latest_iwm),
+                                xytext=(10, -30), textcoords='offset points',
+                                fontsize=11, fontweight='bold', color='#2ca02c',
+                                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+                    
+                    # Chart formatting
+                    ax.set_title('Portfolio Performance vs. Market Benchmarks', fontsize=16, fontweight='bold', pad=20)
+                    ax.set_xlabel('Date', fontsize=12)
+                    ax.set_ylabel('Total Return (%)', fontsize=12)
+                    ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
+                    ax.legend(loc='upper left', fontsize=11)
+                    
+                    # Format y-axis as percentages
+                    ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.1f}%'))
+                    
+                    # Add zero line
+                    ax.axhline(y=0, color='black', linestyle='-', linewidth=0.5, alpha=0.7)
+                    
+                    # 🔧 FIXED: Proper date axis formatting to prevent tick overflow
+                    import matplotlib.dates as mdates
+                    
+                    # Calculate date range
+                    date_range = (dates.max() - dates.min()).days
+                    print(f"📅 Date range span: {date_range} days")
+                    
+                    # Set appropriate date locators based on data range
+                    if date_range <= 7:
+                        # Daily ticks for week or less
+                        ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+                        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+                    elif date_range <= 30:
+                        # Every few days for a month
+                        ax.xaxis.set_major_locator(mdates.DayLocator(interval=max(1, date_range // 7)))
+                        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+                    elif date_range <= 90:
+                        # Weekly ticks for 3 months
+                        ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
+                        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
+                    else:
+                        # Monthly ticks for longer periods
+                        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=1))
+                        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m'))
+                    
+                    # 🔧 CRITICAL: Limit maximum number of ticks
+                    ax.xaxis.set_major_locator(plt.MaxNLocator(nbins=10))  # Max 10 ticks
+                    
+                    plt.xticks(rotation=45)
+                    plt.tight_layout()
+                    
+                    # Save the chart
+                    if save_path:
+                        # Ensure .png extension
+                        if not save_path.endswith('.png'):
+                            save_path += '.png'
+                        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+                        print(f"📊 Historical chart saved to {save_path}")
+                    
+                    plt.show()
+                    chart_created = True
+                    
+                    # Performance summary
+                    print(f"\n📈 PERFORMANCE SUMMARY ({len(df)} days):")
+                    print(f"   Portfolio:    {latest_portfolio:+.2f}%")
+                    if spy_returns is not None and len(spy_returns) > 0:
+                        print(f"   S&P 500:      {latest_spy:+.2f}%")
+                        outperformance_spy = latest_portfolio - latest_spy
+                        print(f"   vs S&P 500:   {outperformance_spy:+.2f}% {'✅' if outperformance_spy > 0 else '❌'}")
+                    
+                    if iwm_returns is not None and len(iwm_returns) > 0:
+                        print(f"   Russell 2000: {latest_iwm:+.2f}%")
+                        outperformance_iwm = latest_portfolio - latest_iwm
+                        print(f"   vs Russell:   {outperformance_iwm:+.2f}% {'✅' if outperformance_iwm > 0 else '❌'}")
+                
+                elif len(df) == 1:
+                    print(f"📊 Only 1 day of data available - need at least 2 days for time-series chart")
+                    # Create single-day bar chart instead
+                    chart_created = self._create_single_day_chart(df, save_path)
+                
+            except Exception as e:
+                print(f"❌ Error creating historical chart: {e}")
+                import traceback
+                traceback.print_exc()  # Show full error for debugging
         
-        if len(spy_values) > 0:
-            ax.plot(dates, spy_values, color='#ff7f0e', linewidth=2, linestyle='-',
-                    label=f'S&P 500 (${initial_investment:,.0f} Invested)', zorder=2)
+        # If no chart created yet, create a current performance bar chart
+        if not chart_created:
+            print("📊 Creating current performance comparison chart")
+            chart_created = self._create_current_performance_chart(save_path)
         
-        if len(iwm_values) > 0:
-            ax.plot(dates, iwm_values, color='#2ca02c', linewidth=2, linestyle='--',
-                    label=f'Russell 2000 (${initial_investment:,.0f} Invested)', zorder=1)
-        
-        # Formatting
-        ax.set_title('LLM Portfolio vs. S&P 500 vs. Russell 2000', fontsize=16, fontweight='bold', pad=20)
-        ax.set_xlabel('Date', fontsize=12)
-        ax.set_ylabel(f'Value of ${initial_investment:,.0f} Investment', fontsize=12)
-        ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
-        ax.legend(loc='upper left', fontsize=11)
-        
-        # Format y-axis as currency
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'${x:,.0f}'))
-        
-        # Add performance annotations
-        if len(portfolio_values) > 0:
-            portfolio_return = ((portfolio_values[-1] - initial_investment) / initial_investment) * 100
-            ax.annotate(f'{portfolio_return:+.1f}%', 
-                    xy=(dates[-1], portfolio_values[-1]),
-                    xytext=(10, 10), textcoords='offset points',
-                    fontsize=11, fontweight='bold', color='#1f77b4',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
-        
-        if len(spy_values) > 0:
-            spy_return = ((spy_values.iloc[-1] - initial_investment) / initial_investment) * 100
-            ax.annotate(f'{spy_return:+.1f}%', 
-                    xy=(dates[-1], spy_values.iloc[-1]),
-                    xytext=(10, -10), textcoords='offset points',
-                    fontsize=11, fontweight='bold', color='#ff7f0e',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
-        
-        if len(iwm_values) > 0:
-            iwm_return = ((iwm_values.iloc[-1] - initial_investment) / initial_investment) * 100
-            ax.annotate(f'{iwm_return:+.1f}%', 
-                    xy=(dates[-1], iwm_values.iloc[-1]),
-                    xytext=(10, 0), textcoords='offset points',
-                    fontsize=11, fontweight='bold', color='#2ca02c',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
-        
-        # Format x-axis dates
-        import matplotlib.dates as mdates
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%m-%d'))
-        num_days = len(dates)
-        if num_days <= 7:
-            ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
-        elif num_days <= 30:
-            ax.xaxis.set_major_locator(mdates.DayLocator(interval=2))
-        else:
-            ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=1))
-        
-        plt.xticks(rotation=45)
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"📊 Chart saved to {save_path}")
-        
-        plt.show()
-        
+        if not chart_created:
+            print("❌ Could not create any performance chart")
+
     def plot_position_details(self, positions, total_value, save_path=None):
         """Create position details chart showing portfolio breakdown and performance"""
         
@@ -1879,15 +2486,21 @@ Please provide analysis and trading recommendations based on this data."""
             ax4.text(weight + max(current_weights) * 0.01, i, f'{weight:.1f}%', 
                     ha='left', va='center', fontsize=9)
         
-        # Add portfolio summary text box
+        # FIXED: Calculate summary metrics from available data
         total_pnl = sum(pnl_dollars)
         total_cost_basis = sum([pos['cost_basis'] for pos in positions])
         total_pnl_pct = (total_pnl / total_cost_basis) * 100 if total_cost_basis > 0 else 0
         profitable_positions = len([p for p in pnl_dollars if p >= 0])
         
+        # FIXED: Calculate portfolio gain from $2000 initial investment
+        portfolio_gain = total_value - 2000.00
+        portfolio_gain_pct = (portfolio_gain / 2000.00) * 100
+        
         summary_text = f"""Portfolio Summary:
         Total Value: ${total_value:,.0f}
-        Total P&L: ${total_pnl:+,.0f} ({total_pnl_pct:+.1f}%)
+        Cash: ${self.cash:.0f}
+        Portfolio Gain: ${portfolio_gain:+,.0f} ({portfolio_gain_pct:+.1f}%)
+        Position P&L: ${total_pnl:+,.0f} ({total_pnl_pct:+.1f}%)
         Profitable Positions: {profitable_positions}/{len(positions)}
         Largest Position: {max(current_weights):.1f}%
         Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}"""
@@ -1907,56 +2520,90 @@ Please provide analysis and trading recommendations based on this data."""
             print(f"📊 Position Details saved to {save_path}")
         
         plt.show()
-        # plt.close()  # Clean up to prevent memory issues
-    
-    
-        """Export daily metrics to CSV for historical tracking"""
+
+    def export_historical_performance(self, report_data, current_prices):
+        """Export simplified historical performance data for charting"""
         
-        filename = 'portfolio_historical_metrics.csv'
+        filename = 'portfolio_performance_history.csv'
         
-        # Current metrics to track
-        current_metrics = {
+        # Calculate portfolio performance
+        account_value = report_data['account_value']
+        initial_investment = 2000.00
+        total_pnl_dollar = account_value - initial_investment
+        total_pnl_percentage = (total_pnl_dollar / initial_investment) * 100
+        
+        # Get benchmark prices
+        spy_price = report_data['benchmarks'].get('SPY', 0)
+        iwm_price = report_data['benchmarks'].get('IWM', 0)
+        
+        # Calculate benchmark returns using the new function
+        benchmark_returns = self.calculate_benchmark_returns(current_prices)
+        
+        spy_return_pct = benchmark_returns.get('SPY', {}).get('return_pct', 0)
+        iwm_return_pct = benchmark_returns.get('IWM', {}).get('return_pct', 0)
+        
+        # Create today's record
+        performance_record = {
             'date': datetime.now().strftime('%Y-%m-%d'),
             'time': datetime.now().strftime('%H:%M:%S'),
-            'account_value': report_data['account_value'],
-            'total_pnl_dollar': report_data['total_pnl_dollar'],
-            'total_pnl_percent': report_data['total_pnl_percent'],
-            'account_growth_percent': report_data['account_growth_percent'],
-            'spy_price': report_data['benchmarks']['SPY'],
-            'iwm_price': report_data['benchmarks']['IWM'],
-            'vix_level': report_data['benchmarks']['VIX'],
-            'positions_profitable': report_data['portfolio_metrics']['positions_profitable'],
-            'largest_position_weight': report_data['portfolio_metrics']['largest_position_weight'],
-            'concentration_risk': report_data['portfolio_metrics']['concentration_risk'],
-            'total_alerts': len(report_data['alerts']) + len(report_data['volume_alerts']) + len(report_data['rebalancing_alerts'])
+            'account_value': account_value,
+            'total_pnl_dollar': total_pnl_dollar,
+            'total_pnl_percentage': total_pnl_percentage,
+            'spy_price': spy_price,
+            'iwm_price': iwm_price,
+            'spy_return_pct': spy_return_pct,
+            'iwm_return_pct': iwm_return_pct
         }
         
-        # Add individual position performance
-        for pos in report_data['positions']:
-            current_metrics[f"{pos['ticker']}_price"] = pos['current_price']
-            current_metrics[f"{pos['ticker']}_pnl_pct"] = pos['pnl_percent']
-            current_metrics[f"{pos['ticker']}_weight"] = pos['current_weight']
-            current_metrics[f"{pos['ticker']}_drift"] = pos['weight_drift']
-        
         # Create DataFrame
-        df_new = pd.DataFrame([current_metrics])
+        df_new = pd.DataFrame([performance_record])
         
         # Append to existing file or create new one
         try:
             if os.path.exists(filename):
                 df_existing = pd.read_csv(filename)
-                df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+                
+                # Check if today's date already exists (avoid duplicates)
+                today_date = datetime.now().strftime('%Y-%m-%d')
+                if today_date in df_existing['date'].values:
+                    # Update today's record instead of adding duplicate
+                    df_existing.loc[df_existing['date'] == today_date] = performance_record
+                    df_combined = df_existing
+                    print(f"📊 Updated today's record in {filename}")
+                else:
+                    # Add new record
+                    df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+                    print(f"📊 Added new record to {filename}")
             else:
+                # Create new file
                 df_combined = df_new
+                print(f"📊 Created new performance history file: {filename}")
             
+            # Save the file
             df_combined.to_csv(filename, index=False)
-            print(f"📈 Historical metrics saved to {filename}")
+            
+            # Display summary
+            print(f"\n📈 PERFORMANCE SUMMARY:")
+            print(f"   Portfolio: {total_pnl_percentage:+.2f}% (${total_pnl_dollar:+,.2f})")
+            print(f"   S&P 500:   {spy_return_pct:+.2f}%")
+            print(f"   Russell 2000: {iwm_return_pct:+.2f}%")
+            
+            # Show outperformance
+            if spy_return_pct != 0:
+                spy_outperformance = total_pnl_percentage - spy_return_pct
+                print(f"   vs S&P 500: {spy_outperformance:+.2f}% {'✅' if spy_outperformance > 0 else '❌'}")
+            
+            if iwm_return_pct != 0:
+                iwm_outperformance = total_pnl_percentage - iwm_return_pct
+                print(f"   vs Russell: {iwm_outperformance:+.2f}% {'✅' if iwm_outperformance > 0 else '❌'}")
+            
+            print(f"📊 Historical records: {len(df_combined)} days")
             
         except Exception as e:
-            print(f"❌ Error saving historical metrics: {e}")
-
-    def export_historical_metrics(self, report_data):
-        """Export enhanced daily metrics to CSV for historical tracking"""
+            print(f"❌ Error saving performance history: {e}")
+   
+    def _export_enhanced_metrics(self, report_data):
+        """Export detailed historical metrics (replaces old function)"""
         
         filename = 'portfolio_historical_metrics.csv'
         
@@ -1977,7 +2624,11 @@ Please provide analysis and trading recommendations based on this data."""
             'total_positions': report_data['portfolio_metrics']['total_positions'],
             'largest_position_weight': report_data['portfolio_metrics']['largest_position_weight'],
             'concentration_risk': report_data['portfolio_metrics']['concentration_risk'],
-            'total_alerts': len(report_data['alerts']) + len(report_data['volume_alerts']) + len(report_data['rebalancing_alerts'])
+            'total_alerts': len(report_data['alerts']) + len(report_data['volume_alerts']) + len(report_data['rebalancing_alerts']),
+            
+            # 🔍 ADD VALIDATION STATUS
+            'validation_status': getattr(self, 'validation_results', {}).get('status', 'NOT_RUN'),
+            'validation_variance': getattr(self, 'validation_results', {}).get('variance', 0)
         }
         
         # Add individual position details (enhanced)
@@ -2008,6 +2659,64 @@ Please provide analysis and trading recommendations based on this data."""
             
         except Exception as e:
             print(f"❌ Error saving historical metrics: {e}")
+
+    def _export_definitive_metrics(self, report_data):
+        """Export foolproof definitive performance record"""
+        
+        filename = 'portfolio_performance_definitive.csv'
+        
+        # Simple, reliable calculation for definitive record
+        total_value = report_data['account_value']
+        initial_investment = 2000.00  # Known starting amount
+        
+        # Calculate performance the simple way
+        total_gain = total_value - initial_investment
+        performance_pct = (total_gain / initial_investment) * 100
+        
+        # Definitive record with validation
+        definitive_record = {
+            'date': datetime.now().strftime('%Y-%m-%d'),
+            'time': datetime.now().strftime('%H:%M:%S'),
+            'total_portfolio_value': total_value,
+            'cash_balance': report_data['cash_available'],
+            'initial_investment': initial_investment,
+            'total_gain_loss': total_gain,
+            'performance_percent': performance_pct,
+            'calculation_method': 'cash_plus_current_holdings',
+            'validation_status': getattr(self, 'validation_results', {}).get('status', 'NOT_RUN'),
+            'num_positions': len(report_data['positions']),
+            'largest_position_pct': max([p['current_weight'] for p in report_data['positions']]) if report_data['positions'] else 0,
+            
+            # Cross-check fields
+            'report_pnl_percent': report_data['total_pnl_percent'],
+            'report_account_growth': report_data['account_growth_percent'],
+            'variance_from_report': performance_pct - report_data['total_pnl_percent']
+        }
+        
+        # Create DataFrame
+        df = pd.DataFrame([definitive_record])
+        
+        # Append to existing file or create new one
+        try:
+            if os.path.exists(filename):
+                df_existing = pd.read_csv(filename)
+                df_combined = pd.concat([df_existing, df], ignore_index=True)
+            else:
+                df_combined = df
+            
+            df_combined.to_csv(filename, index=False)
+            print(f"🛡️  Definitive performance record saved to {filename}")
+            
+            # Show comparison
+            if abs(definitive_record['variance_from_report']) > 0.1:
+                print(f"⚠️  Performance variance detected: {definitive_record['variance_from_report']:+.2f}%")
+                print(f"   Definitive: {performance_pct:.2f}% vs Report: {report_data['total_pnl_percent']:.2f}%")
+            else:
+                print(f"✅ Performance calculations match: {performance_pct:.2f}%")
+            
+        except Exception as e:
+            print(f"❌ Error saving definitive metrics: {e}")
+
 # Usage
 # if __name__ == "__main__":
 #     reporter = DailyPortfolioReport()

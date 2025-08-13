@@ -1,13 +1,13 @@
-Daily portfolio update for 2025-08-12. Here's the data:
+Daily portfolio update for 2025-08-13. Here's the data:
 
 {
-  "date": "2025-08-12T16:54:46.439789",
+  "date": "2025-08-13T09:09:26.136013",
   "account_value": 2086.1500142478944,
-  "initial_investment": 1964.58,
-  "cash_available": 408.88999542236326,
-  "total_pnl_dollar": 460.0500142478943,
-  "total_pnl_percent": 28.29161885787432,
-  "account_growth_percent": -12.105481920083838,
+  "initial_investment": 2000.0,
+  "cash_available": 511.8199995422363,
+  "total_pnl_dollar": 86.15001424789443,
+  "total_pnl_percent": 4.307500712394722,
+  "account_growth_percent": 4.307500712394718,
   "positions": [
     {
       "ticker": "IONS",
@@ -20,8 +20,8 @@ Daily portfolio update for 2025-08-12. Here's the data:
       "pnl_percent": 11.888678323188621,
       "daily_change": 11.888678323188628,
       "current_weight": 5.954988792453841,
-      "target_weight": 6.827993358342045,
-      "weight_drift": -0.8730045658882037
+      "target_weight": 7.3221398612466695,
+      "weight_drift": -1.367151068792828
     },
     {
       "ticker": "QS",
@@ -34,8 +34,8 @@ Daily portfolio update for 2025-08-12. Here's the data:
       "pnl_percent": 10.000004487879135,
       "daily_change": 10.000004487879135,
       "current_weight": 10.308463308250353,
-      "target_weight": 12.022630834512022,
-      "weight_drift": -1.7141675262616687
+      "target_weight": 12.892716769104961,
+      "weight_drift": -2.584253460854608
     },
     {
       "ticker": "GOOGL",
@@ -48,8 +48,8 @@ Daily portfolio update for 2025-08-12. Here's the data:
       "pnl_percent": 5.357511055901878,
       "daily_change": 5.357511055901878,
       "current_weight": 9.747141622085094,
-      "target_weight": 11.868888752229259,
-      "weight_drift": -2.121747130144165
+      "target_weight": 12.727848268221265,
+      "weight_drift": -2.9807066461361718
     },
     {
       "ticker": "NVDA",
@@ -62,8 +62,8 @@ Daily portfolio update for 2025-08-12. Here's the data:
       "pnl_percent": 4.662859235491071,
       "daily_change": 4.662859235491071,
       "current_weight": 8.779809812869226,
-      "target_weight": 10.76194575979337,
-      "weight_drift": -1.982135946924144
+      "target_weight": 11.540795061858661,
+      "weight_drift": -2.760985248989435
     },
     {
       "ticker": "SERV",
@@ -76,8 +76,8 @@ Daily portfolio update for 2025-08-12. Here's the data:
       "pnl_percent": 2.6600992738319658,
       "daily_change": 2.66009927383197,
       "current_weight": 11.488148029525275,
-      "target_weight": 14.356435643564355,
-      "weight_drift": -2.8682876140390796
+      "target_weight": 15.395420612519453,
+      "weight_drift": -3.907272582994178
     },
     {
       "ticker": "CRGY",
@@ -90,8 +90,8 @@ Daily portfolio update for 2025-08-12. Here's the data:
       "pnl_percent": 2.637364314152647,
       "daily_change": 2.637364314152648,
       "current_weight": 11.640582043896524,
-      "target_weight": 14.550150667240636,
-      "weight_drift": -2.9095686233441125
+      "target_weight": 15.603154923632909,
+      "weight_drift": -3.962572879736385
     },
     {
       "ticker": "AMD",
@@ -104,8 +104,8 @@ Daily portfolio update for 2025-08-12. Here's the data:
       "pnl_percent": -1.0351867019786252,
       "daily_change": -1.0351867019786252,
       "current_weight": 8.38626157051873,
-      "target_weight": 10.871410122378697,
-      "weight_drift": -2.4851485518599663
+      "target_weight": 11.658181434487853,
+      "weight_drift": -3.2719198639691225
     },
     {
       "ticker": "RIG",
@@ -118,22 +118,8 @@ Daily portfolio update for 2025-08-12. Here's the data:
       "pnl_percent": -1.9999980926513672,
       "daily_change": -1.9999980926513672,
       "current_weight": 9.16041523448283,
-      "target_weight": 11.99188241805547,
-      "weight_drift": -2.8314671835726397
-    },
-    {
-      "ticker": "CYTK",
-      "shares": 3,
-      "entry_price": 36.58,
-      "current_price": 34.310001373291016,
-      "current_value": 102.93000411987305,
-      "cost_basis": 109.74,
-      "pnl_dollar": -6.809995880126948,
-      "pnl_percent": -6.205573063720565,
-      "daily_change": -6.205573063720565,
-      "current_weight": 4.93396943733127,
-      "target_weight": 6.748662443884139,
-      "weight_drift": -1.8146930065528686
+      "target_weight": 12.859743068928223,
+      "weight_drift": -3.699327834445393
     }
   ],
   "alerts": [],
@@ -145,7 +131,7 @@ Daily portfolio update for 2025-08-12. Here's the data:
     "VIX": 14.729999542236328
   },
   "portfolio_metrics": {
-    "total_positions": 9,
+    "total_positions": 8,
     "positions_profitable": 6,
     "largest_position_weight": 11.640582043896524,
     "concentration_risk": 0
@@ -160,7 +146,7 @@ Key questions:
 
 Additional context:
 - Portfolio total investment: $1,964.58
-- Cash available: $408.89
+- Cash available: $511.82
 - Investment timeframe: August 5, 2025 to December 27, 2025
 - Strategy: Catalyst-driven momentum with concentrated positions
 

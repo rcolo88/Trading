@@ -1,0 +1,48 @@
+{
+  "timestamp": "2025-08-12T22:57:23.303316",
+  "cash": 511.8199995422363,
+  "holdings": {
+    "IONS": {
+      "shares": 3,
+      "entry_price": 37.01,
+      "allocation": 111.03
+    },
+    "CRGY": {
+      "shares": 26,
+      "entry_price": 9.1,
+      "allocation": 236.6
+    },
+    "SERV": {
+      "shares": 23,
+      "entry_price": 10.15,
+      "allocation": 233.45
+    },
+    "QS": {
+      "shares": 23,
+      "entry_price": 8.5,
+      "allocation": 138.0
+    },
+    "RIG": {
+      "shares": 65,
+      "entry_price": 3.0,
+      "allocation": 195.0
+    },
+    "AMD": {
+      "shares": 1,
+      "entry_price": 176.78,
+      "allocation": 176.78
+    },
+    "NVDA": {
+      "shares": 1,
+      "entry_price": 175.0,
+      "allocation": 135.0
+    },
+    "GOOGL": {
+      "shares": 1,
+      "entry_price": 193.0,
+      "allocation": 193.0
+    }
+  },
+  "total_investment": 1964.58,
+  "last_update": "2025-08-12 22:57:23"
+}

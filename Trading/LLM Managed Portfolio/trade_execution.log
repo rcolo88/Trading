@@ -1,0 +1,606 @@
+2025-08-12 22:15:03,230 - INFO - ============================================================
+2025-08-12 22:15:03,230 - INFO - ============================================================
+2025-08-12 22:15:03,230 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-12 22:15:03,230 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-12 22:15:03,230 - INFO - ============================================================
+2025-08-12 22:15:03,230 - INFO - ============================================================
+2025-08-12 22:15:03,232 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-12 22:15:03,232 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-12 22:15:03,234 - INFO - Successfully parsed 2 orders from document
+2025-08-12 22:15:03,234 - INFO - Successfully parsed 2 orders from document
+2025-08-12 22:15:03,234 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-12 22:15:03,234 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-12 22:15:03,234 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-12 22:15:03,234 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-12 22:15:04,603 - INFO - Market data fetched for 13 securities
+2025-08-12 22:15:04,603 - INFO - Market data fetched for 13 securities
+2025-08-12 22:15:04,603 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-12 22:15:04,603 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-12 22:15:04,603 - INFO - Beginning trade execution phase
+2025-08-12 22:15:04,603 - INFO - Beginning trade execution phase
+2025-08-12 22:15:05,579 - INFO - Executing order: SELL SOUN
+2025-08-12 22:15:05,579 - INFO - Executing order: SELL SOUN
+2025-08-12 22:15:05,580 - INFO - SOUN current market price: $15.98
+2025-08-12 22:15:05,580 - INFO - SOUN current market price: $15.98
+2025-08-12 22:15:05,580 - INFO - Available shares for SOUN: 19
+2025-08-12 22:15:05,580 - INFO - Available shares for SOUN: 19
+2025-08-12 22:15:05,580 - INFO - SELL order: selling 19 shares
+2025-08-12 22:15:05,580 - INFO - SELL order: selling 19 shares
+2025-08-12 22:15:05,580 - INFO - TRADE EXECUTED: SOLD 19 shares of SOUN at $15.98 = $303.62
+2025-08-12 22:15:05,580 - INFO - TRADE EXECUTED: SOLD 19 shares of SOUN at $15.98 = $303.62
+2025-08-12 22:15:05,580 - INFO - Updating portfolio holdings for SOUN
+2025-08-12 22:15:05,580 - INFO - Updating portfolio holdings for SOUN
+2025-08-12 22:15:05,580 - INFO - Before: SOUN had 19 shares
+2025-08-12 22:15:05,580 - INFO - Before: SOUN had 19 shares
+2025-08-12 22:15:05,580 - INFO - POSITION CLOSED: Removed SOUN position entirely
+2025-08-12 22:15:05,580 - INFO - POSITION CLOSED: Removed SOUN position entirely
+2025-08-12 22:15:05,580 - INFO - Cash updated: $2.34 + $303.62 = $305.96
+2025-08-12 22:15:05,580 - INFO - Cash updated: $2.34 + $303.62 = $305.96
+2025-08-12 22:15:05,580 - INFO - Portfolio update complete for SOUN
+2025-08-12 22:15:05,580 - INFO - Portfolio update complete for SOUN
+2025-08-12 22:15:05,580 - INFO - Executing order: SELL CYTK
+2025-08-12 22:15:05,580 - INFO - Executing order: SELL CYTK
+2025-08-12 22:15:05,581 - INFO - CYTK current market price: $34.31
+2025-08-12 22:15:05,581 - INFO - CYTK current market price: $34.31
+2025-08-12 22:15:05,581 - INFO - Available shares for CYTK: 6
+2025-08-12 22:15:05,581 - INFO - Available shares for CYTK: 6
+2025-08-12 22:15:05,581 - INFO - SELL order: selling 3 shares
+2025-08-12 22:15:05,581 - INFO - SELL order: selling 3 shares
+2025-08-12 22:15:05,581 - INFO - TRADE EXECUTED: SOLD 3 shares of CYTK at $34.31 = $102.93
+2025-08-12 22:15:05,581 - INFO - TRADE EXECUTED: SOLD 3 shares of CYTK at $34.31 = $102.93
+2025-08-12 22:15:05,581 - INFO - Updating portfolio holdings for CYTK
+2025-08-12 22:15:05,581 - INFO - Updating portfolio holdings for CYTK
+2025-08-12 22:15:05,581 - INFO - Before: CYTK had 6 shares
+2025-08-12 22:15:05,581 - INFO - Before: CYTK had 6 shares
+2025-08-12 22:15:05,581 - INFO - POSITION REDUCED: CYTK now has 3 shares (was 6)
+2025-08-12 22:15:05,581 - INFO - POSITION REDUCED: CYTK now has 3 shares (was 6)
+2025-08-12 22:15:05,581 - INFO - Cash updated: $305.96 + $102.93 = $408.89
+2025-08-12 22:15:05,581 - INFO - Cash updated: $305.96 + $102.93 = $408.89
+2025-08-12 22:15:05,581 - INFO - Portfolio update complete for CYTK
+2025-08-12 22:15:05,581 - INFO - Portfolio update complete for CYTK
+2025-08-12 22:15:05,581 - INFO - EXECUTION COMPLETE - 2 executed, 0 failed
+2025-08-12 22:15:05,581 - INFO - EXECUTION COMPLETE - 2 executed, 0 failed
+2025-08-12 22:15:05,581 - INFO - Cash impact: +$406.55 proceeds, -$0.00 invested, net: $+406.55
+2025-08-12 22:15:05,581 - INFO - Cash impact: +$406.55 proceeds, -$0.00 invested, net: $+406.55
+2025-08-12 22:15:05,581 - INFO - Final cash balance: $408.89
+2025-08-12 22:15:05,581 - INFO - Final cash balance: $408.89
+2025-08-12 22:15:05,581 - INFO - Cash flow matches prediction exactly
+2025-08-12 22:15:05,581 - INFO - Cash flow matches prediction exactly
+2025-08-12 22:15:05,582 - INFO - Detailed execution log saved to: trade_execution_20250812_221505.json
+2025-08-12 22:15:05,582 - INFO - Detailed execution log saved to: trade_execution_20250812_221505.json
+2025-08-12 22:15:05,583 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-12 22:15:05,583 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-12 22:15:05,583 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-12 22:15:05,583 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-12 22:15:05,583 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-12 22:15:05,583 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-12 22:15:05,583 - INFO - Final position - CYTK: 3 shares @ $36.58
+2025-08-12 22:15:05,583 - INFO - Final position - CYTK: 3 shares @ $36.58
+2025-08-12 22:15:05,583 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-12 22:15:05,583 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-12 22:15:05,583 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-12 22:15:05,583 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-12 22:15:05,584 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-12 22:15:05,584 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-12 22:15:05,584 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-12 22:15:05,584 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-12 22:15:05,584 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-12 22:15:05,584 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-12 22:15:05,585 - INFO - Portfolio state saved to portfolio_state.json
+2025-08-12 22:15:05,585 - INFO - Portfolio state saved to portfolio_state.json
+2025-08-12 22:15:05,585 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-12 22:15:05,585 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-12 22:15:05,585 - INFO - ============================================================
+2025-08-12 22:15:05,585 - INFO - ============================================================
+2025-08-12 22:30:51,092 - INFO - ============================================================
+2025-08-12 22:30:51,092 - INFO - ============================================================
+2025-08-12 22:30:51,092 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-12 22:30:51,092 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-12 22:30:51,092 - INFO - ============================================================
+2025-08-12 22:30:51,092 - INFO - ============================================================
+2025-08-12 22:30:51,094 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-12 22:30:51,094 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-12 22:30:51,095 - INFO - Successfully parsed 2 orders from document
+2025-08-12 22:30:51,095 - INFO - Successfully parsed 2 orders from document
+2025-08-12 22:30:51,095 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-12 22:30:51,095 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-12 22:30:51,096 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-12 22:30:51,096 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-12 22:30:52,160 - INFO - Market data fetched for 12 securities
+2025-08-12 22:30:52,160 - INFO - Market data fetched for 12 securities
+2025-08-12 22:30:52,161 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-12 22:30:52,161 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-12 22:30:52,161 - WARNING - Validation warning: No price data for SOUN
+2025-08-12 22:30:52,161 - WARNING - Validation warning: No price data for SOUN
+2025-08-12 22:32:12,735 - INFO - Execution cancelled by user
+2025-08-12 22:32:12,735 - INFO - Execution cancelled by user
+2025-08-12 22:54:46,135 - INFO - ============================================================
+2025-08-12 22:54:46,135 - INFO - ============================================================
+2025-08-12 22:54:46,135 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-12 22:54:46,135 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-12 22:54:46,135 - INFO - ============================================================
+2025-08-12 22:54:46,135 - INFO - ============================================================
+2025-08-12 22:54:46,137 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-12 22:54:46,137 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-12 22:54:46,139 - INFO - Successfully parsed 2 orders from document
+2025-08-12 22:54:46,139 - INFO - Successfully parsed 2 orders from document
+2025-08-12 22:54:46,139 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-12 22:54:46,139 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-12 22:54:46,139 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-12 22:54:46,139 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-12 22:54:47,300 - INFO - Market data fetched for 12 securities
+2025-08-12 22:54:47,300 - INFO - Market data fetched for 12 securities
+2025-08-12 22:54:47,300 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-12 22:54:47,300 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-12 22:54:47,300 - WARNING - Validation warning: No price data for SOUN
+2025-08-12 22:54:47,300 - WARNING - Validation warning: No price data for SOUN
+2025-08-12 22:57:22,399 - INFO - User chose to proceed despite warnings
+2025-08-12 22:57:22,399 - INFO - User chose to proceed despite warnings
+2025-08-12 22:57:22,399 - INFO - Beginning trade execution phase
+2025-08-12 22:57:22,399 - INFO - Beginning trade execution phase
+2025-08-12 22:57:23,300 - INFO - Executing order: SELL SOUN
+2025-08-12 22:57:23,300 - INFO - Executing order: SELL SOUN
+2025-08-12 22:57:23,300 - ERROR - Order failed - No market data for SOUN
+2025-08-12 22:57:23,300 - ERROR - Order failed - No market data for SOUN
+2025-08-12 22:57:23,300 - INFO - Executing order: SELL CYTK
+2025-08-12 22:57:23,300 - INFO - Executing order: SELL CYTK
+2025-08-12 22:57:23,300 - INFO - CYTK current market price: $34.31
+2025-08-12 22:57:23,300 - INFO - CYTK current market price: $34.31
+2025-08-12 22:57:23,300 - INFO - Available shares for CYTK: 3
+2025-08-12 22:57:23,300 - INFO - Available shares for CYTK: 3
+2025-08-12 22:57:23,300 - INFO - SELL order: selling 3 shares
+2025-08-12 22:57:23,300 - INFO - SELL order: selling 3 shares
+2025-08-12 22:57:23,300 - INFO - TRADE EXECUTED: SOLD 3 shares of CYTK at $34.31 = $102.93
+2025-08-12 22:57:23,300 - INFO - TRADE EXECUTED: SOLD 3 shares of CYTK at $34.31 = $102.93
+2025-08-12 22:57:23,301 - INFO - Updating portfolio holdings for CYTK
+2025-08-12 22:57:23,301 - INFO - Updating portfolio holdings for CYTK
+2025-08-12 22:57:23,301 - INFO - Before: CYTK had 3 shares
+2025-08-12 22:57:23,301 - INFO - Before: CYTK had 3 shares
+2025-08-12 22:57:23,301 - INFO - POSITION CLOSED: Removed CYTK position entirely
+2025-08-12 22:57:23,301 - INFO - POSITION CLOSED: Removed CYTK position entirely
+2025-08-12 22:57:23,301 - INFO - Cash updated: $408.89 + $102.93 = $511.82
+2025-08-12 22:57:23,301 - INFO - Cash updated: $408.89 + $102.93 = $511.82
+2025-08-12 22:57:23,301 - INFO - Portfolio update complete for CYTK
+2025-08-12 22:57:23,301 - INFO - Portfolio update complete for CYTK
+2025-08-12 22:57:23,301 - INFO - EXECUTION COMPLETE - 1 executed, 1 failed
+2025-08-12 22:57:23,301 - INFO - EXECUTION COMPLETE - 1 executed, 1 failed
+2025-08-12 22:57:23,301 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-12 22:57:23,301 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-12 22:57:23,301 - INFO - Cash impact: +$102.93 proceeds, -$0.00 invested, net: $+102.93
+2025-08-12 22:57:23,301 - INFO - Cash impact: +$102.93 proceeds, -$0.00 invested, net: $+102.93
+2025-08-12 22:57:23,301 - INFO - Final cash balance: $511.82
+2025-08-12 22:57:23,301 - INFO - Final cash balance: $511.82
+2025-08-12 22:57:23,301 - INFO - Cash flow matches prediction exactly
+2025-08-12 22:57:23,301 - INFO - Cash flow matches prediction exactly
+2025-08-12 22:57:23,302 - INFO - Detailed execution log saved to: trade_execution_20250812_225723.json
+2025-08-12 22:57:23,302 - INFO - Detailed execution log saved to: trade_execution_20250812_225723.json
+2025-08-12 22:57:23,302 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-12 22:57:23,302 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-12 22:57:23,302 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-12 22:57:23,302 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-12 22:57:23,302 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-12 22:57:23,302 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-12 22:57:23,302 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-12 22:57:23,302 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-12 22:57:23,302 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-12 22:57:23,302 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-12 22:57:23,302 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-12 22:57:23,302 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-12 22:57:23,302 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-12 22:57:23,302 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-12 22:57:23,303 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-12 22:57:23,303 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-12 22:57:23,303 - INFO - Portfolio state saved to portfolio_state.json
+2025-08-12 22:57:23,303 - INFO - Portfolio state saved to portfolio_state.json
+2025-08-12 22:57:23,304 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-12 22:57:23,304 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-12 22:57:23,304 - INFO - ============================================================
+2025-08-12 22:57:23,304 - INFO - ============================================================
+2025-08-13 08:32:35,963 - INFO - ============================================================
+2025-08-13 08:32:35,963 - INFO - ============================================================
+2025-08-13 08:32:35,964 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 08:32:35,964 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 08:32:35,964 - INFO - ============================================================
+2025-08-13 08:32:35,964 - INFO - ============================================================
+2025-08-13 08:32:35,967 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 08:32:35,967 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 08:32:35,971 - INFO - Successfully parsed 2 orders from document
+2025-08-13 08:32:35,971 - INFO - Successfully parsed 2 orders from document
+2025-08-13 08:32:35,971 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 08:32:35,971 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 08:32:35,972 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 08:32:35,972 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 08:32:37,198 - INFO - Market data fetched for 11 securities
+2025-08-13 08:32:37,198 - INFO - Market data fetched for 11 securities
+2025-08-13 08:32:37,198 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 08:32:37,198 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 08:32:37,198 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 08:32:37,198 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 08:32:37,198 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 08:32:37,198 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 08:33:37,159 - INFO - User chose to proceed despite warnings
+2025-08-13 08:33:37,159 - INFO - User chose to proceed despite warnings
+2025-08-13 08:33:37,159 - INFO - Beginning trade execution phase
+2025-08-13 08:33:37,159 - INFO - Beginning trade execution phase
+2025-08-13 08:33:38,097 - INFO - Executing order: SELL SOUN
+2025-08-13 08:33:38,097 - INFO - Executing order: SELL SOUN
+2025-08-13 08:33:38,097 - ERROR - Order failed - No market data for SOUN
+2025-08-13 08:33:38,097 - ERROR - Order failed - No market data for SOUN
+2025-08-13 08:33:38,097 - INFO - Executing order: SELL CYTK
+2025-08-13 08:33:38,097 - INFO - Executing order: SELL CYTK
+2025-08-13 08:33:38,097 - ERROR - Order failed - No market data for CYTK
+2025-08-13 08:33:38,097 - ERROR - Order failed - No market data for CYTK
+2025-08-13 08:33:38,098 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 08:33:38,098 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 08:33:38,098 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 08:33:38,098 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 08:33:38,098 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 08:33:38,098 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 08:33:38,098 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 08:33:38,098 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 08:33:38,098 - INFO - Final cash balance: $511.82
+2025-08-13 08:33:38,098 - INFO - Final cash balance: $511.82
+2025-08-13 08:33:38,098 - INFO - Cash flow matches prediction exactly
+2025-08-13 08:33:38,098 - INFO - Cash flow matches prediction exactly
+2025-08-13 08:33:38,099 - INFO - Detailed execution log saved to: trade_execution_20250813_083338.json
+2025-08-13 08:33:38,099 - INFO - Detailed execution log saved to: trade_execution_20250813_083338.json
+2025-08-13 08:33:38,099 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 08:33:38,099 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 08:33:38,099 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 08:33:38,099 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 08:33:38,099 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 08:33:38,099 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 08:33:38,100 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 08:33:38,100 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 08:33:38,100 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 08:33:38,100 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 08:33:38,100 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 08:33:38,100 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 08:33:38,100 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 08:33:38,100 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 08:33:38,100 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 08:33:38,100 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 08:33:38,100 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 08:33:38,100 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 08:33:38,100 - INFO - ============================================================
+2025-08-13 08:33:38,100 - INFO - ============================================================
+2025-08-13 08:35:59,851 - INFO - ============================================================
+2025-08-13 08:35:59,851 - INFO - ============================================================
+2025-08-13 08:35:59,851 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 08:35:59,851 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 08:35:59,851 - INFO - ============================================================
+2025-08-13 08:35:59,851 - INFO - ============================================================
+2025-08-13 08:35:59,853 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 08:35:59,853 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 08:35:59,856 - INFO - Successfully parsed 2 orders from document
+2025-08-13 08:35:59,856 - INFO - Successfully parsed 2 orders from document
+2025-08-13 08:35:59,856 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 08:35:59,856 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 08:35:59,856 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 08:35:59,856 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 08:36:00,995 - INFO - Market data fetched for 11 securities
+2025-08-13 08:36:00,995 - INFO - Market data fetched for 11 securities
+2025-08-13 08:36:00,996 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 08:36:00,996 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 08:36:00,996 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 08:36:00,996 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 08:36:00,996 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 08:36:00,996 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 08:36:03,678 - INFO - User chose to proceed despite warnings
+2025-08-13 08:36:03,678 - INFO - User chose to proceed despite warnings
+2025-08-13 08:36:03,678 - INFO - Beginning trade execution phase
+2025-08-13 08:36:03,678 - INFO - Beginning trade execution phase
+2025-08-13 08:36:04,535 - INFO - Executing order: SELL SOUN
+2025-08-13 08:36:04,535 - INFO - Executing order: SELL SOUN
+2025-08-13 08:36:04,535 - ERROR - Order failed - No market data for SOUN
+2025-08-13 08:36:04,535 - ERROR - Order failed - No market data for SOUN
+2025-08-13 08:36:04,535 - INFO - Executing order: SELL CYTK
+2025-08-13 08:36:04,535 - INFO - Executing order: SELL CYTK
+2025-08-13 08:36:04,535 - ERROR - Order failed - No market data for CYTK
+2025-08-13 08:36:04,535 - ERROR - Order failed - No market data for CYTK
+2025-08-13 08:36:04,535 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 08:36:04,535 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 08:36:04,535 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 08:36:04,535 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 08:36:04,536 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 08:36:04,536 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 08:36:04,536 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 08:36:04,536 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 08:36:04,536 - INFO - Final cash balance: $511.82
+2025-08-13 08:36:04,536 - INFO - Final cash balance: $511.82
+2025-08-13 08:36:04,536 - INFO - Cash flow matches prediction exactly
+2025-08-13 08:36:04,536 - INFO - Cash flow matches prediction exactly
+2025-08-13 08:36:04,537 - INFO - Detailed execution log saved to: trade_execution_20250813_083604.json
+2025-08-13 08:36:04,537 - INFO - Detailed execution log saved to: trade_execution_20250813_083604.json
+2025-08-13 08:36:04,537 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 08:36:04,537 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 08:36:04,537 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 08:36:04,537 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 08:36:04,537 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 08:36:04,537 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 08:36:04,537 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 08:36:04,537 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 08:36:04,537 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 08:36:04,537 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 08:36:04,537 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 08:36:04,537 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 08:36:04,538 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 08:36:04,538 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 08:36:04,538 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 08:36:04,538 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 08:36:04,538 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 08:36:04,538 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 08:36:04,538 - INFO - ============================================================
+2025-08-13 08:36:04,538 - INFO - ============================================================
+2025-08-13 08:41:39,467 - INFO - ============================================================
+2025-08-13 08:41:39,467 - INFO - ============================================================
+2025-08-13 08:41:39,467 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 08:41:39,467 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 08:41:39,467 - INFO - ============================================================
+2025-08-13 08:41:39,467 - INFO - ============================================================
+2025-08-13 08:41:39,469 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 08:41:39,469 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 08:41:39,471 - INFO - Successfully parsed 2 orders from document
+2025-08-13 08:41:39,471 - INFO - Successfully parsed 2 orders from document
+2025-08-13 08:41:39,472 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 08:41:39,472 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 08:41:39,472 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 08:41:39,472 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 08:41:40,569 - INFO - Market data fetched for 11 securities
+2025-08-13 08:41:40,569 - INFO - Market data fetched for 11 securities
+2025-08-13 08:41:40,570 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 08:41:40,570 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 08:41:40,570 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 08:41:40,570 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 08:41:40,570 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 08:41:40,570 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 08:41:43,241 - INFO - User chose to proceed despite warnings
+2025-08-13 08:41:43,241 - INFO - User chose to proceed despite warnings
+2025-08-13 08:41:43,241 - INFO - Beginning trade execution phase
+2025-08-13 08:41:43,241 - INFO - Beginning trade execution phase
+2025-08-13 08:41:44,226 - INFO - Executing order: SELL SOUN
+2025-08-13 08:41:44,226 - INFO - Executing order: SELL SOUN
+2025-08-13 08:41:44,226 - ERROR - Order failed - No market data for SOUN
+2025-08-13 08:41:44,226 - ERROR - Order failed - No market data for SOUN
+2025-08-13 08:41:44,227 - INFO - Executing order: SELL CYTK
+2025-08-13 08:41:44,227 - INFO - Executing order: SELL CYTK
+2025-08-13 08:41:44,227 - ERROR - Order failed - No market data for CYTK
+2025-08-13 08:41:44,227 - ERROR - Order failed - No market data for CYTK
+2025-08-13 08:41:44,227 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 08:41:44,227 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 08:41:44,227 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 08:41:44,227 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 08:41:44,227 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 08:41:44,227 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 08:41:44,227 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 08:41:44,227 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 08:41:44,227 - INFO - Final cash balance: $511.82
+2025-08-13 08:41:44,227 - INFO - Final cash balance: $511.82
+2025-08-13 08:41:44,227 - INFO - Cash flow matches prediction exactly
+2025-08-13 08:41:44,227 - INFO - Cash flow matches prediction exactly
+2025-08-13 08:41:44,228 - INFO - Detailed execution log saved to: trade_execution_20250813_084144.json
+2025-08-13 08:41:44,228 - INFO - Detailed execution log saved to: trade_execution_20250813_084144.json
+2025-08-13 08:41:44,228 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 08:41:44,228 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 08:41:44,228 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 08:41:44,228 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 08:41:44,228 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 08:41:44,228 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 08:41:44,229 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 08:41:44,229 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 08:41:44,229 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 08:41:44,229 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 08:41:44,229 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 08:41:44,229 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 08:41:44,229 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 08:41:44,229 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 08:41:44,229 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 08:41:44,229 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 08:41:44,229 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 08:41:44,229 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 08:41:44,229 - INFO - ============================================================
+2025-08-13 08:41:44,229 - INFO - ============================================================
+2025-08-13 08:49:08,451 - INFO - ============================================================
+2025-08-13 08:49:08,451 - INFO - ============================================================
+2025-08-13 08:49:08,451 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 08:49:08,451 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 08:49:08,452 - INFO - ============================================================
+2025-08-13 08:49:08,452 - INFO - ============================================================
+2025-08-13 08:49:08,453 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 08:49:08,453 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 08:49:08,455 - INFO - Successfully parsed 2 orders from document
+2025-08-13 08:49:08,455 - INFO - Successfully parsed 2 orders from document
+2025-08-13 08:49:08,455 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 08:49:08,455 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 08:49:08,455 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 08:49:08,455 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 08:49:09,638 - INFO - Market data fetched for 11 securities
+2025-08-13 08:49:09,638 - INFO - Market data fetched for 11 securities
+2025-08-13 08:49:09,638 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 08:49:09,638 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 08:49:09,639 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 08:49:09,639 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 08:49:09,639 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 08:49:09,639 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 08:49:13,383 - INFO - User chose to proceed despite warnings
+2025-08-13 08:49:13,383 - INFO - User chose to proceed despite warnings
+2025-08-13 08:49:13,384 - INFO - Beginning trade execution phase
+2025-08-13 08:49:13,384 - INFO - Beginning trade execution phase
+2025-08-13 08:49:14,201 - INFO - Executing order: SELL SOUN
+2025-08-13 08:49:14,201 - INFO - Executing order: SELL SOUN
+2025-08-13 08:49:14,202 - ERROR - Order failed - No market data for SOUN
+2025-08-13 08:49:14,202 - ERROR - Order failed - No market data for SOUN
+2025-08-13 08:49:14,202 - INFO - Executing order: SELL CYTK
+2025-08-13 08:49:14,202 - INFO - Executing order: SELL CYTK
+2025-08-13 08:49:14,202 - ERROR - Order failed - No market data for CYTK
+2025-08-13 08:49:14,202 - ERROR - Order failed - No market data for CYTK
+2025-08-13 08:49:14,202 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 08:49:14,202 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 08:49:14,202 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 08:49:14,202 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 08:49:14,202 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 08:49:14,202 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 08:49:14,202 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 08:49:14,202 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 08:49:14,202 - INFO - Final cash balance: $511.82
+2025-08-13 08:49:14,202 - INFO - Final cash balance: $511.82
+2025-08-13 08:49:14,202 - INFO - Cash flow matches prediction exactly
+2025-08-13 08:49:14,202 - INFO - Cash flow matches prediction exactly
+2025-08-13 08:49:14,203 - INFO - Detailed execution log saved to: trade_execution_20250813_084914.json
+2025-08-13 08:49:14,203 - INFO - Detailed execution log saved to: trade_execution_20250813_084914.json
+2025-08-13 08:49:14,203 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 08:49:14,203 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 08:49:14,203 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 08:49:14,203 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 08:49:14,203 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 08:49:14,203 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 08:49:14,203 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 08:49:14,203 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 08:49:14,204 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 08:49:14,204 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 08:49:14,204 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 08:49:14,204 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 08:49:14,204 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 08:49:14,204 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 08:49:14,204 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 08:49:14,204 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 08:49:14,204 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 08:49:14,204 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 08:49:14,204 - INFO - ============================================================
+2025-08-13 08:49:14,204 - INFO - ============================================================
+2025-08-13 09:00:55,416 - INFO - ============================================================
+2025-08-13 09:00:55,416 - INFO - ============================================================
+2025-08-13 09:00:55,416 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 09:00:55,416 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 09:00:55,416 - INFO - ============================================================
+2025-08-13 09:00:55,416 - INFO - ============================================================
+2025-08-13 09:00:55,418 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 09:00:55,418 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 09:00:55,420 - INFO - Successfully parsed 2 orders from document
+2025-08-13 09:00:55,420 - INFO - Successfully parsed 2 orders from document
+2025-08-13 09:00:55,420 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 09:00:55,420 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 09:00:55,420 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 09:00:55,420 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 09:00:58,252 - INFO - Market data fetched for 11 securities
+2025-08-13 09:00:58,252 - INFO - Market data fetched for 11 securities
+2025-08-13 09:00:58,253 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 09:00:58,253 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 09:00:58,253 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 09:00:58,253 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 09:00:58,253 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 09:00:58,253 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 09:01:02,000 - INFO - User chose to proceed despite warnings
+2025-08-13 09:01:02,000 - INFO - User chose to proceed despite warnings
+2025-08-13 09:01:02,001 - INFO - Beginning trade execution phase
+2025-08-13 09:01:02,001 - INFO - Beginning trade execution phase
+2025-08-13 09:01:02,853 - INFO - Executing order: SELL SOUN
+2025-08-13 09:01:02,853 - INFO - Executing order: SELL SOUN
+2025-08-13 09:01:02,854 - ERROR - Order failed - No market data for SOUN
+2025-08-13 09:01:02,854 - ERROR - Order failed - No market data for SOUN
+2025-08-13 09:01:02,854 - INFO - Executing order: SELL CYTK
+2025-08-13 09:01:02,854 - INFO - Executing order: SELL CYTK
+2025-08-13 09:01:02,854 - ERROR - Order failed - No market data for CYTK
+2025-08-13 09:01:02,854 - ERROR - Order failed - No market data for CYTK
+2025-08-13 09:01:02,854 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 09:01:02,854 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 09:01:02,854 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 09:01:02,854 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 09:01:02,854 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 09:01:02,854 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 09:01:02,854 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 09:01:02,854 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 09:01:02,854 - INFO - Final cash balance: $511.82
+2025-08-13 09:01:02,854 - INFO - Final cash balance: $511.82
+2025-08-13 09:01:02,854 - INFO - Cash flow matches prediction exactly
+2025-08-13 09:01:02,854 - INFO - Cash flow matches prediction exactly
+2025-08-13 09:01:02,855 - INFO - Detailed execution log saved to: trade_execution_20250813_090102.json
+2025-08-13 09:01:02,855 - INFO - Detailed execution log saved to: trade_execution_20250813_090102.json
+2025-08-13 09:01:02,855 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 09:01:02,855 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 09:01:02,855 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 09:01:02,855 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 09:01:02,856 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 09:01:02,856 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 09:01:02,856 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 09:01:02,856 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 09:01:02,856 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 09:01:02,856 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 09:01:02,856 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 09:01:02,856 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 09:01:02,856 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 09:01:02,856 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 09:01:02,856 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 09:01:02,856 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 09:01:02,856 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 09:01:02,856 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 09:01:02,856 - INFO - ============================================================
+2025-08-13 09:01:02,856 - INFO - ============================================================
+2025-08-13 09:04:57,065 - INFO - ============================================================
+2025-08-13 09:04:57,065 - INFO - ============================================================
+2025-08-13 09:04:57,066 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 09:04:57,066 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-13 09:04:57,066 - INFO - ============================================================
+2025-08-13 09:04:57,066 - INFO - ============================================================
+2025-08-13 09:04:57,068 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 09:04:57,068 - INFO - Processing document: trading_recommendations_aug7.md (Type: .MD)
+2025-08-13 09:04:57,070 - INFO - Successfully parsed 2 orders from document
+2025-08-13 09:04:57,070 - INFO - Successfully parsed 2 orders from document
+2025-08-13 09:04:57,070 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 09:04:57,070 - INFO - Order 1: SELL 19 shares of SOUN (HIGH) - No specific reason provided
+2025-08-13 09:04:57,070 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 09:04:57,070 - INFO - Order 2: SELL 3 shares of CYTK (HIGH) - No specific reason provided
+2025-08-13 09:04:58,028 - INFO - Market data fetched for 11 securities
+2025-08-13 09:04:58,028 - INFO - Market data fetched for 11 securities
+2025-08-13 09:04:58,028 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 09:04:58,028 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-13 09:04:58,029 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 09:04:58,029 - WARNING - Validation warning: No price data for SOUN
+2025-08-13 09:04:58,029 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 09:04:58,029 - WARNING - Validation warning: No price data for CYTK
+2025-08-13 09:09:24,410 - INFO - User chose to proceed despite warnings
+2025-08-13 09:09:24,410 - INFO - User chose to proceed despite warnings
+2025-08-13 09:09:24,411 - INFO - Beginning trade execution phase
+2025-08-13 09:09:24,411 - INFO - Beginning trade execution phase
+2025-08-13 09:09:25,329 - INFO - Executing order: SELL SOUN
+2025-08-13 09:09:25,329 - INFO - Executing order: SELL SOUN
+2025-08-13 09:09:25,329 - ERROR - Order failed - No market data for SOUN
+2025-08-13 09:09:25,329 - ERROR - Order failed - No market data for SOUN
+2025-08-13 09:09:25,329 - INFO - Executing order: SELL CYTK
+2025-08-13 09:09:25,329 - INFO - Executing order: SELL CYTK
+2025-08-13 09:09:25,329 - ERROR - Order failed - No market data for CYTK
+2025-08-13 09:09:25,329 - ERROR - Order failed - No market data for CYTK
+2025-08-13 09:09:25,330 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 09:09:25,330 - INFO - EXECUTION COMPLETE - 0 executed, 2 failed
+2025-08-13 09:09:25,330 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 09:09:25,330 - ERROR - Failed SOUN: No market data for SOUN
+2025-08-13 09:09:25,330 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 09:09:25,330 - ERROR - Failed CYTK: No market data for CYTK
+2025-08-13 09:09:25,330 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 09:09:25,330 - INFO - Cash impact: +$0.00 proceeds, -$0.00 invested, net: $+0.00
+2025-08-13 09:09:25,330 - INFO - Final cash balance: $511.82
+2025-08-13 09:09:25,330 - INFO - Final cash balance: $511.82
+2025-08-13 09:09:25,330 - INFO - Cash flow matches prediction exactly
+2025-08-13 09:09:25,330 - INFO - Cash flow matches prediction exactly
+2025-08-13 09:09:25,331 - INFO - Detailed execution log saved to: trade_execution_20250813_090925.json
+2025-08-13 09:09:25,331 - INFO - Detailed execution log saved to: trade_execution_20250813_090925.json
+2025-08-13 09:09:25,331 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 09:09:25,331 - INFO - Final position - IONS: 3 shares @ $37.01
+2025-08-13 09:09:25,331 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 09:09:25,331 - INFO - Final position - CRGY: 26 shares @ $9.10
+2025-08-13 09:09:25,331 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 09:09:25,331 - INFO - Final position - SERV: 23 shares @ $10.15
+2025-08-13 09:09:25,332 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 09:09:25,332 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-13 09:09:25,332 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 09:09:25,332 - INFO - Final position - RIG: 65 shares @ $3.00
+2025-08-13 09:09:25,332 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 09:09:25,332 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-13 09:09:25,332 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 09:09:25,332 - INFO - Final position - NVDA: 1 shares @ $175.00
+2025-08-13 09:09:25,332 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 09:09:25,332 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-13 09:09:25,332 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 09:09:25,332 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-13 09:09:25,332 - INFO - ============================================================
+2025-08-13 09:09:25,332 - INFO - ============================================================
