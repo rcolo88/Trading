@@ -2120,7 +2120,7 @@ Key questions:
 Additional context:
 - Portfolio total investment: ${self.total_investment:,.2f}
 - Cash available: ${self.cash:.2f}
-- Investment timeframe: August 5, 2025 to December 27, 2025
+- Investment timeframe: August 5, 2025 to July 30, 2026
 - Strategy: Catalyst-driven momentum with concentrated positions
 
 Risk management parameters:

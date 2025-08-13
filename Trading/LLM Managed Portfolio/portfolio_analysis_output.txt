@@ -147,7 +147,7 @@ Key questions:
 Additional context:
 - Portfolio total investment: $1,964.58
 - Cash available: $156.02
-- Investment timeframe: August 5, 2025 to December 27, 2025
+- Investment timeframe: August 5, 2025 to July 30, 2026
 - Strategy: Catalyst-driven momentum with concentrated positions
 
 Risk management parameters:
