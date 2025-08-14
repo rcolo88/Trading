@@ -1,21 +1,16 @@
 {
-  "timestamp": "2025-08-13T15:56:14.709404",
-  "cash": 156.0199964904785,
+  "timestamp": "2025-08-14T14:16:28.915174",
+  "cash": 165.17498668670652,
   "holdings": {
     "IONS": {
-      "shares": 7,
-      "entry_price": 40.52428562709263,
-      "allocation": 283.6699993896484
+      "shares": 14,
+      "entry_price": 41.59214273725237,
+      "allocation": 582.2899983215332
     },
     "CRGY": {
-      "shares": 26,
+      "shares": 18,
       "entry_price": 9.1,
-      "allocation": 236.6
-    },
-    "SERV": {
-      "shares": 23,
-      "entry_price": 10.15,
-      "allocation": 233.45
+      "allocation": 163.79999999999998
     },
     "QS": {
       "shares": 23,
@@ -44,5 +39,5 @@
     }
   },
   "total_investment": 1964.58,
-  "last_update": "2025-08-13 15:56:14"
+  "last_update": "2025-08-14 14:16:28"
 }
