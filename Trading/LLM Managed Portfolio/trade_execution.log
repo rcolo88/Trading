@@ -1344,3 +1344,179 @@
 2025-08-14 14:16:28,915 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
 2025-08-14 14:16:28,915 - INFO - ============================================================
 2025-08-14 14:16:28,915 - INFO - ============================================================
+2025-08-14 22:27:38,813 - INFO - ============================================================
+2025-08-14 22:27:38,813 - INFO - ============================================================
+2025-08-14 22:27:38,813 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-14 22:27:38,813 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-14 22:27:38,813 - INFO - ============================================================
+2025-08-14 22:27:38,813 - INFO - ============================================================
+2025-08-14 22:27:38,815 - INFO - Processing document: trading_recommendation_aug1425.md (Type: .MD)
+2025-08-14 22:27:38,815 - INFO - Processing document: trading_recommendation_aug1425.md (Type: .MD)
+2025-08-14 22:27:38,816 - INFO - Successfully parsed 4 orders from document
+2025-08-14 22:27:38,816 - INFO - Successfully parsed 4 orders from document
+2025-08-14 22:27:38,816 - INFO - Order 1: SELL 30 shares of RIG (HIGH) - Oil sector headwinds with Brent crude declining to $50-58/barrel by Q1 2026. Generate immediate cash for FDA catalyst play. Current 65 shares overweight in declining sector.
+2025-08-14 22:27:38,816 - INFO - Order 1: SELL 30 shares of RIG (HIGH) - Oil sector headwinds with Brent crude declining to $50-58/barrel by Q1 2026. Generate immediate cash for FDA catalyst play. Current 65 shares overweight in declining sector.
+2025-08-14 22:27:38,816 - INFO - Order 2: SELL 8 shares of CRGY (HIGH) - Reduce energy exposure from 26 to 18 shares. Sector rotation away from energy with better risk-reward in biotech/tech catalysts. Maintain partial position for diversification.
+2025-08-14 22:27:38,816 - INFO - Order 2: SELL 8 shares of CRGY (HIGH) - Reduce energy exposure from 26 to 18 shares. Sector rotation away from energy with better risk-reward in biotech/tech catalysts. Maintain partial position for diversification.
+2025-08-14 22:27:38,816 - INFO - Order 3: SELL 23 shares of SERV (HIGH) - Complete exit if Serve Robotics (high cash burn, poor fundamentals). If different ticker, verify identity before execution. Reallocate to AI infrastructure theme.
+2025-08-14 22:27:38,816 - INFO - Order 3: SELL 23 shares of SERV (HIGH) - Complete exit if Serve Robotics (high cash burn, poor fundamentals). If different ticker, verify identity before execution. Reallocate to AI infrastructure theme.
+2025-08-14 22:27:38,817 - INFO - Order 4: BUY 7 shares of IONS (HIGH) - Double position from 7 to 14 shares ahead of August 21 FDA PDUFA. Donidalorsen shows 87% HAE attack reduction with 85-90% approval probability. Orphan drug designation provides pricing power.
+2025-08-14 22:27:38,817 - INFO - Order 4: BUY 7 shares of IONS (HIGH) - Double position from 7 to 14 shares ahead of August 21 FDA PDUFA. Donidalorsen shows 87% HAE attack reduction with 85-90% approval probability. Orphan drug designation provides pricing power.
+2025-08-14 22:27:39,818 - INFO - Market data fetched for 10 securities
+2025-08-14 22:27:39,818 - INFO - Market data fetched for 10 securities
+2025-08-14 22:27:39,818 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-14 22:27:39,818 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-14 22:27:39,818 - WARNING - Validation warning: No price data for SERV
+2025-08-14 22:27:39,818 - WARNING - Validation warning: No price data for SERV
+2025-08-14 22:28:15,146 - INFO - Execution cancelled by user
+2025-08-14 22:28:15,146 - INFO - Execution cancelled by user
+2025-08-15 10:29:02,290 - INFO - ============================================================
+2025-08-15 10:29:02,290 - INFO - ============================================================
+2025-08-15 10:29:02,291 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-15 10:29:02,291 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-15 10:29:02,291 - INFO - ============================================================
+2025-08-15 10:29:02,291 - INFO - ============================================================
+2025-08-15 10:29:02,292 - INFO - Processing document: trading_recommendation_aug1425.md (Type: .MD)
+2025-08-15 10:29:02,292 - INFO - Processing document: trading_recommendation_aug1425.md (Type: .MD)
+2025-08-15 10:29:02,294 - INFO - Successfully parsed 4 orders from document
+2025-08-15 10:29:02,294 - INFO - Successfully parsed 4 orders from document
+2025-08-15 10:29:02,294 - INFO - Order 1: SELL 30 shares of RIG (HIGH) - Oil sector headwinds with Brent crude declining to $50-58/barrel by Q1 2026. Generate immediate cash for FDA catalyst play. Current 65 shares overweight in declining sector.
+2025-08-15 10:29:02,294 - INFO - Order 1: SELL 30 shares of RIG (HIGH) - Oil sector headwinds with Brent crude declining to $50-58/barrel by Q1 2026. Generate immediate cash for FDA catalyst play. Current 65 shares overweight in declining sector.
+2025-08-15 10:29:02,294 - INFO - Order 2: SELL 8 shares of CRGY (HIGH) - Reduce energy exposure from 26 to 18 shares. Sector rotation away from energy with better risk-reward in biotech/tech catalysts. Maintain partial position for diversification.
+2025-08-15 10:29:02,294 - INFO - Order 2: SELL 8 shares of CRGY (HIGH) - Reduce energy exposure from 26 to 18 shares. Sector rotation away from energy with better risk-reward in biotech/tech catalysts. Maintain partial position for diversification.
+2025-08-15 10:29:02,294 - INFO - Order 3: SELL 23 shares of SERV (HIGH) - Complete exit if Serve Robotics (high cash burn, poor fundamentals). If different ticker, verify identity before execution. Reallocate to AI infrastructure theme.
+2025-08-15 10:29:02,294 - INFO - Order 3: SELL 23 shares of SERV (HIGH) - Complete exit if Serve Robotics (high cash burn, poor fundamentals). If different ticker, verify identity before execution. Reallocate to AI infrastructure theme.
+2025-08-15 10:29:02,294 - INFO - Order 4: BUY 7 shares of IONS (HIGH) - Double position from 7 to 14 shares ahead of August 21 FDA PDUFA. Donidalorsen shows 87% HAE attack reduction with 85-90% approval probability. Orphan drug designation provides pricing power.
+2025-08-15 10:29:02,294 - INFO - Order 4: BUY 7 shares of IONS (HIGH) - Double position from 7 to 14 shares ahead of August 21 FDA PDUFA. Donidalorsen shows 87% HAE attack reduction with 85-90% approval probability. Orphan drug designation provides pricing power.
+2025-08-15 10:29:04,622 - INFO - Market data fetched for 10 securities
+2025-08-15 10:29:04,622 - INFO - Market data fetched for 10 securities
+2025-08-15 10:29:04,622 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-15 10:29:04,622 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-15 10:29:04,622 - WARNING - Validation warning: No price data for SERV
+2025-08-15 10:29:04,622 - WARNING - Validation warning: No price data for SERV
+2025-08-15 10:29:32,657 - INFO - Execution cancelled by user
+2025-08-15 10:29:32,657 - INFO - Execution cancelled by user
+2025-08-15 10:29:57,084 - INFO - ============================================================
+2025-08-15 10:29:57,084 - INFO - ============================================================
+2025-08-15 10:29:57,084 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-15 10:29:57,084 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-15 10:29:57,084 - INFO - ============================================================
+2025-08-15 10:29:57,084 - INFO - ============================================================
+2025-08-15 10:29:57,087 - INFO - Processing document: trading_recommendation_aug1425.md (Type: .MD)
+2025-08-15 10:29:57,087 - INFO - Processing document: trading_recommendation_aug1425.md (Type: .MD)
+2025-08-15 10:29:57,088 - INFO - Successfully parsed 4 orders from document
+2025-08-15 10:29:57,088 - INFO - Successfully parsed 4 orders from document
+2025-08-15 10:29:57,089 - INFO - Order 1: SELL 30 shares of RIG (HIGH) - Oil sector headwinds with Brent crude declining to $50-58/barrel by Q1 2026. Generate immediate cash for FDA catalyst play. Current 65 shares overweight in declining sector.
+2025-08-15 10:29:57,089 - INFO - Order 1: SELL 30 shares of RIG (HIGH) - Oil sector headwinds with Brent crude declining to $50-58/barrel by Q1 2026. Generate immediate cash for FDA catalyst play. Current 65 shares overweight in declining sector.
+2025-08-15 10:29:57,089 - INFO - Order 2: SELL 8 shares of CRGY (HIGH) - Reduce energy exposure from 26 to 18 shares. Sector rotation away from energy with better risk-reward in biotech/tech catalysts. Maintain partial position for diversification.
+2025-08-15 10:29:57,089 - INFO - Order 2: SELL 8 shares of CRGY (HIGH) - Reduce energy exposure from 26 to 18 shares. Sector rotation away from energy with better risk-reward in biotech/tech catalysts. Maintain partial position for diversification.
+2025-08-15 10:29:57,089 - INFO - Order 3: SELL 23 shares of SERV (HIGH) - Complete exit if Serve Robotics (high cash burn, poor fundamentals). If different ticker, verify identity before execution. Reallocate to AI infrastructure theme.
+2025-08-15 10:29:57,089 - INFO - Order 3: SELL 23 shares of SERV (HIGH) - Complete exit if Serve Robotics (high cash burn, poor fundamentals). If different ticker, verify identity before execution. Reallocate to AI infrastructure theme.
+2025-08-15 10:29:57,089 - INFO - Order 4: BUY 7 shares of IONS (HIGH) - Double position from 7 to 14 shares ahead of August 21 FDA PDUFA. Donidalorsen shows 87% HAE attack reduction with 85-90% approval probability. Orphan drug designation provides pricing power.
+2025-08-15 10:29:57,089 - INFO - Order 4: BUY 7 shares of IONS (HIGH) - Double position from 7 to 14 shares ahead of August 21 FDA PDUFA. Donidalorsen shows 87% HAE attack reduction with 85-90% approval probability. Orphan drug designation provides pricing power.
+2025-08-15 10:29:58,050 - INFO - Market data fetched for 10 securities
+2025-08-15 10:29:58,050 - INFO - Market data fetched for 10 securities
+2025-08-15 10:29:58,051 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-15 10:29:58,051 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-15 10:29:58,051 - WARNING - Validation warning: No price data for SERV
+2025-08-15 10:29:58,051 - WARNING - Validation warning: No price data for SERV
+2025-08-15 10:30:06,026 - INFO - User chose to proceed despite warnings
+2025-08-15 10:30:06,026 - INFO - User chose to proceed despite warnings
+2025-08-15 10:30:06,027 - INFO - Beginning trade execution phase
+2025-08-15 10:30:06,027 - INFO - Beginning trade execution phase
+2025-08-15 10:30:06,862 - INFO - Executing order: SELL RIG
+2025-08-15 10:30:06,862 - INFO - Executing order: SELL RIG
+2025-08-15 10:30:06,862 - INFO - RIG current market price: $2.97
+2025-08-15 10:30:06,862 - INFO - RIG current market price: $2.97
+2025-08-15 10:30:06,862 - INFO - Available shares for RIG: 65
+2025-08-15 10:30:06,862 - INFO - Available shares for RIG: 65
+2025-08-15 10:30:06,862 - INFO - SELL order: selling 30 shares
+2025-08-15 10:30:06,862 - INFO - SELL order: selling 30 shares
+2025-08-15 10:30:06,862 - INFO - TRADE EXECUTED: SOLD 30 shares of RIG at $2.97 = $89.10
+2025-08-15 10:30:06,862 - INFO - TRADE EXECUTED: SOLD 30 shares of RIG at $2.97 = $89.10
+2025-08-15 10:30:06,862 - INFO - Updating portfolio holdings for RIG
+2025-08-15 10:30:06,862 - INFO - Updating portfolio holdings for RIG
+2025-08-15 10:30:06,862 - INFO - Before: RIG had 65 shares
+2025-08-15 10:30:06,862 - INFO - Before: RIG had 65 shares
+2025-08-15 10:30:06,862 - INFO - POSITION REDUCED: RIG now has 35 shares (was 65)
+2025-08-15 10:30:06,862 - INFO - POSITION REDUCED: RIG now has 35 shares (was 65)
+2025-08-15 10:30:06,862 - INFO - Cash updated: $165.17 + $89.10 = $254.27
+2025-08-15 10:30:06,862 - INFO - Cash updated: $165.17 + $89.10 = $254.27
+2025-08-15 10:30:06,863 - INFO - Portfolio update complete for RIG
+2025-08-15 10:30:06,863 - INFO - Portfolio update complete for RIG
+2025-08-15 10:30:06,863 - INFO - Executing order: SELL CRGY
+2025-08-15 10:30:06,863 - INFO - Executing order: SELL CRGY
+2025-08-15 10:30:06,863 - INFO - CRGY current market price: $9.47
+2025-08-15 10:30:06,863 - INFO - CRGY current market price: $9.47
+2025-08-15 10:30:06,863 - INFO - Available shares for CRGY: 18
+2025-08-15 10:30:06,863 - INFO - Available shares for CRGY: 18
+2025-08-15 10:30:06,863 - INFO - SELL order: selling 8 shares
+2025-08-15 10:30:06,863 - INFO - SELL order: selling 8 shares
+2025-08-15 10:30:06,863 - INFO - TRADE EXECUTED: SOLD 8 shares of CRGY at $9.47 = $75.76
+2025-08-15 10:30:06,863 - INFO - TRADE EXECUTED: SOLD 8 shares of CRGY at $9.47 = $75.76
+2025-08-15 10:30:06,863 - INFO - Updating portfolio holdings for CRGY
+2025-08-15 10:30:06,863 - INFO - Updating portfolio holdings for CRGY
+2025-08-15 10:30:06,863 - INFO - Before: CRGY had 18 shares
+2025-08-15 10:30:06,863 - INFO - Before: CRGY had 18 shares
+2025-08-15 10:30:06,863 - INFO - POSITION REDUCED: CRGY now has 10 shares (was 18)
+2025-08-15 10:30:06,863 - INFO - POSITION REDUCED: CRGY now has 10 shares (was 18)
+2025-08-15 10:30:06,864 - INFO - Cash updated: $254.27 + $75.76 = $330.03
+2025-08-15 10:30:06,864 - INFO - Cash updated: $254.27 + $75.76 = $330.03
+2025-08-15 10:30:06,864 - INFO - Portfolio update complete for CRGY
+2025-08-15 10:30:06,864 - INFO - Portfolio update complete for CRGY
+2025-08-15 10:30:06,864 - INFO - Executing order: SELL SERV
+2025-08-15 10:30:06,864 - INFO - Executing order: SELL SERV
+2025-08-15 10:30:06,864 - ERROR - Order failed - No market data for SERV
+2025-08-15 10:30:06,864 - ERROR - Order failed - No market data for SERV
+2025-08-15 10:30:06,864 - INFO - Executing order: BUY IONS
+2025-08-15 10:30:06,864 - INFO - Executing order: BUY IONS
+2025-08-15 10:30:06,864 - INFO - IONS current market price: $43.04
+2025-08-15 10:30:06,864 - INFO - IONS current market price: $43.04
+2025-08-15 10:30:06,864 - INFO - BUY order: 7 shares x $43.04 = $301.28 required
+2025-08-15 10:30:06,864 - INFO - BUY order: 7 shares x $43.04 = $301.28 required
+2025-08-15 10:30:06,864 - INFO - Available cash: $320.03 (after $10.00 reserve)
+2025-08-15 10:30:06,864 - INFO - Available cash: $320.03 (after $10.00 reserve)
+2025-08-15 10:30:06,864 - INFO - TRADE EXECUTED: BOUGHT 7 shares of IONS at $43.04 = $301.28
+2025-08-15 10:30:06,864 - INFO - TRADE EXECUTED: BOUGHT 7 shares of IONS at $43.04 = $301.28
+2025-08-15 10:30:06,864 - INFO - Updating portfolio holdings for IONS
+2025-08-15 10:30:06,864 - INFO - Updating portfolio holdings for IONS
+2025-08-15 10:30:06,864 - INFO - Before: IONS had 14 shares @ $41.59
+2025-08-15 10:30:06,864 - INFO - Before: IONS had 14 shares @ $41.59
+2025-08-15 10:30:06,864 - INFO - POSITION INCREASED: IONS now has 21 shares @ $42.07 avg (was 14 @ $42.07)
+2025-08-15 10:30:06,864 - INFO - POSITION INCREASED: IONS now has 21 shares @ $42.07 avg (was 14 @ $42.07)
+2025-08-15 10:30:06,865 - INFO - Cash updated: $330.03 - $301.28 = $28.75
+2025-08-15 10:30:06,865 - INFO - Cash updated: $330.03 - $301.28 = $28.75
+2025-08-15 10:30:06,865 - INFO - Portfolio update complete for IONS
+2025-08-15 10:30:06,865 - INFO - Portfolio update complete for IONS
+2025-08-15 10:30:06,865 - INFO - EXECUTION COMPLETE - 3 executed, 1 failed
+2025-08-15 10:30:06,865 - INFO - EXECUTION COMPLETE - 3 executed, 1 failed
+2025-08-15 10:30:06,865 - ERROR - Failed SERV: No market data for SERV
+2025-08-15 10:30:06,865 - ERROR - Failed SERV: No market data for SERV
+2025-08-15 10:30:06,865 - INFO - Cash impact: +$164.86 proceeds, -$301.28 invested, net: $-136.42
+2025-08-15 10:30:06,865 - INFO - Cash impact: +$164.86 proceeds, -$301.28 invested, net: $-136.42
+2025-08-15 10:30:06,866 - INFO - Final cash balance: $28.75
+2025-08-15 10:30:06,866 - INFO - Final cash balance: $28.75
+2025-08-15 10:30:06,866 - INFO - Minor cash variance: $+0.20 from prediction
+2025-08-15 10:30:06,866 - INFO - Minor cash variance: $+0.20 from prediction
+2025-08-15 10:30:06,867 - INFO - Detailed execution log saved to: trade_executions/trade_execution_20250815_103006.json
+2025-08-15 10:30:06,867 - INFO - Detailed execution log saved to: trade_executions/trade_execution_20250815_103006.json
+2025-08-15 10:30:06,867 - INFO - Final position - IONS: 21 shares @ $42.07
+2025-08-15 10:30:06,867 - INFO - Final position - IONS: 21 shares @ $42.07
+2025-08-15 10:30:06,867 - INFO - Final position - CRGY: 10 shares @ $9.10
+2025-08-15 10:30:06,867 - INFO - Final position - CRGY: 10 shares @ $9.10
+2025-08-15 10:30:06,867 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-15 10:30:06,867 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-15 10:30:06,868 - INFO - Final position - RIG: 35 shares @ $3.00
+2025-08-15 10:30:06,868 - INFO - Final position - RIG: 35 shares @ $3.00
+2025-08-15 10:30:06,868 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-15 10:30:06,868 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-15 10:30:06,868 - INFO - Final position - NVDA: 2 shares @ $179.08
+2025-08-15 10:30:06,868 - INFO - Final position - NVDA: 2 shares @ $179.08
+2025-08-15 10:30:06,868 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-15 10:30:06,868 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-15 10:30:06,870 - INFO - Portfolio state saved to portfolio_state.json
+2025-08-15 10:30:06,870 - INFO - Portfolio state saved to portfolio_state.json
+2025-08-15 10:30:06,871 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-15 10:30:06,871 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-15 10:30:06,871 - INFO - ============================================================
+2025-08-15 10:30:06,871 - INFO - ============================================================

@@ -1,16 +1,16 @@
 {
-  "timestamp": "2025-08-14T14:16:28.915174",
-  "cash": 165.17498668670652,
+  "timestamp": "2025-08-15T10:30:06.869154",
+  "cash": 28.754983272552465,
   "holdings": {
     "IONS": {
-      "shares": 14,
-      "entry_price": 41.59214273725237,
-      "allocation": 582.2899983215332
+      "shares": 21,
+      "entry_price": 42.0747621300107,
+      "allocation": 883.5700047302246
     },
     "CRGY": {
-      "shares": 18,
+      "shares": 10,
       "entry_price": 9.1,
-      "allocation": 163.79999999999998
+      "allocation": 91.0
     },
     "QS": {
       "shares": 23,
@@ -18,9 +18,9 @@
       "allocation": 138.0
     },
     "RIG": {
-      "shares": 65,
+      "shares": 35,
       "entry_price": 3.0,
-      "allocation": 195.0
+      "allocation": 105.0
     },
     "AMD": {
       "shares": 1,
@@ -39,5 +39,5 @@
     }
   },
   "total_investment": 1964.58,
-  "last_update": "2025-08-14 14:16:28"
+  "last_update": "2025-08-15 10:30:06"
 }

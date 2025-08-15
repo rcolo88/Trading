@@ -15,6 +15,8 @@ from typing import List, Optional, Dict
 import logging
 import glob
 import re
+import pandas_market_calendars as mcal
+import pytz
 
 # Configure trade execution logger
 trade_logger = logging.getLogger('trade_execution')
@@ -439,6 +441,55 @@ def plot_performance_chart_fixed(self, save_path=None):
     print("❌ No reliable historical data - chart generation skipped")
     print("💡 Run the system for a few more days to build historical data")
 
+def is_market_open():
+    """
+    Check if US stock market is currently open (NYSE/NASDAQ)
+    Returns True if market is open, False otherwise
+    """
+    try:
+        # Get current time in Eastern Time
+        et_tz = pytz.timezone('US/Eastern')
+        now_et = datetime.now(et_tz)
+        
+        # Create NYSE calendar
+        nyse = mcal.get_calendar('NYSE')
+        
+        # Get today's schedule
+        today = now_et.date()
+        schedule = nyse.schedule(start_date=today, end_date=today)
+        
+        # If no schedule for today, market is closed
+        if schedule.empty:
+            return False
+        
+        # Check if current time is within market hours
+        is_open = nyse.open_at_time(schedule, pd.Timestamp(now_et), only_rth=True)
+        return is_open
+        
+    except Exception as e:
+        print(f"Error checking market status: {e}")
+        return False
+
+def enforce_market_hours():
+    """
+    Exit script if market is not open with informative message
+    """
+    if not is_market_open():
+        et_tz = pytz.timezone('US/Eastern')
+        current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+        
+        print("🚫 MARKET CLOSED")
+        print(f"Current time: {current_time}")
+        print("The script can only run during US market hours:")
+        print("• Monday-Friday, 9:30 AM - 4:00 PM Eastern Time")
+        print("• On days when NYSE/NASDAQ are open (no holidays)")
+        print("\nPlease run this script during market hours.")
+        exit(1)
+    else:
+        et_tz = pytz.timezone('US/Eastern')
+        current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+        print(f"✅ Market is open - {current_time}")
+
 class DailyPortfolioReport:
     # == 1. INITIALIZATION ==
     def __init__(self):
@@ -457,7 +508,7 @@ class DailyPortfolioReport:
         }
 
         self.benchmarks = ['SPY', 'IWM', 'VIX']
-        self.total_investment = 1964.58  # Unchanged - original investment
+        # total_investment will be calculated dynamically from current holdings
         if not self.load_portfolio_state():
             # Only set default if state file doesn't exist
             self.cash = 0.00
@@ -607,7 +658,7 @@ class DailyPortfolioReport:
             'timestamp': datetime.now().isoformat(),
             'cash': self.cash,
             'holdings': dict(self.holdings),
-            'total_investment': getattr(self, 'total_investment', 2000.00),
+            'total_investment': self.get_total_investment(),
             'last_update': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
         
@@ -866,6 +917,14 @@ class DailyPortfolioReport:
         
         return positions, total_current_value, total_cost_basis
     
+    def get_total_investment(self):
+        """Calculate current total investment as sum of all position cost basis"""
+        total_investment = 0.0
+        for ticker, position in self.holdings.items():
+            cost_basis = position['shares'] * position['entry_price']
+            total_investment += cost_basis
+        return total_investment
+    
     def check_alerts(self, positions):
         """Check for stop-loss and profit target alerts"""
         alerts = []
@@ -1118,7 +1177,7 @@ class DailyPortfolioReport:
             return []
     
     def parse_text_content(self, content: str):
-        """Parse trading orders from text content (works for both MD and PDF)"""
+        """Parse trading orders from text content with improved section detection"""
         orders = []
         
         # Extract ORDERS section
@@ -1135,21 +1194,28 @@ class DailyPortfolioReport:
             line = line.strip()
             if not line:
                 continue
-                
-            # Check for priority headers
-            if 'HIGH PRIORITY' in line.upper() or 'IMMEDIATE' in line.upper():
+            
+            # Remove markdown formatting for priority detection
+            clean_line = line.replace('**', '').replace('*', '').replace('#', '').strip()
+            
+            # Check for priority headers (improved detection)
+            if any(keyword in clean_line.upper() for keyword in ['HIGH PRIORITY', 'IMMEDIATE EXECUTION']):
                 current_priority = OrderPriority.HIGH
+                print(f"📍 Detected HIGH priority section")
                 continue
-            elif 'MEDIUM PRIORITY' in line.upper() or 'POSITION MANAGEMENT' in line.upper():
+            elif any(keyword in clean_line.upper() for keyword in ['MEDIUM PRIORITY', 'POSITION MANAGEMENT']):
                 current_priority = OrderPriority.MEDIUM
+                print(f"📍 Detected MEDIUM priority section")
                 continue
-            elif 'LOW PRIORITY' in line.upper():
+            elif any(keyword in clean_line.upper() for keyword in ['LOW PRIORITY', 'STRATEGIC POSITIONING']):
                 current_priority = OrderPriority.LOW
+                print(f"📍 Detected LOW priority section")
                 continue
             
             # Parse order lines
             order = self._parse_order_line(line, current_priority)
             if order:
+                print(f"   ✓ Parsed: {order.action.value} {order.shares} {order.ticker} ({order.priority.value})")
                 orders.append(order)
         
         return orders
@@ -1162,10 +1228,17 @@ class DailyPortfolioReport:
         return match.group(1) if match else ""
     
     def _parse_order_line(self, line: str, priority: OrderPriority):
-        """Parse a single order line"""
-        line = line.strip('*- ')  # Remove markdown formatting
+        """Parse a single order line with improved markdown handling"""
+        # Remove ALL markdown formatting (asterisks, dashes, bullets)
+        # Strip asterisks from anywhere in the line
+        line = line.replace('**', '').replace('*', '').strip('- ')
+        line = line.strip()
         
-        # Pattern 1: "SELL all 19 shares of SOUN"
+        # Skip empty lines
+        if not line:
+            return None
+        
+        # Pattern 1: "SELL all X shares of TICKER"
         sell_all_match = re.search(r'sell\s+all\s+(\d+)\s+shares?\s+of\s+([A-Z]+)', line, re.IGNORECASE)
         if sell_all_match:
             shares, ticker = sell_all_match.groups()
@@ -1178,7 +1251,7 @@ class DailyPortfolioReport:
                 priority=priority
             )
         
-        # Pattern 2: "SELL 3 shares of CYTK"
+        # Pattern 2: "SELL X shares/share of TICKER"
         sell_match = re.search(r'sell\s+(\d+)\s+shares?\s+of\s+([A-Z]+)', line, re.IGNORECASE)
         if sell_match:
             shares, ticker = sell_match.groups()
@@ -1191,7 +1264,7 @@ class DailyPortfolioReport:
                 priority=priority
             )
         
-        # Pattern 3: "BUY 15 shares of NVDA"
+        # Pattern 3: "BUY X shares/share of TICKER"
         buy_match = re.search(r'buy\s+(\d+)\s+shares?\s+of\s+([A-Z]+)', line, re.IGNORECASE)
         if buy_match:
             shares, ticker = buy_match.groups()
@@ -1204,7 +1277,7 @@ class DailyPortfolioReport:
                 priority=priority
             )
         
-        # Pattern 4: "HOLD all 3 shares of IONS"
+        # Pattern 4: "HOLD all X shares/share of TICKER" or "HOLD X shares of TICKER"
         hold_match = re.search(r'hold\s+(?:all\s+)?(\d+)?\s*shares?\s+of\s+([A-Z]+)', line, re.IGNORECASE)
         if hold_match:
             shares, ticker = hold_match.groups()
@@ -2119,7 +2192,7 @@ Key questions:
 - Market outlook for tomorrow/this week?
 
 Additional context:
-- Portfolio total investment: ${self.total_investment:,.2f}
+- Portfolio total investment: ${self.get_total_investment():,.2f}
 - Cash available: ${self.cash:.2f}
 - Investment timeframe: August 5, 2025 to July 30, 2026
 - Strategy: Catalyst-driven momentum with concentrated positions
@@ -2923,6 +2996,8 @@ Please provide analysis and trading recommendations based on this data."""
 
 # Usage 
 if __name__ == "__main__":
+    # Market hours validation - must be first
+    enforce_market_hours()
     
     print("\n" + "=" * 60)
     print("INTEGRATION WITH YOUR PORTFOLIO SCRIPT:")
