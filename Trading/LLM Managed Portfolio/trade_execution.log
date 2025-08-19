@@ -1520,3 +1520,159 @@
 2025-08-15 10:30:06,871 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
 2025-08-15 10:30:06,871 - INFO - ============================================================
 2025-08-15 10:30:06,871 - INFO - ============================================================
+2025-08-15 14:07:15,316 - INFO - ============================================================
+2025-08-15 14:07:15,316 - INFO - ============================================================
+2025-08-15 14:07:15,316 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-15 14:07:15,316 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-15 14:07:15,316 - INFO - ============================================================
+2025-08-15 14:07:15,316 - INFO - ============================================================
+2025-08-15 14:07:15,318 - INFO - Processing document: trading_recommendations_aug1525.md (Type: .MD)
+2025-08-15 14:07:15,318 - INFO - Processing document: trading_recommendations_aug1525.md (Type: .MD)
+2025-08-15 14:07:15,320 - WARNING - No valid orders found in document
+2025-08-15 14:07:15,320 - WARNING - No valid orders found in document
+2025-08-15 14:12:13,815 - INFO - ============================================================
+2025-08-15 14:12:13,815 - INFO - ============================================================
+2025-08-15 14:12:13,815 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-15 14:12:13,815 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-15 14:12:13,816 - INFO - ============================================================
+2025-08-15 14:12:13,816 - INFO - ============================================================
+2025-08-15 14:12:13,817 - INFO - Processing document: trading_recommendations_aug1525.md (Type: .MD)
+2025-08-15 14:12:13,817 - INFO - Processing document: trading_recommendations_aug1525.md (Type: .MD)
+2025-08-15 14:12:13,818 - INFO - Successfully parsed 3 orders from document
+2025-08-15 14:12:13,818 - INFO - Successfully parsed 3 orders from document
+2025-08-15 14:12:13,818 - INFO - Order 1: SELL 13 shares of IONS (HIGH) - Reduce concentration from 21 to 8 shares (43.4% to ~16% allocation). Binary FDA decision Aug 21 creates unacceptable portfolio risk. Maintain exposure but protect capital.
+2025-08-15 14:12:13,818 - INFO - Order 1: SELL 13 shares of IONS (HIGH) - Reduce concentration from 21 to 8 shares (43.4% to ~16% allocation). Binary FDA decision Aug 21 creates unacceptable portfolio risk. Maintain exposure but protect capital.
+2025-08-15 14:12:13,818 - INFO - Order 2: SELL 35 shares of RIG (HIGH) - Complete exit at $2.96. Oil declining to $50-58/barrel by Q1 2026. Offshore drilling faces structural headwinds. Generate $103 cash for redeployment.
+2025-08-15 14:12:13,818 - INFO - Order 2: SELL 35 shares of RIG (HIGH) - Complete exit at $2.96. Oil declining to $50-58/barrel by Q1 2026. Offshore drilling faces structural headwinds. Generate $103 cash for redeployment.
+2025-08-15 14:12:13,818 - INFO - Order 3: SELL 10 shares of CRGY (HIGH) - Exit entire position at $9.47. Energy sector underperformance expected despite strong Q2 results. Raise $95 cash for better opportunities.
+2025-08-15 14:12:13,818 - INFO - Order 3: SELL 10 shares of CRGY (HIGH) - Exit entire position at $9.47. Energy sector underperformance expected despite strong Q2 results. Raise $95 cash for better opportunities.
+2025-08-15 14:12:14,784 - INFO - Market data fetched for 10 securities
+2025-08-15 14:12:14,784 - INFO - Market data fetched for 10 securities
+2025-08-15 14:12:14,785 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-15 14:12:14,785 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-15 14:12:14,785 - INFO - Beginning trade execution phase
+2025-08-15 14:12:14,785 - INFO - Beginning trade execution phase
+2025-08-15 14:12:15,679 - INFO - Executing order: SELL IONS
+2025-08-15 14:12:15,679 - INFO - Executing order: SELL IONS
+2025-08-15 14:12:15,679 - INFO - IONS current market price: $43.60
+2025-08-15 14:12:15,679 - INFO - IONS current market price: $43.60
+2025-08-15 14:12:15,679 - INFO - Available shares for IONS: 21
+2025-08-15 14:12:15,679 - INFO - Available shares for IONS: 21
+2025-08-15 14:12:15,679 - INFO - SELL order: selling 13 shares
+2025-08-15 14:12:15,679 - INFO - SELL order: selling 13 shares
+2025-08-15 14:12:15,679 - INFO - TRADE EXECUTED: SOLD 13 shares of IONS at $43.60 = $566.80
+2025-08-15 14:12:15,679 - INFO - TRADE EXECUTED: SOLD 13 shares of IONS at $43.60 = $566.80
+2025-08-15 14:12:15,679 - INFO - Updating portfolio holdings for IONS
+2025-08-15 14:12:15,679 - INFO - Updating portfolio holdings for IONS
+2025-08-15 14:12:15,679 - INFO - Before: IONS had 21 shares
+2025-08-15 14:12:15,679 - INFO - Before: IONS had 21 shares
+2025-08-15 14:12:15,679 - INFO - POSITION REDUCED: IONS now has 8 shares (was 21)
+2025-08-15 14:12:15,679 - INFO - POSITION REDUCED: IONS now has 8 shares (was 21)
+2025-08-15 14:12:15,679 - INFO - Cash updated: $28.75 + $566.80 = $595.55
+2025-08-15 14:12:15,679 - INFO - Cash updated: $28.75 + $566.80 = $595.55
+2025-08-15 14:12:15,680 - INFO - Portfolio update complete for IONS
+2025-08-15 14:12:15,680 - INFO - Portfolio update complete for IONS
+2025-08-15 14:12:15,680 - INFO - Executing order: SELL RIG
+2025-08-15 14:12:15,680 - INFO - Executing order: SELL RIG
+2025-08-15 14:12:15,680 - INFO - RIG current market price: $2.97
+2025-08-15 14:12:15,680 - INFO - RIG current market price: $2.97
+2025-08-15 14:12:15,680 - INFO - Available shares for RIG: 35
+2025-08-15 14:12:15,680 - INFO - Available shares for RIG: 35
+2025-08-15 14:12:15,680 - INFO - SELL order: selling 35 shares
+2025-08-15 14:12:15,680 - INFO - SELL order: selling 35 shares
+2025-08-15 14:12:15,680 - INFO - TRADE EXECUTED: SOLD 35 shares of RIG at $2.97 = $103.95
+2025-08-15 14:12:15,680 - INFO - TRADE EXECUTED: SOLD 35 shares of RIG at $2.97 = $103.95
+2025-08-15 14:12:15,680 - INFO - Updating portfolio holdings for RIG
+2025-08-15 14:12:15,680 - INFO - Updating portfolio holdings for RIG
+2025-08-15 14:12:15,680 - INFO - Before: RIG had 35 shares
+2025-08-15 14:12:15,680 - INFO - Before: RIG had 35 shares
+2025-08-15 14:12:15,680 - INFO - POSITION CLOSED: Removed RIG position entirely
+2025-08-15 14:12:15,680 - INFO - POSITION CLOSED: Removed RIG position entirely
+2025-08-15 14:12:15,680 - INFO - Cash updated: $595.55 + $103.95 = $699.50
+2025-08-15 14:12:15,680 - INFO - Cash updated: $595.55 + $103.95 = $699.50
+2025-08-15 14:12:15,680 - INFO - Portfolio update complete for RIG
+2025-08-15 14:12:15,680 - INFO - Portfolio update complete for RIG
+2025-08-15 14:12:15,680 - INFO - Executing order: SELL CRGY
+2025-08-15 14:12:15,680 - INFO - Executing order: SELL CRGY
+2025-08-15 14:12:15,680 - INFO - CRGY current market price: $9.47
+2025-08-15 14:12:15,680 - INFO - CRGY current market price: $9.47
+2025-08-15 14:12:15,680 - INFO - Available shares for CRGY: 10
+2025-08-15 14:12:15,680 - INFO - Available shares for CRGY: 10
+2025-08-15 14:12:15,680 - INFO - SELL order: selling 10 shares
+2025-08-15 14:12:15,680 - INFO - SELL order: selling 10 shares
+2025-08-15 14:12:15,681 - INFO - TRADE EXECUTED: SOLD 10 shares of CRGY at $9.47 = $94.65
+2025-08-15 14:12:15,681 - INFO - TRADE EXECUTED: SOLD 10 shares of CRGY at $9.47 = $94.65
+2025-08-15 14:12:15,681 - INFO - Updating portfolio holdings for CRGY
+2025-08-15 14:12:15,681 - INFO - Updating portfolio holdings for CRGY
+2025-08-15 14:12:15,681 - INFO - Before: CRGY had 10 shares
+2025-08-15 14:12:15,681 - INFO - Before: CRGY had 10 shares
+2025-08-15 14:12:15,681 - INFO - POSITION CLOSED: Removed CRGY position entirely
+2025-08-15 14:12:15,681 - INFO - POSITION CLOSED: Removed CRGY position entirely
+2025-08-15 14:12:15,681 - INFO - Cash updated: $699.50 + $94.65 = $794.15
+2025-08-15 14:12:15,681 - INFO - Cash updated: $699.50 + $94.65 = $794.15
+2025-08-15 14:12:15,681 - INFO - Portfolio update complete for CRGY
+2025-08-15 14:12:15,681 - INFO - Portfolio update complete for CRGY
+2025-08-15 14:12:15,681 - INFO - EXECUTION COMPLETE - 3 executed, 0 failed
+2025-08-15 14:12:15,681 - INFO - EXECUTION COMPLETE - 3 executed, 0 failed
+2025-08-15 14:12:15,681 - INFO - Cash impact: +$765.40 proceeds, -$0.00 invested, net: $+765.40
+2025-08-15 14:12:15,681 - INFO - Cash impact: +$765.40 proceeds, -$0.00 invested, net: $+765.40
+2025-08-15 14:12:15,681 - INFO - Final cash balance: $794.15
+2025-08-15 14:12:15,681 - INFO - Final cash balance: $794.15
+2025-08-15 14:12:15,681 - WARNING - Significant cash variance: $-1.40 from prediction
+2025-08-15 14:12:15,681 - WARNING - Significant cash variance: $-1.40 from prediction
+2025-08-15 14:12:15,682 - INFO - Detailed execution log saved to: trade_executions/trade_execution_20250815_141215.json
+2025-08-15 14:12:15,682 - INFO - Detailed execution log saved to: trade_executions/trade_execution_20250815_141215.json
+2025-08-15 14:12:15,682 - INFO - Final position - IONS: 8 shares @ $42.07
+2025-08-15 14:12:15,682 - INFO - Final position - IONS: 8 shares @ $42.07
+2025-08-15 14:12:15,682 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-15 14:12:15,682 - INFO - Final position - QS: 23 shares @ $8.50
+2025-08-15 14:12:15,682 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-15 14:12:15,682 - INFO - Final position - AMD: 1 shares @ $176.78
+2025-08-15 14:12:15,682 - INFO - Final position - NVDA: 2 shares @ $179.08
+2025-08-15 14:12:15,682 - INFO - Final position - NVDA: 2 shares @ $179.08
+2025-08-15 14:12:15,682 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-15 14:12:15,682 - INFO - Final position - GOOGL: 1 shares @ $193.00
+2025-08-15 14:12:15,683 - INFO - Portfolio state saved to portfolio_state.json
+2025-08-15 14:12:15,683 - INFO - Portfolio state saved to portfolio_state.json
+2025-08-15 14:12:15,683 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-15 14:12:15,683 - INFO - AUTOMATED TRADE EXECUTION SESSION COMPLETED
+2025-08-15 14:12:15,683 - INFO - ============================================================
+2025-08-15 14:12:15,683 - INFO - ============================================================
+2025-08-15 14:45:07,413 - INFO - ============================================================
+2025-08-15 14:45:07,413 - INFO - ============================================================
+2025-08-15 14:45:07,413 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-15 14:45:07,413 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-15 14:45:07,413 - INFO - ============================================================
+2025-08-15 14:45:07,413 - INFO - ============================================================
+2025-08-15 14:45:07,415 - INFO - Processing document: trading_recommendations_aug1525.md (Type: .MD)
+2025-08-15 14:45:07,415 - INFO - Processing document: trading_recommendations_aug1525.md (Type: .MD)
+2025-08-15 14:45:07,417 - INFO - Successfully parsed 8 orders from document
+2025-08-15 14:45:07,417 - INFO - Successfully parsed 8 orders from document
+2025-08-15 14:45:07,417 - INFO - Order 1: SELL 13 shares of IONS (HIGH) - Reduce concentration from 21 to 8 shares (43.4% to ~16% allocation). Binary FDA decision Aug 21 creates unacceptable portfolio risk. Maintain exposure but protect capital.
+2025-08-15 14:45:07,417 - INFO - Order 1: SELL 13 shares of IONS (HIGH) - Reduce concentration from 21 to 8 shares (43.4% to ~16% allocation). Binary FDA decision Aug 21 creates unacceptable portfolio risk. Maintain exposure but protect capital.
+2025-08-15 14:45:07,417 - INFO - Order 2: SELL 35 shares of RIG (HIGH) - Complete exit at $2.96. Oil declining to $50-58/barrel by Q1 2026. Offshore drilling faces structural headwinds. Generate $103 cash for redeployment.
+2025-08-15 14:45:07,417 - INFO - Order 2: SELL 35 shares of RIG (HIGH) - Complete exit at $2.96. Oil declining to $50-58/barrel by Q1 2026. Offshore drilling faces structural headwinds. Generate $103 cash for redeployment.
+2025-08-15 14:45:07,417 - INFO - Order 3: SELL 10 shares of CRGY (HIGH) - Exit entire position at $9.47. Energy sector underperformance expected despite strong Q2 results. Raise $95 cash for better opportunities.
+2025-08-15 14:45:07,417 - INFO - Order 3: SELL 10 shares of CRGY (HIGH) - Exit entire position at $9.47. Energy sector underperformance expected despite strong Q2 results. Raise $95 cash for better opportunities.
+2025-08-15 14:45:07,418 - INFO - Order 4: HOLD NVDA - Hold position
+2025-08-15 14:45:07,418 - INFO - Order 4: HOLD NVDA - Hold position
+2025-08-15 14:45:07,418 - INFO - Order 5: HOLD QS - Hold position
+2025-08-15 14:45:07,418 - INFO - Order 5: HOLD QS - Hold position
+2025-08-15 14:45:07,418 - INFO - Order 6: HOLD GOOGL - Hold position
+2025-08-15 14:45:07,418 - INFO - Order 6: HOLD GOOGL - Hold position
+2025-08-15 14:45:07,418 - INFO - Order 7: HOLD AMD - Hold position
+2025-08-15 14:45:07,418 - INFO - Order 7: HOLD AMD - Hold position
+2025-08-15 14:45:07,418 - INFO - Order 8: BUY 2 shares of ALAB (LOW) - If cash permits after sales, initiate Astera Labs position at ~$92. AI infrastructure connectivity pure-play with 150% revenue growth.
+2025-08-15 14:45:07,418 - INFO - Order 8: BUY 2 shares of ALAB (LOW) - If cash permits after sales, initiate Astera Labs position at ~$92. AI infrastructure connectivity pure-play with 150% revenue growth.
+2025-08-15 14:45:08,340 - INFO - Market data fetched for 8 securities
+2025-08-15 14:45:08,340 - INFO - Market data fetched for 8 securities
+2025-08-15 14:45:08,340 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-15 14:45:08,340 - INFO - Cash flow validation PASSED - all trades feasible
+2025-08-15 14:45:08,340 - WARNING - Validation warning: No price data for RIG
+2025-08-15 14:45:08,340 - WARNING - Validation warning: No price data for RIG
+2025-08-15 14:45:08,340 - WARNING - Validation warning: No price data for CRGY
+2025-08-15 14:45:08,340 - WARNING - Validation warning: No price data for CRGY
+2025-08-15 14:45:08,340 - WARNING - Validation warning: No price data for ALAB
+2025-08-15 14:45:08,340 - WARNING - Validation warning: No price data for ALAB
+2025-08-15 14:47:57,207 - INFO - Execution cancelled by user
+2025-08-15 14:47:57,207 - INFO - Execution cancelled by user

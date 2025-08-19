@@ -1,0 +1,54 @@
+{
+  "timestamp": "2025-08-15T14:12:15.681854",
+  "document": "trading_recommendations_aug1525.md",
+  "file_type": ".md",
+  "validation": {
+    "feasible": true,
+    "total_sells": 766.7999813556671,
+    "total_buys": 0,
+    "final_cash": 795.5549646282195,
+    "warnings": [],
+    "phase_results": {
+      "HIGH Priority SELLS (Generate Cash)": {
+        "sells": 766.7999813556671,
+        "buys": 0,
+        "warnings": []
+      }
+    }
+  },
+  "orders_parsed": 3,
+  "orders_executed": 3,
+  "orders_failed": 0,
+  "total_proceeds": 765.3999826908112,
+  "total_invested": 0,
+  "predicted_cash": 795.5549646282195,
+  "actual_cash": 794.1549659633636,
+  "cash_variance": -1.399998664855957,
+  "updated_holdings": {
+    "IONS": {
+      "shares": 8,
+      "entry_price": 42.0747621300107,
+      "allocation": 336.5980970400855
+    },
+    "QS": {
+      "shares": 23,
+      "entry_price": 8.5,
+      "allocation": 138.0
+    },
+    "AMD": {
+      "shares": 1,
+      "entry_price": 176.78,
+      "allocation": 176.78
+    },
+    "NVDA": {
+      "shares": 2,
+      "entry_price": 179.0800018310547,
+      "allocation": 358.1600036621094
+    },
+    "GOOGL": {
+      "shares": 1,
+      "entry_price": 193.0,
+      "allocation": 193.0
+    }
+  }
+}

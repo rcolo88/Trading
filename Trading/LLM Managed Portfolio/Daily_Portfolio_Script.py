@@ -702,6 +702,72 @@ class DailyPortfolioReport:
             print("📝 Using default holdings from __init__")
             return False
 
+    def load_positions_from_previous_day(self):
+        """Load positions from the most recent trade execution file (previous day's positions)"""
+        try:
+            trade_executions_dir = 'trade_executions'
+            if not os.path.exists(trade_executions_dir):
+                print("📝 No trade_executions directory found")
+                return False
+            
+            # Get all trade execution files
+            execution_files = [f for f in os.listdir(trade_executions_dir) 
+                             if f.startswith('trade_execution_') and f.endswith('.json')]
+            
+            if not execution_files:
+                print("📝 No trade execution files found")
+                return False
+            
+            # Sort by filename (which contains timestamp) to get the most recent
+            execution_files.sort(reverse=True)
+            most_recent_file = execution_files[0]
+            file_path = os.path.join(trade_executions_dir, most_recent_file)
+            
+            print(f"📂 Loading positions from previous day: {most_recent_file}")
+            
+            with open(file_path, 'r') as f:
+                execution_data = json.load(f)
+            
+            if 'updated_holdings' not in execution_data:
+                print("⚠️ No updated_holdings found in execution file")
+                return False
+            
+            # Load the positions from the execution file
+            previous_holdings = execution_data['updated_holdings']
+            
+            if not previous_holdings:
+                print("📝 No holdings found in previous day's execution file")
+                return False
+            
+            # Replace current holdings with previous day's positions
+            self.holdings = previous_holdings
+            
+            # Try to get cash from the execution file if available
+            if 'actual_cash' in execution_data:
+                self.cash = execution_data['actual_cash']
+            elif 'predicted_cash' in execution_data:
+                self.cash = execution_data['predicted_cash']
+            
+            print(f"✅ Loaded {len(self.holdings)} positions from {most_recent_file}")
+            print(f"   Positions: {list(self.holdings.keys())}")
+            print(f"   Execution timestamp: {execution_data.get('timestamp', 'Unknown')}")
+            
+            # Clean up positions with 0 shares
+            positions_to_remove = []
+            for ticker, position in self.holdings.items():
+                if position.get('shares', 0) <= 0:
+                    positions_to_remove.append(ticker)
+            
+            for ticker in positions_to_remove:
+                print(f"🗑️  Removing {ticker} (0 shares)")
+                del self.holdings[ticker]
+            
+            return True
+            
+        except Exception as e:
+            print(f"⚠️ Error loading positions from previous day: {e}")
+            return False
+
     def fetch_current_data(self):
         """Fetch current price data for all holdings and benchmarks"""
         
@@ -1222,8 +1288,9 @@ class DailyPortfolioReport:
     
     def _extract_orders_section(self, content: str):
         """Extract the ORDERS section from markdown"""
-        # Look for ## ORDERS section
-        pattern = r'##\s+ORDERS\s*\n(.*?)(?=\n##|\Z)'
+        # Look for ## ORDERS section - improved to capture all subsections
+        # Stop only at major sections that are clearly not part of ORDERS
+        pattern = r'##\s+ORDERS\s*\n(.*?)(?=\n##\s+(?:MARKET ANALYSIS|STRATEGIC ALLOCATION|EXECUTION NOTES|RISK MANAGEMENT)|\Z)'
         match = re.search(pattern, content, re.DOTALL | re.IGNORECASE)
         return match.group(1) if match else ""
     
@@ -3003,8 +3070,7 @@ if __name__ == "__main__":
     print("INTEGRATION WITH YOUR PORTFOLIO SCRIPT:")
     print("=" * 60)
     
-    # This would be integrated into your existing Daily_Portfolio_Script.py
-    # from Daily_Portfolio_Script import DailyPortfolioReport
+
     
     # Create portfolio instance
     portfolio = DailyPortfolioReport()
