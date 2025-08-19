@@ -3063,11 +3063,22 @@ Please provide analysis and trading recommendations based on this data."""
 
 # Usage 
 if __name__ == "__main__":
+    import argparse
+    
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Daily Portfolio Management Script')
+    parser.add_argument('--report-only', action='store_true', 
+                      help='Generate portfolio report without executing any trades')
+    args = parser.parse_args()
+    
     # Market hours validation - must be first
     enforce_market_hours()
     
     print("\n" + "=" * 60)
-    print("INTEGRATION WITH YOUR PORTFOLIO SCRIPT:")
+    if args.report_only:
+        print("📊 PORTFOLIO REPORT MODE (READ-ONLY):")
+    else:
+        print("INTEGRATION WITH YOUR PORTFOLIO SCRIPT:")
     print("=" * 60)
     
 
@@ -3075,17 +3086,25 @@ if __name__ == "__main__":
     # Create portfolio instance
     portfolio = DailyPortfolioReport()
     
-    # Execute automated trading from document
-    # Will automatically look for doc if doc is unspecified
-    results = portfolio.execute_automated_trading()
-    
-    # Generate updated portfolio report
-    portfolio.generate_report()
+    if args.report_only:
+        # Only generate the report without executing trades
+        print("🔍 Running in read-only mode - no trades will be executed")
+        portfolio.generate_report()
+    else:
+        # Execute automated trading from document
+        # Will automatically look for doc if doc is unspecified
+        results = portfolio.execute_automated_trading()
+        
+        # Generate updated portfolio report
+        portfolio.generate_report()
     
 
-# STEPS:
+# USAGE:
+# For trading execution:
 # 1. Save Claude's response as 'claude_recommendations.txt'
-# 2. Add the automated trading methods to your DailyPortfolioReport class
-# 3. Run: python Daily_Portfolio_Script.py --execute-trades claude_recommendations.txt
-# 4. Review execution report and update holdings in script
+# 2. Run: python Daily_Portfolio_Script.py
+# 3. Review execution report and update holdings in script
+#
+# For read-only portfolio report (no trades executed):
+# Run: python Daily_Portfolio_Script.py --report-only
     
