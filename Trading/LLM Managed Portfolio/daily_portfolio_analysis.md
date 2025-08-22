@@ -1,4 +1,4 @@
-# Daily Portfolio Analysis - 2025-08-21
+# Daily Portfolio Analysis - 2025-08-22
 
 ## Executive Summary
 - **Total Portfolio Value**: $794.15
@@ -7,7 +7,8 @@
 - **Active Positions**: 0
 
 ## Benchmark Comparison
-- **VIX_daily**: +3.19%
+- **VIX_daily**: -12.41%
+- **VIX_weekly**: -3.00%
 
 ## Position Analysis
 ## Alerts & Recommendations
@@ -17,4 +18,4 @@
 *Historical performance data will be populated as data accumulates*
 
 ---
-*Generated: 2025-08-21 11:39:09*
+*Generated: 2025-08-22 13:06:29*

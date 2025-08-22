@@ -86,13 +86,17 @@ def main():
                       help='Generate portfolio report without executing any trades')
     parser.add_argument('--test-parser', action='store_true',
                       help='Test document parsing without executing trades')
+    parser.add_argument('--load-previous-day', action='store_true',
+                      help='Load portfolio positions from previous day performance history')
     args = parser.parse_args()
     
     # Market hours validation - must be first
     enforce_market_hours()
     
     print("\n" + "=" * 60)
-    if args.report_only:
+    if args.load_previous_day:
+        print("🔄 LLM MANAGED PORTFOLIO - POSITION RECOVERY MODE")
+    elif args.report_only:
         print("📊 LLM MANAGED PORTFOLIO - REPORT MODE (READ-ONLY)")
     elif args.test_parser:
         print("🧪 LLM MANAGED PORTFOLIO - PARSER TEST MODE")
@@ -104,7 +108,36 @@ def main():
     try:
         portfolio_system = LLMManagedPortfolio()
         
-        if args.test_parser:
+        if args.load_previous_day:
+            # Load positions from saved portfolio state
+            print("🔄 Loading positions from saved portfolio state...")
+            previous_positions = portfolio_system.portfolio.load_positions_from_previous_day()
+            
+            if previous_positions != portfolio_system.portfolio.holdings:
+                portfolio_system.portfolio.holdings = previous_positions
+                portfolio_system.portfolio.save_portfolio_state()
+                print(f"✅ Portfolio positions restored from saved state")
+                print(f"   Loaded {len(previous_positions)} positions")
+                print(f"   Current cash: ${portfolio_system.portfolio.cash:.2f}")
+                
+                # Show summary of loaded positions
+                for ticker, position in previous_positions.items():
+                    shares = position.get('shares', 0)
+                    entry_price = position.get('entry_price', 0)
+                    allocation = position.get('allocation', shares * entry_price)
+                    print(f"   {ticker}: {shares} shares @ ${entry_price:.2f} (${allocation:.2f})")
+                
+                # Generate report to update portfolio_analysis_output.txt and performance history
+                print("\n📊 Generating updated portfolio report...")
+                portfolio_system.generate_report()
+                print("✅ Portfolio analysis files updated with restored positions")
+            else:
+                print("ℹ️  No changes needed - positions already current")
+                # Still generate report to ensure files are current
+                print("\n📊 Generating current portfolio report...")
+                portfolio_system.generate_report()
+                
+        elif args.test_parser:
             # Test document parsing functionality
             print("🔍 Testing document parsing...")
             document = portfolio_system.trade_executor.find_trading_document()

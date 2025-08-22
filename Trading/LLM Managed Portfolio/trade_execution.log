@@ -1712,3 +1712,10 @@
 2025-08-21 11:10:36,752 - INFO - ============================================================
 2025-08-21 11:10:36,753 - WARNING - No trading document found - execution cancelled
 2025-08-21 11:10:36,753 - WARNING - No trading document found - execution cancelled
+2025-08-22 10:17:12,084 - INFO - ============================================================
+2025-08-22 10:17:12,086 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-22 10:17:12,086 - INFO - ============================================================
+2025-08-22 10:17:12,089 - INFO - Processing document: /Users/robertcologero/GitHub/Trading/LLM Managed Portfolio/Portfolio Scripts/../trading_recommendations_aug2125.md (Type: .MD)
+2025-08-22 10:17:12,091 - INFO - Parsed 1 orders from document
+2025-08-22 10:17:12,915 - INFO - Execution completed: 0/1 trades successful
+2025-08-22 10:17:12,915 - INFO - ============================================================

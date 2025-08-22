@@ -72,26 +72,44 @@ class PortfolioManager:
         return len(positions_to_remove)
     
     def save_portfolio_state(self):
-        """Save current portfolio state to JSON file"""
+        """Save current portfolio state to JSON file and create dated backup"""
         try:
-            # Get the parent directory (one level up from Pieced Portfolio Scripts)
-            parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-            state_file = os.path.join(parent_dir, 'portfolio_state.json')
+            from datetime import datetime
             
+            # Get the parent directory (one level up from Portfolio Scripts)
+            parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+            
+            # Create state data
+            current_time = pd.Timestamp.now()
             state = {
+                'timestamp': current_time.isoformat(),
                 'cash': self.cash,
                 'holdings': self.holdings,
                 'benchmarks': self.benchmarks,
                 'partial_fill_mode': self.partial_fill_mode.value,
                 'min_cash_reserve': self.min_cash_reserve,
                 'partial_fill_threshold': self.partial_fill_threshold,
-                'last_updated': json.dumps(str(pd.Timestamp.now()))
+                'last_updated': str(current_time)
             }
             
+            # Save current state file (main portfolio_state.json)
+            state_file = os.path.join(parent_dir, 'portfolio_state.json')
             with open(state_file, 'w') as f:
                 json.dump(state, f, indent=4, default=str)
             
+            # Save dated backup to Portfolio States folder
+            stats_dir = os.path.join(parent_dir, 'Portfolio States')
+            os.makedirs(stats_dir, exist_ok=True)
+            
+            # Format date as mmddyy (e.g., 082225 for Aug 22, 2025)
+            date_str = current_time.strftime('%m%d%y')
+            dated_file = os.path.join(stats_dir, f'portfolio_state_{date_str}.json')
+            
+            with open(dated_file, 'w') as f:
+                json.dump(state, f, indent=4, default=str)
+            
             print(f"💾 Portfolio state saved to {state_file}")
+            print(f"📊 Dated backup saved to Portfolio States/portfolio_state_{date_str}.json")
             return True
             
         except Exception as e:
@@ -135,52 +153,82 @@ class PortfolioManager:
             return False
     
     def load_positions_from_previous_day(self):
-        """Load positions from the most recent portfolio performance history"""
+        """Load positions from the most recent dated portfolio state file in Portfolio States/"""
         try:
-            # Get the parent directory (one level up from Pieced Portfolio Scripts)
+            import glob
+            from datetime import datetime
+            
+            # Get the parent directory (one level up from Portfolio Scripts)
             parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-            history_file = os.path.join(parent_dir, 'portfolio_performance_history.csv')
+            stats_dir = os.path.join(parent_dir, 'Portfolio States')
             
-            if not os.path.exists(history_file):
-                print("📊 No portfolio history found - using current holdings")
+            if not os.path.exists(stats_dir):
+                print("📊 No Portfolio States folder found - using current holdings")
                 return self.holdings
             
-            import pandas as pd
-            df = pd.read_csv(history_file)
+            # Find all dated portfolio state files
+            pattern = os.path.join(stats_dir, 'portfolio_state_*.json')
+            state_files = glob.glob(pattern)
             
-            if df.empty:
-                print("📊 Portfolio history is empty - using current holdings") 
+            if not state_files:
+                print("📊 No dated portfolio state files found - using current holdings")
                 return self.holdings
             
-            # Get the most recent entry
-            latest = df.iloc[-1]
+            # Parse dates and find most recent file
+            dated_files = []
+            for file_path in state_files:
+                filename = os.path.basename(file_path)
+                # Extract date from filename like "portfolio_state_082225.json"
+                if filename.startswith('portfolio_state_') and filename.endswith('.json'):
+                    date_part = filename[16:-5]  # Remove "portfolio_state_" and ".json"
+                    if len(date_part) == 6:  # mmddyy format
+                        try:
+                            month = int(date_part[:2])
+                            day = int(date_part[2:4])
+                            year_2digit = int(date_part[4:6])
+                            
+                            # Convert 2-digit year to 4-digit (assume 20xx for years 00-99)
+                            if year_2digit >= 0:
+                                full_year = 2000 + year_2digit
+                            
+                            file_date = datetime(full_year, month, day)
+                            dated_files.append((file_date, file_path))
+                        except ValueError:
+                            continue  # Skip files with invalid date formats
             
-            # Parse positions from the latest entry
-            previous_positions = {}
-            position_columns = [col for col in df.columns if col.endswith('_shares')]
+            if not dated_files:
+                print("📊 No valid dated portfolio state files found - using current holdings")
+                return self.holdings
             
-            for col in position_columns:
-                ticker = col.replace('_shares', '').upper()
-                shares = int(latest[col]) if pd.notna(latest[col]) and latest[col] != 0 else 0
+            # Sort by date (most recent first) and get the latest file
+            dated_files.sort(key=lambda x: x[0], reverse=True)
+            latest_date, latest_file = dated_files[0]
+            
+            # Load the most recent state file
+            with open(latest_file, 'r') as f:
+                saved_state = json.load(f)
+            
+            saved_holdings = saved_state.get('holdings', {})
+            saved_cash = float(saved_state.get('cash', 0.0))
+            
+            if saved_holdings:
+                print(f"📈 Loading {len(saved_holdings)} positions from most recent state")
+                print(f"   File: {os.path.basename(latest_file)}")
+                print(f"   Date: {latest_date.strftime('%m/%d/%Y')}")
+                print(f"   Timestamp: {saved_state.get('timestamp', 'Unknown')}")
                 
-                if shares > 0:
-                    # Try to get entry price from current holdings or use a default
-                    entry_price = self.holdings.get(ticker, {}).get('entry_price', 0.0)
-                    previous_positions[ticker] = {
-                        'shares': shares,
-                        'entry_price': entry_price,
-                        'allocation': shares * entry_price
-                    }
-            
-            if previous_positions:
-                print(f"📈 Loaded {len(previous_positions)} positions from previous day")
-                return previous_positions
+                # Also update cash from saved state
+                if saved_cash != self.cash:
+                    print(f"💰 Updating cash: ${self.cash:.2f} → ${saved_cash:.2f}")
+                    self.cash = saved_cash
+                
+                return saved_holdings
             else:
-                print("📊 No previous positions found - using current holdings")
+                print("📊 No positions in most recent state file - using current holdings")
                 return self.holdings
                 
         except Exception as e:
-            print(f"❌ Error loading previous positions: {e}")
+            print(f"❌ Error loading dated portfolio state: {e}")
             print("📊 Using current holdings as fallback")
             return self.holdings
     

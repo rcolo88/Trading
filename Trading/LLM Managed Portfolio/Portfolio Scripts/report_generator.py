@@ -435,6 +435,9 @@ class ReportGenerator:
         self.plot_performance_chart()
         self.plot_position_details(positions, total_current_value)
         
+        # Update portfolio state timestamp after report generation
+        self.portfolio.save_portfolio_state()
+        
         return report_data
     
     def _display_report(self, report_data: Dict[str, Any]):

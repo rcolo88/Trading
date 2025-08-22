@@ -37,9 +37,66 @@ pip install PyPDF2      # Alternative PDF processing
 ```
 
 ### Quick Start
+
+#### Modular System (Recommended)
+```bash
+# Full execution (trading + reporting)
+conda run -n trading_env python "Portfolio Scripts/main.py"
+
+# Report generation only (safe for any time)
+conda run -n trading_env python "Portfolio Scripts/main.py" --report-only
+
+# Load positions from saved state (recovery mode)
+conda run -n trading_env python "Portfolio Scripts/main.py" --load-previous-day
+
+# Test document parsing without trading
+conda run -n trading_env python "Portfolio Scripts/main.py" --test-parser
+```
+
+#### Legacy System (Deprecated)
 ```bash
 python Daily_Portfolio_Script.py
 ```
+
+## Command Line Options
+
+### Portfolio Recovery
+Use this when you need to restore your portfolio positions from the last saved state:
+
+```bash
+conda run -n trading_env python "Portfolio Scripts/main.py" --load-previous-day
+```
+
+**When to use**:
+- Portfolio shows incorrect/hardcoded positions
+- After system updates or code changes
+- When `portfolio_state.json` timestamp is behind performance history
+- To recover from initialization issues
+
+**What it does**:
+- Loads positions and cash from `portfolio_state.json`
+- Compares with current hardcoded defaults
+- Updates portfolio if positions differ
+- Shows summary of restored positions
+- Saves updated state for persistence
+
+### Report-Only Mode
+Generate portfolio analysis without executing any trades:
+
+```bash
+conda run -n trading_env python "Portfolio Scripts/main.py" --report-only
+```
+
+**Safe to run anytime** - no trading operations, only market data analysis.
+
+### Document Parser Testing
+Test trading document parsing without executing trades:
+
+```bash
+conda run -n trading_env python "Portfolio Scripts/main.py" --test-parser
+```
+
+Useful for validating trading recommendations before live execution.
 
 ## Daily Workflow
 
