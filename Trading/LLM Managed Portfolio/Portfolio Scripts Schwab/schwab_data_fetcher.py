@@ -71,7 +71,8 @@ class SchwabDataFetcher:
             if (self.config['api_key'] == "YOUR_API_KEY_HERE" or 
                 self.config['app_secret'] == "YOUR_APP_SECRET_HERE"):
                 logger.warning("⚠️  Schwab API credentials not configured")
-                logger.info("📝 Using fallback to yfinance functionality")
+                logger.error("❌ Schwab API credentials required for operation")
+                raise Exception("Schwab API credentials not configured")
                 self.client = None
                 return
             
@@ -90,8 +91,27 @@ class SchwabDataFetcher:
             
         except Exception as e:
             logger.error(f"❌ Error initializing Schwab client: {e}")
-            logger.info("🔄 Falling back to yfinance functionality")
+            
+            # Provide specific guidance for common errors
+            if "RedirectServerExitedError" in str(e) or "callback URL" in str(e).lower():
+                logger.error("🔧 CALLBACK URL ISSUE DETECTED:")
+                logger.error("   1. Ensure your callback URL in schwab_credentials.json includes a port: 'https://127.0.0.1:8182'")
+                logger.error("   2. Verify this EXACT URL is configured in your Schwab developer app settings")
+                logger.error("   3. The callback URL must match exactly between your app and credentials file")
+                logger.error("   4. Visit https://developer.schwab.com/ to update your app's callback URL")
+            elif "api_key" in str(e).lower() or "app_secret" in str(e).lower():
+                logger.error("🔧 CREDENTIALS ISSUE DETECTED:")
+                logger.error("   1. Verify your API key and app secret in schwab_credentials.json")
+                logger.error("   2. Ensure your Schwab developer app is in 'Ready for Use' status")
+            else:
+                logger.error("🔧 AUTHENTICATION TROUBLESHOOTING:")
+                logger.error("   1. Check if your Schwab developer app is approved and active")
+                logger.error("   2. Verify all credentials are correct")
+                logger.error("   3. Try deleting schwab_token.json to force re-authentication")
+            
+            logger.error("❌ Failed to initialize Schwab API client")
             self.client = None
+            raise Exception(f"Schwab API initialization failed: {e}")
     
     def _test_connection(self):
         """Test Schwab API connection with a simple quote request"""
@@ -122,8 +142,8 @@ class SchwabDataFetcher:
         print(f"🎯 Fetching data for tickers: {all_tickers}")
         
         if self.client is None:
-            logger.warning("⚠️  Schwab API client not available, falling back to yfinance")
-            return self._fallback_to_yfinance(all_tickers, holdings_tickers, benchmark_tickers)
+            logger.error("❌ Schwab API client not available")
+            raise Exception("Schwab API client is required for operation")
         
         try:
             # Fetch current quotes using Schwab API
@@ -148,8 +168,8 @@ class SchwabDataFetcher:
                 
         except Exception as e:
             logger.error(f"❌ Error with Schwab API: {e}")
-            logger.info("🔄 Falling back to yfinance")
-            return self._fallback_to_yfinance(all_tickers, holdings_tickers, benchmark_tickers)
+            logger.error("❌ Schwab API error, cannot continue without proper API access")
+            raise Exception(f"Schwab API error: {e}")
     
     def _fetch_schwab_quotes(self, tickers: List[str]) -> Optional[Dict[str, float]]:
         """Fetch current quotes from Schwab API"""
@@ -281,19 +301,6 @@ class SchwabDataFetcher:
             logger.error(f"❌ Error parsing Schwab history data: {e}")
             return None
     
-    def _fallback_to_yfinance(self, all_tickers: List[str], holdings_tickers: List[str], benchmark_tickers: List[str]) -> Tuple[Optional[Dict], Optional[pd.DataFrame], Optional[pd.DataFrame]]:
-        """Fallback to yfinance when Schwab API is unavailable"""
-        try:
-            # Import and use the original DataFetcher as fallback
-            from data_fetcher import DataFetcher
-            
-            logger.info("🔄 Using yfinance fallback")
-            fallback_fetcher = DataFetcher()
-            return fallback_fetcher.fetch_current_data(holdings_tickers, benchmark_tickers)
-            
-        except Exception as e:
-            logger.error(f"❌ Fallback to yfinance also failed: {e}")
-            return None, None, None
     
     # Maintain compatibility with existing interface
     def get_current_prices(self, tickers: List[str]) -> Optional[Dict[str, float]]:
@@ -347,7 +354,7 @@ class SchwabDataFetcher:
             'data_date_range': None,
             'missing_data_points': 0,
             'quality_score': 0,
-            'api_source': 'Schwab API' if self.client else 'yfinance (fallback)'
+            'api_source': 'Schwab API'
         }
         
         if not self.price_data.empty:
