@@ -176,38 +176,71 @@ class SchwabDataFetcher:
         try:
             current_prices = {}
             
-            # Handle VIX separately (use $VIX.X for Schwab)
+            # Handle VIX separately - try different formats for Schwab
             processed_tickers = []
             for ticker in tickers:
                 if ticker == '^VIX' or ticker == 'VIX':
-                    processed_tickers.append('$VIX.X')  # Schwab VIX symbol
+                    # Try VIX without special symbols first, then $VIX.X if needed
+                    processed_tickers.append('VIX')
                 else:
                     processed_tickers.append(ticker)
             
             # Fetch quotes in batches or individually
             if len(processed_tickers) == 1:
                 # Single ticker
-                response = self.client.get_quote(processed_tickers[0])
+                ticker = processed_tickers[0]
+                original_ticker = tickers[0]
+                logger.debug(f"🔍 Fetching single quote for: {ticker} -> {original_ticker}")
+                
+                response = self.client.get_quote(ticker)
                 if response.status_code == 200:
                     quote_data = response.json()
+                    logger.debug(f"🔍 Single quote response: {quote_data}")
+                    
                     price = self._extract_price_from_quote(quote_data)
                     if price:
-                        # Map back to original ticker name
-                        original_ticker = tickers[0]
                         current_prices[original_ticker] = price
+                        logger.debug(f"✅ Successfully extracted single price for {original_ticker}: {price}")
+                    else:
+                        logger.warning(f"⚠️  Could not extract price from single quote for {ticker}")
+                else:
+                    logger.error(f"❌ Single quote request failed with status {response.status_code} for {ticker}")
             else:
                 # Multiple tickers - use get_quotes
                 response = self.client.get_quotes(processed_tickers)
                 if response.status_code == 200:
                     quotes_data = response.json()
+                    logger.debug(f"🔍 Full quotes response: {quotes_data}")
+                    
+                    # Check if the response is nested (common pattern)
+                    if isinstance(quotes_data, dict) and len(quotes_data) == 1:
+                        # Sometimes responses are nested, try to unwrap
+                        first_key = next(iter(quotes_data))
+                        if isinstance(quotes_data[first_key], dict):
+                            quotes_data = quotes_data[first_key]
+                            logger.debug(f"🔍 Unwrapped nested response: {quotes_data}")
                     
                     for i, ticker in enumerate(processed_tickers):
+                        original_ticker = tickers[i]
+                        logger.debug(f"🔍 Processing ticker: {ticker} -> {original_ticker}")
+                        
                         if ticker in quotes_data:
                             price = self._extract_price_from_quote(quotes_data[ticker])
                             if price:
-                                # Map back to original ticker name
-                                original_ticker = tickers[i]
                                 current_prices[original_ticker] = price
+                                logger.debug(f"✅ Successfully extracted price for {original_ticker}: {price}")
+                            else:
+                                logger.warning(f"⚠️  Could not extract price for {ticker}")
+                        else:
+                            logger.warning(f"⚠️  Ticker {ticker} not found in quotes response")
+                            # Try variations of the ticker symbol
+                            for key in quotes_data.keys():
+                                if key.upper() == ticker.upper():
+                                    price = self._extract_price_from_quote(quotes_data[key])
+                                    if price:
+                                        current_prices[original_ticker] = price
+                                        logger.debug(f"✅ Found price for {original_ticker} using key variation {key}: {price}")
+                                        break
             
             return current_prices if current_prices else None
             
@@ -218,15 +251,68 @@ class SchwabDataFetcher:
     def _extract_price_from_quote(self, quote_data: Dict) -> Optional[float]:
         """Extract current price from Schwab quote response"""
         try:
-            # Schwab quote response structure may vary, try multiple fields
+            # Debug: Log the actual response structure (only first few keys to avoid spam)
+            top_keys = list(quote_data.keys())[:5] if isinstance(quote_data, dict) else []
+            logger.debug(f"🔍 Schwab quote top-level keys: {top_keys}")
+            
+            # Schwab quote response is nested - look in different sections
             if isinstance(quote_data, dict):
-                # Try different price fields in order of preference
-                price_fields = ['lastPrice', 'mark', 'bidPrice', 'askPrice', 'closePrice']
-                for field in price_fields:
+                # Priority 1: Look in the 'quote' section (most recent market data)
+                if 'quote' in quote_data and isinstance(quote_data['quote'], dict):
+                    quote_section = quote_data['quote']
+                    logger.debug(f"🔍 Found quote section with keys: {list(quote_section.keys())}")
+                    
+                    # Try price fields in order of preference within quote section
+                    quote_price_fields = ['lastPrice', 'mark', 'bidPrice', 'askPrice', 'closePrice']
+                    for field in quote_price_fields:
+                        if field in quote_section and quote_section[field] is not None:
+                            try:
+                                price = float(quote_section[field])
+                                if price > 0:  # Sanity check
+                                    logger.debug(f"✅ Found price {price} in quote.{field}")
+                                    return price
+                            except (ValueError, TypeError):
+                                continue
+                
+                # Priority 2: Look in the 'regular' section (regular market data)
+                if 'regular' in quote_data and isinstance(quote_data['regular'], dict):
+                    regular_section = quote_data['regular']
+                    logger.debug(f"🔍 Found regular section with keys: {list(regular_section.keys())}")
+                    
+                    regular_price_fields = ['regularMarketLastPrice', 'lastPrice', 'price']
+                    for field in regular_price_fields:
+                        if field in regular_section and regular_section[field] is not None:
+                            try:
+                                price = float(regular_section[field])
+                                if price > 0:
+                                    logger.debug(f"✅ Found price {price} in regular.{field}")
+                                    return price
+                            except (ValueError, TypeError):
+                                continue
+                
+                # Priority 3: Try top-level price fields (fallback)
+                top_level_price_fields = ['lastPrice', 'mark', 'price', 'close']
+                for field in top_level_price_fields:
                     if field in quote_data and quote_data[field] is not None:
-                        return float(quote_data[field])
+                        try:
+                            price = float(quote_data[field])
+                            if price > 0:
+                                logger.debug(f"✅ Found price {price} in top-level {field}")
+                                return price
+                        except (ValueError, TypeError):
+                            continue
+                
+                # Final fallback: Look for any numeric field > 1 (avoid boolean values)
+                for key, value in quote_data.items():
+                    if isinstance(value, (int, float)) and value > 1 and value < 10000:  # Reasonable price range
+                        logger.debug(f"🔍 Trying fallback price field '{key}': {value}")
+                        return float(value)
+                        
+                logger.warning(f"⚠️  No valid price found in quote data")
+                
             return None
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            logger.error(f"❌ Error extracting price from quote: {e}")
             return None
     
     def _fetch_schwab_historical(self, tickers: List[str], days: int = 5) -> pd.DataFrame:
@@ -235,8 +321,8 @@ class SchwabDataFetcher:
             historical_data = {}
             
             for ticker in tickers:
-                # Handle VIX separately
-                schwab_ticker = '$VIX.X' if ticker in ['^VIX', 'VIX'] else ticker
+                # Handle VIX separately - try simple VIX first
+                schwab_ticker = 'VIX' if ticker in ['^VIX', 'VIX'] else ticker
                 
                 try:
                     # Get daily price history for the last few days

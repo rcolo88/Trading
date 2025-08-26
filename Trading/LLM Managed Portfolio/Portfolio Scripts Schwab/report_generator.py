@@ -20,8 +20,10 @@ class ReportGenerator:
         self.portfolio = portfolio_manager
         self.data_fetcher = data_fetcher
         
-        # Get the parent directory (one level up from Pieced Portfolio Scripts)
+        # Get the parent directory (one level up from Portfolio Scripts Schwab)
         self.parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+        # Current directory for charts
+        self.current_dir = os.path.dirname(os.path.abspath(__file__))
     
     def calculate_position_metrics(self, current_prices: Dict[str, float]) -> List[Dict[str, Any]]:
         """Calculate key metrics for each position"""
@@ -217,17 +219,29 @@ class ReportGenerator:
             if os.path.exists(history_file):
                 df = pd.read_csv(history_file)
                 
+                # Normalize column names - handle both 'date' and 'Date'
+                if 'date' in df.columns and 'Date' not in df.columns:
+                    df = df.rename(columns={'date': 'Date'})
+                if 'time' in df.columns and 'Time' not in df.columns:
+                    df = df.rename(columns={'time': 'Time'})
+                
                 # Check if today's data already exists
                 today = datetime.now().strftime('%Y-%m-%d')
-                existing_today = df[df['Date'] == today]
+                if 'Date' in df.columns:
+                    existing_today = df[df['Date'] == today]
+                else:
+                    existing_today = pd.DataFrame()  # Empty if no Date column
                 
                 if not existing_today.empty:
-                    # Update today's row
-                    df.loc[df['Date'] == today] = pd.Series(current_row)
+                    # Update today's row - use proper indexing
+                    mask = df['Date'] == today
+                    for col, value in current_row.items():
+                        df.loc[mask, col] = value
                     print("📊 Updated today's performance data")
                 else:
                     # Append new row
-                    df = pd.concat([df, pd.DataFrame([current_row])], ignore_index=True)
+                    new_df = pd.DataFrame([current_row])
+                    df = pd.concat([df, new_df], ignore_index=True)
                     print("📊 Added new daily performance record")
             else:
                 # Create new file
@@ -258,9 +272,35 @@ class ReportGenerator:
                 print("❌ Not enough historical data for chart (need at least 2 data points)")
                 return
             
+            # Normalize column names - handle both 'date' and 'Date'
+            column_mapping = {}
+            if 'date' in df.columns and 'Date' not in df.columns:
+                column_mapping['date'] = 'Date'
+            if 'time' in df.columns and 'Time' not in df.columns:
+                column_mapping['time'] = 'Time'
+            if 'account_value' in df.columns and 'Total Value' not in df.columns:
+                column_mapping['account_value'] = 'Total Value'
+            if 'total_pnl_dollar' in df.columns and 'Total P&L $' not in df.columns:
+                column_mapping['total_pnl_dollar'] = 'Total P&L $'
+            if 'total_pnl_percentage' in df.columns and 'Total P&L %' not in df.columns:
+                column_mapping['total_pnl_percentage'] = 'Total P&L %'
+            
+            if column_mapping:
+                df = df.rename(columns=column_mapping)
+                print(f"📊 Normalized column names: {column_mapping}")
+            
+            # Check if Date column exists
+            if 'Date' not in df.columns:
+                print("❌ Missing 'Date' column in performance history")
+                return
+                
             # Parse dates and sort
-            df['Date'] = pd.to_datetime(df['Date'])
-            df = df.sort_values('Date')
+            try:
+                df['Date'] = pd.to_datetime(df['Date'])
+                df = df.sort_values('Date')
+            except Exception as date_error:
+                print(f"❌ Error parsing dates: {date_error}")
+                return
             
             # Create chart
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
@@ -292,11 +332,11 @@ class ReportGenerator:
             
             plt.tight_layout()
             
-            # Save chart
+            # Save chart to Portfolio Scripts Schwab directory
             if save_path:
                 chart_path = save_path
             else:
-                chart_path = os.path.join(self.parent_dir, 'LLM Managed Portfolio Performance.png')
+                chart_path = os.path.join(self.current_dir, 'LLM Managed Portfolio Performance.png')
             
             plt.savefig(chart_path, dpi=300, bbox_inches='tight')
             print(f"✅ Chart saved to {chart_path}")
@@ -316,42 +356,44 @@ class ReportGenerator:
             fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
             
             # Chart 1: Position Values (Pie Chart)
-            tickers = [pos['ticker'] for pos in positions]
-            values = [pos['current_value'] for pos in positions]
+            position_tickers = [pos['ticker'] for pos in positions]
+            position_values = [pos['current_value'] for pos in positions]
             
             # Add cash as a segment if significant
+            pie_labels = position_tickers.copy()
+            pie_values = position_values.copy()
             if self.portfolio.cash > total_value * 0.05:  # Show cash if >5% of total
-                tickers.append('CASH')
-                values.append(self.portfolio.cash)
+                pie_labels.append('CASH')
+                pie_values.append(self.portfolio.cash)
             
-            ax1.pie(values, labels=tickers, autopct='%1.1f%%', startangle=90)
+            ax1.pie(pie_values, labels=pie_labels, autopct='%1.1f%%', startangle=90)
             ax1.set_title('Portfolio Allocation by Value')
             
-            # Chart 2: P&L by Position (Bar Chart)
+            # Chart 2: P&L by Position (Bar Chart) - positions only
             pnl_values = [pos['pnl_dollar'] for pos in positions]
             colors = ['green' if pnl >= 0 else 'red' for pnl in pnl_values]
             
-            bars = ax2.bar(tickers, pnl_values, color=colors, alpha=0.7)
+            bars = ax2.bar(position_tickers, pnl_values, color=colors, alpha=0.7)
             ax2.set_title('Profit & Loss by Position')
             ax2.set_ylabel('P&L ($)')
             ax2.axhline(y=0, color='black', linestyle='-', alpha=0.3)
             plt.setp(ax2.get_xticklabels(), rotation=45)
             
-            # Chart 3: Weight Drift (Bar Chart)
+            # Chart 3: Weight Drift (Bar Chart) - positions only
             weight_drifts = [pos['weight_drift'] for pos in positions]
             colors_drift = ['blue' if drift >= 0 else 'orange' for drift in weight_drifts]
             
-            ax3.bar(tickers, weight_drifts, color=colors_drift, alpha=0.7)
+            ax3.bar(position_tickers, weight_drifts, color=colors_drift, alpha=0.7)
             ax3.set_title('Weight Drift from Target')
             ax3.set_ylabel('Drift (%)')
             ax3.axhline(y=0, color='black', linestyle='-', alpha=0.3)
             plt.setp(ax3.get_xticklabels(), rotation=45)
             
-            # Chart 4: Performance Percentages
+            # Chart 4: Performance Percentages - positions only
             pnl_pcts = [pos['pnl_percent'] for pos in positions]
             colors_pct = ['green' if pnl >= 0 else 'red' for pnl in pnl_pcts]
             
-            ax4.bar(tickers, pnl_pcts, color=colors_pct, alpha=0.7)
+            ax4.bar(position_tickers, pnl_pcts, color=colors_pct, alpha=0.7)
             ax4.set_title('Performance by Position (%)')
             ax4.set_ylabel('Return (%)')
             ax4.axhline(y=0, color='black', linestyle='-', alpha=0.3)
@@ -359,11 +401,11 @@ class ReportGenerator:
             
             plt.tight_layout()
             
-            # Save chart
+            # Save chart to Portfolio Scripts Schwab directory
             if save_path:
                 chart_path = save_path
             else:
-                chart_path = os.path.join(self.parent_dir, 'Portfolio Position Details.png')
+                chart_path = os.path.join(self.current_dir, 'LLM Position Details.png')
             
             plt.savefig(chart_path, dpi=300, bbox_inches='tight')
             print(f"✅ Position details chart saved to {chart_path}")
@@ -371,6 +413,57 @@ class ReportGenerator:
             
         except Exception as e:
             print(f"❌ Error creating position details chart: {e}")
+    
+    def generate_portfolio_analysis_output(self, report_data: Dict[str, Any], current_prices: Dict[str, float]):
+        """Generate portfolio_analysis_output.txt file for compatibility with legacy systems"""
+        
+        try:
+            # Create the output data structure matching the legacy format
+            output_data = {
+                "date": datetime.now().isoformat(),
+                "account_value": report_data['total_value'],
+                "initial_investment": 2000.0,  # Fixed initial investment
+                "cash_available": report_data['cash'],
+                "total_pnl_dollar": report_data['total_pnl'],
+                "total_pnl_percent": report_data['total_pnl_pct'],
+                "account_growth_percent": report_data['total_pnl_pct'],
+                "positions": []
+            }
+            
+            # Add position details
+            for pos in report_data['positions']:
+                position_data = {
+                    "ticker": pos['ticker'],
+                    "shares": pos['shares'],
+                    "entry_price": pos['entry_price'],
+                    "current_price": pos['current_price'],
+                    "current_value": pos['current_value'],
+                    "cost_basis": pos['cost_basis'],
+                    "pnl_dollar": pos['pnl_dollar'],
+                    "pnl_percent": pos['pnl_percent']
+                }
+                output_data["positions"].append(position_data)
+            
+            # Create the output text in the expected format
+            output_text = f"Daily portfolio update for {datetime.now().strftime('%Y-%m-%d')}. Here's the data:\n\n"
+            output_text += json.dumps(output_data, indent=2)
+            
+            # Save to both parent directory (for compatibility) and current directory
+            parent_file = os.path.join(self.parent_dir, 'portfolio_analysis_output.txt')
+            current_file = os.path.join(self.current_dir, 'portfolio_analysis_output.txt')
+            
+            # Write to parent directory (legacy location)
+            with open(parent_file, 'w') as f:
+                f.write(output_text)
+            print(f"✅ Portfolio analysis output saved to {parent_file}")
+            
+            # Also write to current directory (Portfolio Scripts Schwab)
+            with open(current_file, 'w') as f:
+                f.write(output_text)
+            print(f"✅ Portfolio analysis output saved to {current_file}")
+            
+        except Exception as e:
+            print(f"❌ Error generating portfolio analysis output: {e}")
     
     def generate_report(self):
         """Generate comprehensive portfolio report"""
@@ -432,6 +525,7 @@ class ReportGenerator:
         # Export data and generate files
         self.export_historical_performance(report_data, current_prices)
         self.generate_analysis_file(report_data)
+        self.generate_portfolio_analysis_output(report_data, current_prices)
         self.plot_performance_chart()
         self.plot_position_details(positions, total_current_value)
         
