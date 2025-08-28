@@ -159,3 +159,73 @@ conda run -n trading_env python "Pieced Portfolio Scripts/main.py" --report-only
 - **Same CLI arguments** supported (`--report-only`, `--test-parser`)
 
 **Always use `Portfolio Scripts Schwab/` for the latest Schwab-compatible implementation.**
+
+## 🤖 Local LLM Runtime System (NEW)
+
+### Overview
+A complete standalone local LLM-powered trading system that operates entirely within `local_runtime/` directory. This system provides an alternative to external LLM dependencies by using locally-hosted specialized financial models.
+
+### Quick Start
+```bash
+# Navigate to local LLM system
+cd local_runtime
+
+# View system information and options
+python local_start.py
+
+# Test components (CPU mode - no GPU required)
+python main_local.py --test-components --force-cpu
+
+# Analysis only mode (generates recommendations without trading)
+python main_local.py --analysis-only --force-cpu
+
+# Full trading execution (requires GPU for optimal performance)
+python main_local.py
+```
+
+### Architecture
+The local LLM system uses 4 specialized financial models:
+1. **News Analysis**: `AdaptLLM/Llama-3-FinMA-8B-Instruct` - Financial news sentiment
+2. **Market Analysis**: `Qwen/Qwen2.5-14B-Instruct` - Technical analysis
+3. **Trading Decision**: `deepseek-ai/DeepSeek-R1-Distill-Qwen-14B` - Core recommendations  
+4. **Risk Validation**: `microsoft/Phi-3-medium-4k-instruct` - Safety checks
+
+### Key Features
+- **Standalone Operation**: Complete copy of Portfolio Scripts Schwab system
+- **Compatible Output**: Generates standard `trading_recommendation_*.md` files
+- **Flexible Modes**: CPU/GPU, quick/full pipeline, analysis/trading
+- **Safety Layers**: Multi-model risk validation and hard-coded limits
+- **Zero Impact**: Does not modify original `Portfolio Scripts Schwab/` directory
+
+### Integration with Existing System
+```bash
+# Original Schwab system (unchanged)
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py"
+
+# Local LLM alternative
+cd local_runtime && python main_local.py
+
+# Both systems use same portfolio state files and output formats
+```
+
+### Resource Requirements
+- **CPU Mode**: 16GB+ RAM, any modern CPU (slower but functional)
+- **GPU Mode (Quick)**: 8GB+ VRAM, 16GB+ RAM
+- **GPU Mode (Full)**: 20GB+ VRAM, 32GB+ RAM
+
+### Dependencies
+```bash
+# Core LLM dependencies
+pip install vllm transformers torch accelerate
+
+# Existing portfolio system dependencies
+pip install yfinance pandas numpy matplotlib pandas-market-calendars pytz
+```
+
+### Development Workflow
+1. **Testing**: Use `python main_local.py --test-components --force-cpu`
+2. **Analysis**: Use `python main_local.py --analysis-only --force-cpu` 
+3. **Production**: Use `python main_local.py` for full execution
+4. **Documentation**: See `local_runtime/README_LOCAL.md` for complete details
+
+The local LLM system provides a complete alternative to external LLM dependencies while maintaining full compatibility with the existing portfolio management workflow.
