@@ -1,0 +1,63 @@
+Daily portfolio update for 2025-08-28. Here's the data:
+
+{
+  "date": "2025-08-28T10:15:32.746269",
+  "account_value": 2061.8783659633636,
+  "initial_investment": 2000.0,
+  "cash_available": 794.1549659633636,
+  "total_pnl_dollar": 61.87836596336365,
+  "total_pnl_percent": 3.0939182981681825,
+  "account_growth_percent": 3.0939182981681825,
+  "positions": [
+    {
+      "ticker": "IONS",
+      "shares": 8,
+      "entry_price": 42.0747621300107,
+      "current_price": 43.15,
+      "current_value": 345.2,
+      "cost_basis": 336.5980970400856,
+      "pnl_dollar": 8.601902959914412,
+      "pnl_percent": 2.555541173748825
+    },
+    {
+      "ticker": "QS",
+      "shares": 23,
+      "entry_price": 8.5,
+      "current_price": 8.105,
+      "current_value": 186.41500000000002,
+      "cost_basis": 195.5,
+      "pnl_dollar": -9.08499999999998,
+      "pnl_percent": -4.6470588235294015
+    },
+    {
+      "ticker": "AMD",
+      "shares": 1,
+      "entry_price": 176.78,
+      "current_price": 168.219,
+      "current_value": 168.219,
+      "cost_basis": 176.78,
+      "pnl_dollar": -8.561000000000007,
+      "pnl_percent": -4.84274239167327
+    },
+    {
+      "ticker": "NVDA",
+      "shares": 2,
+      "entry_price": 179.0800018310547,
+      "current_price": 178.6197,
+      "current_value": 357.2394,
+      "cost_basis": 358.1600036621094,
+      "pnl_dollar": -0.9206036621093858,
+      "pnl_percent": -0.2570369814318769
+    },
+    {
+      "ticker": "GOOGL",
+      "shares": 1,
+      "entry_price": 193.0,
+      "current_price": 210.65,
+      "current_value": 210.65,
+      "cost_basis": 193.0,
+      "pnl_dollar": 17.650000000000006,
+      "pnl_percent": 9.145077720207256
+    }
+  ]
+}

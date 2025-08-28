@@ -1,178 +1,111 @@
-# config/model_config.py
+#!/usr/bin/env python3
 """
-Model Configuration based on HuggingFace FinBench Leaderboard
-Selection criteria: Performance, Size, Specialization
-"""
+Local LLM Trading System - Updated Integration Point
+Now points to the full local LLM trading system in local_runtime/
 
-MODEL_CONFIGS = {
-    "news_analysis": {
-        "model_id": "AdaptLLM/Llama-3-FinMA-8B-Instruct",
-        "purpose": "Financial news analysis and sentiment extraction",
-        "vram_required": "16GB",
-        "quantization": "8bit",
-        "performance_score": 0.847,  # FinBench score
-        "specialized_tasks": [
-            "earnings_analysis",
-            "market_sentiment",
-            "catalyst_identification",
-            "risk_event_detection"
-        ]
-    },
-    
-    "market_analysis": {
-        "model_id": "Qwen/Qwen2.5-14B-Instruct",
-        "purpose": "Technical analysis and market pattern recognition",
-        "vram_required": "20GB",
-        "quantization": "4bit",
-        "performance_score": 0.891,
-        "specialized_tasks": [
-            "price_prediction",
-            "volume_analysis",
-            "support_resistance",
-            "trend_identification"
-        ]
-    },
-    
-    "trading_decision": {
-        "model_id": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
-        "purpose": "Trading strategy and position management",
-        "vram_required": "20GB",
-        "quantization": "4bit",
-        "performance_score": 0.923,
-        "specialized_tasks": [
-            "position_sizing",
-            "risk_management",
-            "portfolio_optimization",
-            "trade_timing"
-        ]
-    },
-    
-    "risk_validation": {
-        "model_id": "microsoft/Phi-3-medium-4k-instruct",
-        "purpose": "Fast risk checks and compliance",
-        "vram_required": "8GB",
-        "quantization": "8bit",
-        "performance_score": 0.812,
-        "specialized_tasks": [
-            "stop_loss_validation",
-            "position_concentration",
-            "cash_flow_verification",
-            "regulatory_compliance"
-        ]
-    }
-}
-
-
-
-# deployment/llm_server.py
-"""
-High-performance LLM inference server using vLLM
-Handles multiple models with efficient batching
+This file serves as a compatibility bridge and quick start guide.
+The actual system is implemented in main_local.py with full integration.
 """
 
+import os
+import sys
 import asyncio
-from typing import Dict, List, Optional
-from vllm import AsyncLLMEngine, SamplingParams, AsyncEngineArgs
-from transformers import AutoTokenizer
-import torch
 
-class LocalLLMServer:
-    def __init__(self, model_configs: Dict):
-        self.engines = {}
-        self.tokenizers = {}
-        self.model_configs = model_configs
-        
-    async def initialize_models(self):
-        """Load and initialize all models with optimal settings"""
-        for model_name, config in self.model_configs.items():
-            print(f"Loading {model_name}: {config['model_id']}")
-            
-            # Configure engine args for optimal performance
-            engine_args = AsyncEngineArgs(
-                model=config['model_id'],
-                tensor_parallel_size=torch.cuda.device_count(),
-                max_model_len=4096,
-                gpu_memory_utilization=0.90,
-                quantization=config.get('quantization', None),
-                dtype="float16" if config['quantization'] == '4bit' else "auto",
-                trust_remote_code=True,
-                download_dir="/models/cache",
-                enable_prefix_caching=True,  # Speeds up repeated prompts
-                enable_chunked_prefill=True,  # Better throughput
-            )
-            
-            # Initialize engine and tokenizer
-            self.engines[model_name] = AsyncLLMEngine.from_engine_args(engine_args)
-            self.tokenizers[model_name] = AutoTokenizer.from_pretrained(
-                config['model_id'],
-                trust_remote_code=True
-            )
-            
-    async def generate(
-        self, 
-        model_name: str, 
-        prompt: str, 
-        max_tokens: int = 2048,
-        temperature: float = 0.1,  # Low temp for financial decisions
-        top_p: float = 0.95
-    ) -> str:
-        """Generate response from specified model"""
-        
-        if model_name not in self.engines:
-            raise ValueError(f"Model {model_name} not loaded")
-        
-        sampling_params = SamplingParams(
-            temperature=temperature,
-            top_p=top_p,
-            max_tokens=max_tokens,
-            stop=["</s>", "\n\n### "]  # Common stop tokens
-        )
-        
-        # Format prompt based on model template
-        formatted_prompt = self._format_prompt(model_name, prompt)
-        
-        # Generate with streaming
-        request_id = f"{model_name}_{asyncio.get_event_loop().time()}"
-        results = []
-        
-        async for output in self.engines[model_name].generate(
-            formatted_prompt, 
-            sampling_params, 
-            request_id
-        ):
-            results.append(output)
-        
-        # Extract text from final output
-        return results[-1].outputs[0].text if results else ""
+def show_system_info():
+    """Show information about the local LLM trading system"""
     
-    def _format_prompt(self, model_name: str, prompt: str) -> str:
-        """Format prompt according to model's template"""
+    print("🤖 Local LLM Trading System")
+    print("=" * 50)
+    print("A complete local LLM-powered trading system that:")
+    print("• Uses 4 specialized financial LLM models")
+    print("• Generates trading recommendations locally")
+    print("• Integrates with Schwab API for execution")
+    print("• Creates compatible trading documents")
+    print("• Operates entirely within local_runtime/")
+    print()
+    
+    print("📊 Model Configuration:")
+    print("• News Analysis: AdaptLLM/Llama-3-FinMA-8B-Instruct")
+    print("• Market Analysis: Qwen/Qwen2.5-14B-Instruct") 
+    print("• Trading Decision: deepseek-ai/DeepSeek-R1-Distill-Qwen-14B")
+    print("• Risk Validation: microsoft/Phi-3-medium-4k-instruct")
+    print()
+    
+    print("🚀 Quick Start Options:")
+    print("1. Full Trading Execution:")
+    print("   python main_local.py")
+    print()
+    print("2. Analysis Only (No Trading):")
+    print("   python main_local.py --analysis-only")
+    print()
+    print("3. Test Components:")
+    print("   python main_local.py --test-components")
+    print()
+    print("4. CPU Mode (No GPU Required):")
+    print("   python main_local.py --force-cpu --analysis-only")
+    print()
+    
+    print("📁 System Structure:")
+    print("• main_local.py - Main system entry point")
+    print("• local_llm_server.py - Multi-model LLM server")
+    print("• llm_analysis_pipeline.py - 4-model analysis chain")
+    print("• local_trading_executor.py - Trading execution orchestrator")
+    print("• Portfolio Scripts Schwab/ - Complete portfolio system copy")
+    print()
+
+
+async def run_quick_demo():
+    """Run a quick demonstration of the system"""
+    
+    print("🧪 Running Quick System Demo...")
+    print()
+    
+    try:
+        # Import the main system
+        from main_local import LocalLLMTradingSystem
         
-        templates = {
-            "news_analysis": """<|begin_of_text|><|start_header_id|>system<|end_header_id|>
-You are a financial news analyst specializing in extracting actionable trading signals from news.
-Focus on: earnings surprises, FDA approvals, M&A activity, guidance changes, analyst upgrades.
-<|eot_id|><|start_header_id|>user<|end_header_id|>
-{prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>""",
-            
-            "trading_decision": """<|im_start|>system
-You are a professional portfolio manager making trading decisions.
-Current date: {date}
-Portfolio constraints: Max position 20%, stop-loss at -15%, maintain 5% cash reserve.
-Output format: JSON with explicit BUY/SELL orders and share quantities.
-<|im_end|>
-<|im_start|>user
-{prompt}<|im_end|>
-<|im_start|>assistant""",
-            
-            "market_analysis": """### Instruction:
-Analyze the following market data and identify trading opportunities.
-Focus on: momentum shifts, volume anomalies, support/resistance levels, trend strength.
+        # Initialize system
+        system = LocalLLMTradingSystem()
+        
+        # Show portfolio summary
+        summary = system.get_portfolio_summary()
+        print(f"📊 Portfolio Summary:")
+        print(f"   Total Value: ${summary['total_value']:,.2f}")
+        print(f"   Cash: ${summary['cash']:,.2f} ({summary['cash_percentage']:.1f}%)")
+        print(f"   Active Positions: {summary['active_positions']}")
+        print()
+        
+        # Test components
+        await system.test_llm_components()
+        
+        print("✅ Quick demo completed successfully!")
+        print("   Use 'python main_local.py --help' for full options")
+        
+    except Exception as e:
+        print(f"❌ Demo failed: {e}")
+        print("   This is expected if dependencies are not installed")
+        print("   Run: pip install -r installation.sh requirements")
 
-### Input:
-{prompt}
 
-### Response:""",
-            
-            "risk_validation": """Human: Validate the following trades for risk compliance:
-{prompt}
+def main():
+    """Main entry point for local_start.py"""
+    
+    if len(sys.argv) > 1 and sys.argv[1] == '--demo':
+        # Run quick demo
+        asyncio.run(run_quick_demo())
+    else:
+        # Show system info and usage
+        show_system_info()
+        
+        print("💡 Next Steps:")
+        print("1. Review installation requirements in installation.sh")
+        print("2. Install dependencies: pip install vllm transformers torch")
+        print("3. Run: python main_local.py --test-components")
+        print("4. For full trading: python main_local.py")
+        print()
+        print("Use --demo flag to run quick component test:")
+        print("python local_start.py --demo")
+
+
+if __name__ == "__main__":
+    main()
