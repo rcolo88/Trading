@@ -131,6 +131,26 @@ conda run -n trading_env python "Pieced Portfolio Scripts/main.py" --report-only
 6. **Report Generation** - Create analysis, charts, and export data
 7. **State Persistence** - Save all changes for next run
 
+## Recent Updates (2025-08-28)
+
+### Portfolio Analysis Consolidation
+- **REMOVED**: `portfolio_analysis_output.txt` (legacy JSON format)  
+- **ENHANCED**: `daily_portfolio_analysis.md` - Now comprehensive single source
+- **INCLUDES**: Portfolio weights, cash %, risk alerts, raw JSON data for LLM processing
+- **BENEFIT**: Streamlined Claude analysis workflow with all data in one markdown file
+
+### Manual Trading Override System
+- **NEW**: `Portfolio Scripts Schwab/manual_trades_override.json`  
+- **CONTROL**: Set `"enabled": true` to bypass document parsing entirely
+- **TEMPLATE**: Pre-populated with structured JSON format for manual trade entry
+- **PRIORITY**: Manual override takes precedence over all document parsing
+
+### Enhanced Natural Language Parser  
+- **IMPROVED**: `trade_executor.py` parsing for complex order formats
+- **SUPPORTS**: "SELL 10 shares of QS", "BUY 1 share of XLV", "HOLD all 2 shares of NVDA"
+- **PATTERNS**: 5 different regex patterns for natural language flexibility
+- **FALLBACK**: Maintains backward compatibility with simple order formats
+
 ## Migration Notes
 
 - **Legacy files preserved** but should not be used for active development
@@ -138,4 +158,4 @@ conda run -n trading_env python "Pieced Portfolio Scripts/main.py" --report-only
 - **All functionality enhanced** in modular version with better error handling
 - **Same CLI arguments** supported (`--report-only`, `--test-parser`)
 
-**Always use `Pieced Portfolio Scripts/` for the latest, most reliable implementation.**
+**Always use `Portfolio Scripts Schwab/` for the latest Schwab-compatible implementation.**

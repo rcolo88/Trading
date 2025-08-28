@@ -127,7 +127,7 @@ def main():
                     allocation = position.get('allocation', shares * entry_price)
                     print(f"   {ticker}: {shares} shares @ ${entry_price:.2f} (${allocation:.2f})")
                 
-                # Generate report to update portfolio_analysis_output.txt and performance history
+                # Generate report to update daily_portfolio_analysis.md and performance history
                 print("\n📊 Generating updated portfolio report...")
                 portfolio_system.generate_report()
                 print("✅ Portfolio analysis files updated with restored positions")

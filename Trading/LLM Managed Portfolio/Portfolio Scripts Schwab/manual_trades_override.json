@@ -1,0 +1,77 @@
+{
+  "enabled": true,
+  "description": "Manual trading override system - takes priority over document parsing",
+  "instructions": "Set 'enabled' to true to use these trades instead of parsing documents. Each trade must specify action, ticker, and either shares or target_value.",
+  "trades": [
+    {
+      "action": "SELL",
+      "ticker": "QS", 
+      "shares": 10,
+      "reason": "Reduce speculative position from 20% portfolio weight to manageable 12%",
+      "priority": "HIGH"
+    },
+    {
+      "action": "BUY",
+      "ticker": "XLV",
+      "shares": 1,
+      "reason": "Healthcare ETF provides defensive diversification during tech rotation",
+      "priority": "HIGH"
+    },
+    {
+      "action": "BUY", 
+      "ticker": "VEA",
+      "shares": 1,
+      "reason": "International developed markets ETF capitalizes on MSCI EAFE outperformance",
+      "priority": "HIGH"
+    },
+    {
+      "action": "HOLD",
+      "ticker": "NVDA",
+      "shares": 2,
+      "reason": "Maintain position through earnings catalyst",
+      "priority": "MEDIUM"
+    },
+    {
+      "action": "HOLD", 
+      "ticker": "GOOGL",
+      "shares": 1,
+      "reason": "Continue holding momentum leader with AI tailwinds",
+      "priority": "MEDIUM"
+    },
+    {
+      "action": "BUY",
+      "ticker": "TLT", 
+      "shares": 1,
+      "reason": "Treasury bond ETF provides portfolio insurance ahead of Fed cuts",
+      "priority": "MEDIUM"
+    },
+    {
+      "action": "HOLD",
+      "ticker": "IONS", 
+      "shares": 8,
+      "reason": "Maintain biotech allocation through September 22 PDUFA decision catalyst",
+      "priority": "LOW"
+    },
+    {
+      "action": "HOLD",
+      "ticker": "AMD",
+      "shares": 1, 
+      "reason": "Keep minimal position despite China headwinds given MI350 launch catalyst",
+      "priority": "LOW"
+    }
+  ],
+  "validation": {
+    "allowed_actions": ["BUY", "SELL", "HOLD", "REDUCE"],
+    "allowed_priorities": ["HIGH", "MEDIUM", "LOW"],
+    "required_fields": ["action", "ticker"],
+    "optional_fields": ["shares", "target_value", "reason", "priority"]
+  },
+  "usage_notes": [
+    "Set 'enabled': false to disable manual override and use document parsing",
+    "Set 'enabled': true to execute only the trades listed above",
+    "Each trade needs either 'shares' (number) or 'target_value' (dollar amount)",
+    "Priority affects execution order: HIGH → MEDIUM → LOW",
+    "SELL orders execute first to generate cash for BUY orders",
+    "HOLD orders are informational only and don't trigger trades"
+  ]
+}

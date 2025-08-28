@@ -47,6 +47,82 @@ class TradeExecutor:
             handler.setFormatter(formatter)
             self.trade_logger.addHandler(handler)
     
+    def check_manual_override(self) -> Optional[List[TradeOrder]]:
+        """Check for manual trading override file"""
+        
+        # Check for manual override file in current directory
+        override_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'manual_trades_override.json')
+        
+        if not os.path.exists(override_file):
+            return None
+        
+        try:
+            with open(override_file, 'r', encoding='utf-8') as f:
+                override_data = json.load(f)
+            
+            if not override_data.get('enabled', False):
+                print("📋 Manual override file exists but is disabled")
+                return None
+            
+            print("🔧 Manual trading override is ENABLED - using manual trades instead of document parsing")
+            
+            trades = override_data.get('trades', [])
+            if not trades:
+                print("❌ Manual override enabled but no trades specified")
+                return None
+            
+            orders = []
+            for i, trade in enumerate(trades, 1):
+                try:
+                    # Validate required fields
+                    if 'action' not in trade or 'ticker' not in trade:
+                        print(f"❌ Trade {i}: Missing required fields (action, ticker)")
+                        continue
+                    
+                    # Convert to TradeOrder
+                    action = OrderType(trade['action'].upper())
+                    ticker = trade['ticker'].upper()
+                    shares = trade.get('shares')
+                    target_value = trade.get('target_value')
+                    reason = trade.get('reason', '')
+                    
+                    # Parse priority
+                    priority_str = trade.get('priority', 'MEDIUM').upper()
+                    if priority_str == 'HIGH':
+                        priority = OrderPriority.HIGH
+                    elif priority_str == 'LOW':
+                        priority = OrderPriority.LOW
+                    else:
+                        priority = OrderPriority.MEDIUM
+                    
+                    order = TradeOrder(
+                        ticker=ticker,
+                        action=action,
+                        shares=shares,
+                        target_value=target_value,
+                        reason=reason,
+                        priority=priority
+                    )
+                    
+                    orders.append(order)
+                    print(f"   ✅ Order {i}: {action.value} {ticker}")
+                    
+                except (ValueError, KeyError) as e:
+                    print(f"❌ Trade {i}: Invalid format ({e})")
+                    continue
+            
+            if orders:
+                print(f"📊 Loaded {len(orders)} manual trades")
+                self.trade_logger.info(f"Using manual override with {len(orders)} trades")
+                return orders
+            else:
+                print("❌ No valid trades found in manual override file")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error reading manual override file: {e}")
+            return None
+    
     def find_trading_document(self) -> Optional[str]:
         """Auto-detect trading recommendation document"""
         
@@ -234,7 +310,7 @@ class TradeExecutor:
         return content
     
     def _parse_order_line(self, line: str, priority: OrderPriority) -> Optional[TradeOrder]:
-        """Parse a single order line"""
+        """Parse a single order line with enhanced natural language support"""
         
         # Normalize line
         line = line.strip()
@@ -244,25 +320,59 @@ class TradeExecutor:
         # Remove bullet points and numbering
         line = re.sub(r'^[-•*]\s*', '', line)
         line = re.sub(r'^\d+\.\s*', '', line)
+        line = re.sub(r'^\**\s*', '', line)  # Remove ** markdown bold
         
-        # Extract action and ticker
-        action_match = re.search(r'\b(BUY|SELL|REDUCE|HOLD)\s+([A-Z]{1,5})\b', line.upper())
-        if not action_match:
+        # Enhanced regex patterns for natural language parsing
+        patterns = [
+            # "BUY 10 shares of NVDA" or "SELL 10 shares of QS"
+            r'\b(BUY|SELL|REDUCE|HOLD)\s+(\d+)\s+shares?\s+of\s+([A-Z]{1,5})\b',
+            # "HOLD all 2 shares of NVDA"
+            r'\b(BUY|SELL|REDUCE|HOLD)\s+all\s+(\d+)\s+shares?\s+of\s+([A-Z]{1,5})\b',
+            # "BUY 1 share of XLV"
+            r'\b(BUY|SELL|REDUCE|HOLD)\s+(\d+)\s+share\s+of\s+([A-Z]{1,5})\b',
+            # "BUY NVDA 10 shares"
+            r'\b(BUY|SELL|REDUCE|HOLD)\s+([A-Z]{1,5})\s+(\d+)\s+shares?\b',
+            # "BUY NVDA" (without shares)
+            r'\b(BUY|SELL|REDUCE|HOLD)\s+([A-Z]{1,5})\b'
+        ]
+        
+        action_str = None
+        ticker = None
+        shares = None
+        
+        for pattern in patterns:
+            match = re.search(pattern, line.upper())
+            if match:
+                groups = match.groups()
+                if len(groups) == 3:  # action, shares/ticker, ticker/shares
+                    action_str = groups[0]
+                    if groups[1].isdigit():
+                        shares = int(groups[1])
+                        ticker = groups[2]
+                    elif groups[2].isdigit():
+                        ticker = groups[1]
+                        shares = int(groups[2])
+                    else:
+                        ticker = groups[2]  # "of NVDA" case
+                        shares = int(groups[1]) if groups[1].isdigit() else None
+                elif len(groups) == 2:  # action, ticker
+                    action_str = groups[0]
+                    ticker = groups[1]
+                break
+        
+        if not action_str or not ticker:
             return None
-        
-        action_str = action_match.group(1)
-        ticker = action_match.group(2)
         
         try:
             action = OrderType(action_str)
         except ValueError:
             return None
         
-        # Extract shares if specified
-        shares = None
-        shares_match = re.search(r'(\d+)\s*shares?', line, re.IGNORECASE)
-        if shares_match:
-            shares = int(shares_match.group(1))
+        # If shares not found in regex, try backup extraction
+        if shares is None:
+            shares_match = re.search(r'(\d+)\s*shares?', line, re.IGNORECASE)
+            if shares_match:
+                shares = int(shares_match.group(1))
         
         # Extract dollar amount
         value = None
@@ -410,42 +520,53 @@ class TradeExecutor:
         self.trade_logger.info("AUTOMATED TRADE EXECUTION SESSION STARTED")
         self.trade_logger.info("=" * 60)
         
-        # Auto-detect document if not provided
-        if document_path is None:
-            document_path = self.find_trading_document()
-            if not document_path:
-                self.trade_logger.warning("No trading document found - execution cancelled")
+        # Check for manual override first
+        manual_orders = self.check_manual_override()
+        if manual_orders:
+            # Use manual orders instead of parsing document
+            orders = manual_orders
+        else:
+            # Auto-detect document if not provided
+            if document_path is None:
+                document_path = self.find_trading_document()
+                if not document_path:
+                    self.trade_logger.warning("No trading document found - execution cancelled")
+                    return []
+            
+            # Validate file exists
+            if not os.path.exists(document_path):
+                error_msg = f"File not found: {document_path}"
+                print(f"❌ {error_msg}")
+                self.trade_logger.error(error_msg)
                 return []
-        
-        # Validate file exists
-        if not os.path.exists(document_path):
-            error_msg = f"File not found: {document_path}"
-            print(f"❌ {error_msg}")
-            self.trade_logger.error(error_msg)
-            return []
-        
-        print(f"📄 Document: {os.path.basename(document_path)}")
-        file_ext = os.path.splitext(document_path)[1].lower()
-        print(f"📋 File type: {file_ext.upper()}")
-        
-        # LOG: Document being processed
-        self.trade_logger.info(f"Processing document: {document_path} (Type: {file_ext.upper()})")
-        
-        # Parse orders from document
-        orders = self.parse_document(document_path)
-        
-        if not orders:
-            error_msg = "No valid orders found in document"
-            print(f"❌ {error_msg}")
-            self.trade_logger.error(error_msg)
-            return []
+            
+            print(f"📄 Document: {os.path.basename(document_path)}")
+            file_ext = os.path.splitext(document_path)[1].lower()
+            print(f"📋 File type: {file_ext.upper()}")
+            
+            # LOG: Document being processed
+            self.trade_logger.info(f"Processing document: {document_path} (Type: {file_ext.upper()})")
+            
+            # Parse orders from document
+            orders = self.parse_document(document_path)
+            
+            if not orders:
+                error_msg = "No valid orders found in document"
+                print(f"❌ {error_msg}")
+                self.trade_logger.error(error_msg)
+                return []
         
         print(f"📊 Found {len(orders)} orders to process")
         self.trade_logger.info(f"Parsed {len(orders)} orders from document")
         
-        # Get current market data
+        # Get current market data for both existing holdings and new order tickers
+        existing_tickers = list(self.portfolio.holdings.keys())
+        order_tickers = [order.ticker for order in orders]
+        all_tickers = list(set(existing_tickers + order_tickers))  # Remove duplicates
+        
+        print(f"📊 Fetching prices for: {all_tickers}")
         current_prices, _, _ = self.data_fetcher.fetch_current_data(
-            list(self.portfolio.holdings.keys()), 
+            all_tickers, 
             self.portfolio.benchmarks
         )
         

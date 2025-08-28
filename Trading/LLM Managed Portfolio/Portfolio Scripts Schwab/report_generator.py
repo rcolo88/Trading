@@ -414,57 +414,6 @@ class ReportGenerator:
         except Exception as e:
             print(f"❌ Error creating position details chart: {e}")
     
-    def generate_portfolio_analysis_output(self, report_data: Dict[str, Any], current_prices: Dict[str, float]):
-        """Generate portfolio_analysis_output.txt file for compatibility with legacy systems"""
-        
-        try:
-            # Create the output data structure matching the legacy format
-            output_data = {
-                "date": datetime.now().isoformat(),
-                "account_value": report_data['total_value'],
-                "initial_investment": 2000.0,  # Fixed initial investment
-                "cash_available": report_data['cash'],
-                "total_pnl_dollar": report_data['total_pnl'],
-                "total_pnl_percent": report_data['total_pnl_pct'],
-                "account_growth_percent": report_data['total_pnl_pct'],
-                "positions": []
-            }
-            
-            # Add position details
-            for pos in report_data['positions']:
-                position_data = {
-                    "ticker": pos['ticker'],
-                    "shares": pos['shares'],
-                    "entry_price": pos['entry_price'],
-                    "current_price": pos['current_price'],
-                    "current_value": pos['current_value'],
-                    "cost_basis": pos['cost_basis'],
-                    "pnl_dollar": pos['pnl_dollar'],
-                    "pnl_percent": pos['pnl_percent']
-                }
-                output_data["positions"].append(position_data)
-            
-            # Create the output text in the expected format
-            output_text = f"Daily portfolio update for {datetime.now().strftime('%Y-%m-%d')}. Here's the data:\n\n"
-            output_text += json.dumps(output_data, indent=2)
-            
-            # Save to both parent directory (for compatibility) and current directory
-            parent_file = os.path.join(self.parent_dir, 'portfolio_analysis_output.txt')
-            current_file = os.path.join(self.current_dir, 'portfolio_analysis_output.txt')
-            
-            # Write to parent directory (legacy location)
-            with open(parent_file, 'w') as f:
-                f.write(output_text)
-            print(f"✅ Portfolio analysis output saved to {parent_file}")
-            
-            # Also write to current directory (Portfolio Scripts Schwab)
-            with open(current_file, 'w') as f:
-                f.write(output_text)
-            print(f"✅ Portfolio analysis output saved to {current_file}")
-            
-        except Exception as e:
-            print(f"❌ Error generating portfolio analysis output: {e}")
-    
     def generate_report(self):
         """Generate comprehensive portfolio report"""
         
@@ -525,7 +474,6 @@ class ReportGenerator:
         # Export data and generate files
         self.export_historical_performance(report_data, current_prices)
         self.generate_analysis_file(report_data)
-        self.generate_portfolio_analysis_output(report_data, current_prices)
         self.plot_performance_chart()
         self.plot_position_details(positions, total_current_value)
         

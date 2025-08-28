@@ -1731,3 +1731,29 @@
 2025-08-26 15:44:38,226 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
 2025-08-26 15:44:38,226 - INFO - ============================================================
 2025-08-26 15:44:38,228 - WARNING - No trading document found - execution cancelled
+2025-08-28 10:15:27,806 - INFO - ============================================================
+2025-08-28 10:15:27,807 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-28 10:15:27,807 - INFO - ============================================================
+2025-08-28 10:15:27,813 - INFO - Processing document: /Users/robertcologero/GitHub/Trading/LLM Managed Portfolio/Portfolio Scripts Schwab/../trading_recommendation_aug2725.md (Type: .MD)
+2025-08-28 10:15:27,817 - INFO - Parsed 5 orders from document
+2025-08-28 10:15:30,188 - INFO - Execution completed: 0/0 trades successful
+2025-08-28 10:15:30,189 - INFO - ============================================================
+2025-08-28 11:30:29,157 - INFO - ============================================================
+2025-08-28 11:30:29,157 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-28 11:30:29,157 - INFO - ============================================================
+2025-08-28 11:30:29,158 - INFO - Using manual override with 8 trades
+2025-08-28 11:30:29,158 - INFO - Parsed 8 orders from document
+2025-08-28 11:30:32,845 - INFO - SELL QS: 10 shares at $8.16 = $81.60
+2025-08-28 11:30:32,851 - INFO - Execution completed: 1/4 trades successful
+2025-08-28 11:30:32,851 - INFO - ============================================================
+2025-08-28 11:57:27,405 - INFO - ============================================================
+2025-08-28 11:57:27,406 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-08-28 11:57:27,406 - INFO - ============================================================
+2025-08-28 11:57:27,406 - INFO - Using manual override with 8 trades
+2025-08-28 11:57:27,406 - INFO - Parsed 8 orders from document
+2025-08-28 11:57:31,014 - INFO - SELL QS: 10 shares at $8.18 = $81.80
+2025-08-28 11:57:31,018 - INFO - BUY XLV: 1 shares at $136.01 = $136.01
+2025-08-28 11:57:31,021 - INFO - BUY VEA: 1 shares at $58.98 = $58.98
+2025-08-28 11:57:31,026 - INFO - BUY TLT: 1 shares at $87.14 = $87.14
+2025-08-28 11:57:31,031 - INFO - Execution completed: 4/4 trades successful
+2025-08-28 11:57:31,031 - INFO - ============================================================
