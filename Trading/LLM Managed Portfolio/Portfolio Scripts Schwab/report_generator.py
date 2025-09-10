@@ -302,6 +302,22 @@ class ReportGenerator:
                 print(f"❌ Error parsing dates: {date_error}")
                 return
             
+            # Use account_value if Total Value is missing/empty, and filter out invalid rows
+            if 'account_value' in df.columns:
+                # Fill missing Total Value with account_value
+                df['Total Value'] = df['Total Value'].fillna(df['account_value'])
+                # If Total Value is still missing, use account_value
+                mask = df['Total Value'].isna() | (df['Total Value'] == 0)
+                df.loc[mask, 'Total Value'] = df.loc[mask, 'account_value']
+            
+            # Filter out rows where Total Value is still missing or invalid
+            df = df.dropna(subset=['Total Value'])
+            df = df[df['Total Value'] > 0]
+            
+            if len(df) < 2:
+                print("❌ Not enough valid data points after filtering")
+                return
+            
             # Create chart
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
             
@@ -313,20 +329,80 @@ class ReportGenerator:
             ax1.legend()
             ax1.grid(True, alpha=0.3)
             
+            # Rotate x-axis labels for better readability
+            plt.setp(ax1.xaxis.get_majorticklabels(), rotation=45, ha='right')
+            
             # Calculate percentage returns from $2000 baseline
             portfolio_returns = ((df['Total Value'] - 2000) / 2000) * 100
             
             # Plot 2: Returns comparison
             ax2.plot(df['Date'], portfolio_returns, 'g-', linewidth=2, label='Portfolio Return')
             
-            # Add SPY comparison if available
-            if 'SPY Return %' in df.columns:
-                ax2.plot(df['Date'], df['SPY Return %'], 'orange', linewidth=2, label='SPY Benchmark', alpha=0.7)
+            # Calculate SPY cumulative returns from initial prices if price data available
+            spy_cumulative_returns = None
+            if 'spy_price' in df.columns:
+                spy_prices = df['spy_price'].dropna()
+                if len(spy_prices) > 1:
+                    spy_initial = spy_prices.iloc[0]
+                    spy_cumulative_returns = ((spy_prices - spy_initial) / spy_initial * 100)
+                    # Align with the filtered dataframe
+                    spy_cumulative_returns = spy_cumulative_returns.reindex(df.index).ffill()
+            
+            if spy_cumulative_returns is not None and not spy_cumulative_returns.isna().all():
+                ax2.plot(df['Date'], spy_cumulative_returns, 'orange', linewidth=2, label='SPY Benchmark', alpha=0.7)
+            
+            # Calculate IWM cumulative returns from initial prices if price data available  
+            iwm_cumulative_returns = None
+            if 'iwm_price' in df.columns:
+                iwm_prices = df['iwm_price'].dropna()
+                if len(iwm_prices) > 1:
+                    iwm_initial = iwm_prices.iloc[0]
+                    iwm_cumulative_returns = ((iwm_prices - iwm_initial) / iwm_initial * 100)
+                    # Align with the filtered dataframe
+                    iwm_cumulative_returns = iwm_cumulative_returns.reindex(df.index).ffill()
+            
+            if iwm_cumulative_returns is not None and not iwm_cumulative_returns.isna().all():
+                ax2.plot(df['Date'], iwm_cumulative_returns, 'purple', linewidth=2, label='IWM Benchmark', alpha=0.7)
             
             ax2.axhline(y=0, color='black', linestyle='-', alpha=0.3)
             ax2.set_title('Portfolio Performance vs Benchmark', fontsize=14, fontweight='bold')
             ax2.set_xlabel('Date')
             ax2.set_ylabel('Return (%)')
+            
+            # Rotate x-axis labels for better readability
+            plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
+            
+            # Add return percentage values at the end of each line
+            latest_date = df['Date'].iloc[-1]
+            latest_portfolio_return = portfolio_returns.iloc[-1]
+            
+            # Add portfolio return value at end of line
+            ax2.annotate(f'{latest_portfolio_return:.1f}%', 
+                        xy=(latest_date, latest_portfolio_return),
+                        xytext=(5, 0), textcoords='offset points',
+                        fontsize=10, fontweight='bold', color='green',
+                        ha='left', va='center')
+            
+            # Add SPY return value if available
+            if spy_cumulative_returns is not None and not spy_cumulative_returns.isna().all():
+                latest_spy_return = spy_cumulative_returns.iloc[-1]
+                if not pd.isna(latest_spy_return):
+                    ax2.annotate(f'{latest_spy_return:.1f}%', 
+                                xy=(latest_date, latest_spy_return),
+                                xytext=(5, 0), textcoords='offset points',
+                                fontsize=10, fontweight='bold', color='orange',
+                                ha='left', va='center')
+            
+            # Add IWM return value if available
+            if iwm_cumulative_returns is not None and not iwm_cumulative_returns.isna().all():
+                latest_iwm_return = iwm_cumulative_returns.iloc[-1]
+                if not pd.isna(latest_iwm_return):
+                    ax2.annotate(f'{latest_iwm_return:.1f}%', 
+                                xy=(latest_date, latest_iwm_return),
+                                xytext=(5, 0), textcoords='offset points',
+                                fontsize=10, fontweight='bold', color='purple',
+                                ha='left', va='center')
+            
             ax2.legend()
             ax2.grid(True, alpha=0.3)
             
@@ -414,17 +490,21 @@ class ReportGenerator:
         except Exception as e:
             print(f"❌ Error creating position details chart: {e}")
     
-    def generate_report(self):
+    def generate_report(self, prefer_close_prices: bool = False):
         """Generate comprehensive portfolio report"""
         
         print(f"\n{'='*60}")
-        print(f"📊 DAILY PORTFOLIO REPORT - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        if prefer_close_prices:
+            print(f"📊 DAILY PORTFOLIO REPORT (CLOSE PRICES) - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        else:
+            print(f"📊 DAILY PORTFOLIO REPORT - {datetime.now().strftime('%Y-%m-%d %H:%M')}")
         print(f"{'='*60}")
         
         # Get current market data
         current_prices, volume_data, price_data = self.data_fetcher.fetch_current_data(
             list(self.portfolio.holdings.keys()),
-            self.portfolio.benchmarks
+            self.portfolio.benchmarks,
+            prefer_close_prices
         )
         
         if not current_prices:
