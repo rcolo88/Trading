@@ -326,6 +326,18 @@ class ReportGenerator:
             ax1.axhline(y=2000, color='r', linestyle='--', alpha=0.7, label='Initial Investment ($2,000)')
             ax1.set_title('Portfolio Value Over Time', fontsize=14, fontweight='bold')
             ax1.set_ylabel('Portfolio Value ($)')
+            
+            # Add current portfolio value annotation
+            latest_date = df['Date'].iloc[-1]
+            latest_value = df['Total Value'].iloc[-1]
+            total_return_pct = ((latest_value - 2000) / 2000) * 100
+            ax1.annotate(f'${latest_value:,.0f}\n(+{total_return_pct:.1f}%)', 
+                        xy=(latest_date, latest_value),
+                        xytext=(10, 10), textcoords='offset points',
+                        fontsize=11, fontweight='bold', color='blue',
+                        ha='left', va='bottom',
+                        bbox=dict(boxstyle='round,pad=0.3', facecolor='lightblue', alpha=0.7))
+            
             ax1.legend()
             ax1.grid(True, alpha=0.3)
             
@@ -373,15 +385,15 @@ class ReportGenerator:
             plt.setp(ax2.xaxis.get_majorticklabels(), rotation=45, ha='right')
             
             # Add return percentage values at the end of each line
-            latest_date = df['Date'].iloc[-1]
             latest_portfolio_return = portfolio_returns.iloc[-1]
             
-            # Add portfolio return value at end of line
+            # Add portfolio return value at end of line with background box
             ax2.annotate(f'{latest_portfolio_return:.1f}%', 
                         xy=(latest_date, latest_portfolio_return),
-                        xytext=(5, 0), textcoords='offset points',
-                        fontsize=10, fontweight='bold', color='green',
-                        ha='left', va='center')
+                        xytext=(10, 0), textcoords='offset points',
+                        fontsize=12, fontweight='bold', color='darkgreen',
+                        ha='left', va='center',
+                        bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgreen', alpha=0.8))
             
             # Add SPY return value if available
             if spy_cumulative_returns is not None and not spy_cumulative_returns.isna().all():
@@ -389,9 +401,10 @@ class ReportGenerator:
                 if not pd.isna(latest_spy_return):
                     ax2.annotate(f'{latest_spy_return:.1f}%', 
                                 xy=(latest_date, latest_spy_return),
-                                xytext=(5, 0), textcoords='offset points',
-                                fontsize=10, fontweight='bold', color='orange',
-                                ha='left', va='center')
+                                xytext=(10, 0), textcoords='offset points',
+                                fontsize=12, fontweight='bold', color='darkorange',
+                                ha='left', va='center',
+                                bbox=dict(boxstyle='round,pad=0.3', facecolor='moccasin', alpha=0.8))
             
             # Add IWM return value if available
             if iwm_cumulative_returns is not None and not iwm_cumulative_returns.isna().all():
@@ -399,9 +412,10 @@ class ReportGenerator:
                 if not pd.isna(latest_iwm_return):
                     ax2.annotate(f'{latest_iwm_return:.1f}%', 
                                 xy=(latest_date, latest_iwm_return),
-                                xytext=(5, 0), textcoords='offset points',
-                                fontsize=10, fontweight='bold', color='purple',
-                                ha='left', va='center')
+                                xytext=(10, 0), textcoords='offset points',
+                                fontsize=12, fontweight='bold', color='darkviolet',
+                                ha='left', va='center',
+                                bbox=dict(boxstyle='round,pad=0.3', facecolor='plum', alpha=0.8))
             
             ax2.legend()
             ax2.grid(True, alpha=0.3)
