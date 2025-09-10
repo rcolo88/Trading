@@ -94,9 +94,9 @@ conda run -n options python Daily_Portfolio_Script_new_parse.py --test-parser
 - `trade_execution.log` - Trade execution log
 - `daily_portfolio_analysis.md` - Analysis file for Claude review
 
-### Chart Outputs
-- `LLM Managed Portfolio Performance.png` - Time series performance chart
-- `Portfolio Position Details.png` - Position breakdown charts
+### Chart Outputs (Generated in `Portfolio Scripts Schwab/`)
+- `Portfolio Scripts Schwab/LLM Managed Portfolio Performance.png` - Time series performance chart
+- `Portfolio Scripts Schwab/LLM Position Details.png` - Position breakdown charts
 
 ## Claude Integration Notes
 
@@ -138,6 +138,12 @@ conda run -n trading_env python "Pieced Portfolio Scripts/main.py" --report-only
 - **ENHANCED**: `daily_portfolio_analysis.md` - Now comprehensive single source for all analysis
 - **INCLUDES**: Portfolio weights, cash %, risk alerts, raw JSON data for LLM processing
 - **BENEFIT**: Streamlined Claude analysis workflow with all data in one markdown file
+
+### Chart Output Consolidation
+- **CONSOLIDATED**: All chart outputs now generated in `Portfolio Scripts Schwab/` folder only
+- **REMOVED**: Duplicate legacy charts from root directory  
+- **CENTRALIZED**: `LLM Managed Portfolio Performance.png` and `LLM Position Details.png` in primary Schwab folder
+- **BENEFIT**: Single source of truth for all portfolio visualizations
 
 ### Manual Trading Override System
 - **NEW**: `Portfolio Scripts Schwab/manual_trades_override.json`  
