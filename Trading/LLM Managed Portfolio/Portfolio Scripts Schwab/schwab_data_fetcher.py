@@ -126,7 +126,7 @@ class SchwabDataFetcher:
         except Exception as e:
             logger.error(f"❌ Schwab API connection test failed: {e}")
     
-    def fetch_current_data(self, holdings_tickers: List[str], benchmark_tickers: List[str] = None) -> Tuple[Optional[Dict], Optional[pd.DataFrame], Optional[pd.DataFrame]]:
+    def fetch_current_data(self, holdings_tickers: List[str], benchmark_tickers: List[str] = None, prefer_close_prices: bool = False) -> Tuple[Optional[Dict], Optional[pd.DataFrame], Optional[pd.DataFrame]]:
         """
         Fetch current price data using Schwab API
         Maintains same interface as original DataFetcher for compatibility
@@ -147,7 +147,7 @@ class SchwabDataFetcher:
         
         try:
             # Fetch current quotes using Schwab API
-            current_prices = self._fetch_schwab_quotes(all_tickers)
+            current_prices = self._fetch_schwab_quotes(all_tickers, prefer_close_prices)
             
             # Fetch historical data for analysis
             historical_data = self._fetch_schwab_historical(all_tickers)
@@ -171,7 +171,7 @@ class SchwabDataFetcher:
             logger.error("❌ Schwab API error, cannot continue without proper API access")
             raise Exception(f"Schwab API error: {e}")
     
-    def _fetch_schwab_quotes(self, tickers: List[str]) -> Optional[Dict[str, float]]:
+    def _fetch_schwab_quotes(self, tickers: List[str], prefer_close_prices: bool = False) -> Optional[Dict[str, float]]:
         """Fetch current quotes from Schwab API"""
         try:
             current_prices = {}
@@ -197,7 +197,7 @@ class SchwabDataFetcher:
                     quote_data = response.json()
                     logger.debug(f"🔍 Single quote response: {quote_data}")
                     
-                    price = self._extract_price_from_quote(quote_data)
+                    price = self._extract_price_from_quote(quote_data, prefer_close_prices)
                     if price:
                         current_prices[original_ticker] = price
                         logger.debug(f"✅ Successfully extracted single price for {original_ticker}: {price}")
@@ -225,7 +225,7 @@ class SchwabDataFetcher:
                         logger.debug(f"🔍 Processing ticker: {ticker} -> {original_ticker}")
                         
                         if ticker in quotes_data:
-                            price = self._extract_price_from_quote(quotes_data[ticker])
+                            price = self._extract_price_from_quote(quotes_data[ticker], prefer_close_prices)
                             if price:
                                 current_prices[original_ticker] = price
                                 logger.debug(f"✅ Successfully extracted price for {original_ticker}: {price}")
@@ -236,7 +236,7 @@ class SchwabDataFetcher:
                             # Try variations of the ticker symbol
                             for key in quotes_data.keys():
                                 if key.upper() == ticker.upper():
-                                    price = self._extract_price_from_quote(quotes_data[key])
+                                    price = self._extract_price_from_quote(quotes_data[key], prefer_close_prices)
                                     if price:
                                         current_prices[original_ticker] = price
                                         logger.debug(f"✅ Found price for {original_ticker} using key variation {key}: {price}")
@@ -248,7 +248,7 @@ class SchwabDataFetcher:
             logger.error(f"❌ Error fetching Schwab quotes: {e}")
             return None
     
-    def _extract_price_from_quote(self, quote_data: Dict) -> Optional[float]:
+    def _extract_price_from_quote(self, quote_data: Dict, prefer_close_prices: bool = False) -> Optional[float]:
         """Extract current price from Schwab quote response"""
         try:
             # Debug: Log the actual response structure (only first few keys to avoid spam)
@@ -263,7 +263,12 @@ class SchwabDataFetcher:
                     logger.debug(f"🔍 Found quote section with keys: {list(quote_section.keys())}")
                     
                     # Try price fields in order of preference within quote section
-                    quote_price_fields = ['lastPrice', 'mark', 'bidPrice', 'askPrice', 'closePrice']
+                    if prefer_close_prices:
+                        # Prioritize close prices for after-hours reporting
+                        quote_price_fields = ['closePrice', 'lastPrice', 'mark', 'bidPrice', 'askPrice']
+                    else:
+                        # Normal priority for live trading
+                        quote_price_fields = ['lastPrice', 'mark', 'bidPrice', 'askPrice', 'closePrice']
                     for field in quote_price_fields:
                         if field in quote_section and quote_section[field] is not None:
                             try:
@@ -279,7 +284,10 @@ class SchwabDataFetcher:
                     regular_section = quote_data['regular']
                     logger.debug(f"🔍 Found regular section with keys: {list(regular_section.keys())}")
                     
-                    regular_price_fields = ['regularMarketLastPrice', 'lastPrice', 'price']
+                    if prefer_close_prices:
+                        regular_price_fields = ['regularMarketPreviousClose', 'regularMarketLastPrice', 'lastPrice', 'price']
+                    else:
+                        regular_price_fields = ['regularMarketLastPrice', 'lastPrice', 'price', 'regularMarketPreviousClose']
                     for field in regular_price_fields:
                         if field in regular_section and regular_section[field] is not None:
                             try:
@@ -291,7 +299,10 @@ class SchwabDataFetcher:
                                 continue
                 
                 # Priority 3: Try top-level price fields (fallback)
-                top_level_price_fields = ['lastPrice', 'mark', 'price', 'close']
+                if prefer_close_prices:
+                    top_level_price_fields = ['close', 'closePrice', 'lastPrice', 'mark', 'price']
+                else:
+                    top_level_price_fields = ['lastPrice', 'mark', 'price', 'close', 'closePrice']
                 for field in top_level_price_fields:
                     if field in quote_data and quote_data[field] is not None:
                         try:

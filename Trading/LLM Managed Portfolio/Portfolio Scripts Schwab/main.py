@@ -11,12 +11,14 @@ This orchestrates all the modular components:
 - ReportGenerator: Analysis and reporting
 
 Usage:
-    python main.py                # Execute trades and generate report
-    python main.py --report-only  # Generate report without executing trades
+    python main.py                    # Execute trades and generate report
+    python main.py --report-only      # Generate report without executing trades
 """
 
 import argparse
-from market_hours import enforce_market_hours
+import pytz
+from datetime import datetime
+from market_hours import enforce_market_hours, is_market_open
 from portfolio_manager import PortfolioManager
 from schwab_data_fetcher import SchwabDataFetcher
 from trade_executor import TradeExecutor
@@ -56,14 +58,14 @@ class LLMManagedPortfolio:
         
         return results
     
-    def generate_report(self):
+    def generate_report(self, prefer_close_prices: bool = False):
         """Generate comprehensive portfolio report"""
         
         print(f"\n📊 GENERATING PORTFOLIO REPORT")
         print("=" * 40)
         
         # Generate report using the report generator
-        report_data = self.report_generator.generate_report()
+        report_data = self.report_generator.generate_report(prefer_close_prices)
         
         if report_data:
             print("✅ Portfolio report generation completed")
@@ -94,8 +96,43 @@ def main():
                       help='Sync portfolio with actual Schwab account positions')
     args = parser.parse_args()
     
-    # Market hours validation - must be first
-    enforce_market_hours()
+    # Conditional market hours validation
+    market_is_open = is_market_open()
+    
+    if args.report_only:
+        # --report-only mode: Only allow when market is CLOSED
+        if market_is_open:
+            et_tz = pytz.timezone('US/Eastern')
+            current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+            print("🚫 REPORT-ONLY MODE RESTRICTED DURING MARKET HOURS")
+            print(f"Current time: {current_time}")
+            print("The --report-only flag can only be used when the market is CLOSED:")
+            print("• After 4:00 PM Eastern Time on trading days")
+            print("• On weekends and holidays")
+            print("• Before 9:30 AM Eastern Time on trading days")
+            print("\nThis ensures report prices reflect the most recent close prices.")
+            print("During market hours, use the full trading mode or wait until market close.")
+            exit(1)
+        else:
+            et_tz = pytz.timezone('US/Eastern')
+            current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+            print(f"✅ Market is closed - Report-only mode enabled - {current_time}")
+    else:
+        # All other modes: Require market to be OPEN
+        if not market_is_open:
+            et_tz = pytz.timezone('US/Eastern')
+            current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+            print("🚫 TRADING MODES REQUIRE MARKET TO BE OPEN")
+            print(f"Current time: {current_time}")
+            print("Trading operations can only run during US market hours:")
+            print("• Monday-Friday, 9:30 AM - 4:00 PM Eastern Time")
+            print("• On days when NYSE/NASDAQ are open (no holidays)")
+            print("\nTo generate reports when market is closed, use: --report-only")
+            exit(1)
+        else:
+            et_tz = pytz.timezone('US/Eastern')
+            current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+            print(f"✅ Market is open - Trading mode enabled - {current_time}")
     
     print("\n" + "=" * 60)
     if args.load_previous_day:
@@ -193,9 +230,10 @@ def main():
                 print("❌ No trading document found")
                 
         elif args.report_only:
-            # Only generate the report without executing trades
+            # Only generate the report without executing trades - use close prices when market is closed
             print("🔍 Running in read-only mode - no trades will be executed")
-            portfolio_system.generate_report()
+            print("💰 Using most recent close prices for accurate after-hours valuation")
+            portfolio_system.generate_report(prefer_close_prices=True)
             
         else:
             # Full execution mode: Execute trades then generate report
