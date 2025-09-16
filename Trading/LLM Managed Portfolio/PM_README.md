@@ -9,8 +9,9 @@
   ## 📊 YOUR CURRENT ASSIGNMENT
 
   **Portfolio Details:**
-  - Investment Period: August 5, 2025 to July 30, 2026
-  - Strategy: Catalyst-driven momentum with concentrated positions
+  - Goal: Maximize returns in 3-8 month timeframe
+  - Investment Period: 5 years 
+  - Strategy: A combination of catalyst driven momentum companies and undervalued companies. A company does not need to fall in both of these categories, only one
   - Risk Profile: Moderate-aggressive with strict risk controls
   - Current Portfolio Value: Analyze the provided data
 

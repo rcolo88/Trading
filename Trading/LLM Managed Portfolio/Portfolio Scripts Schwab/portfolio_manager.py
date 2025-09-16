@@ -36,6 +36,10 @@ class PortfolioManager:
         self.min_cash_reserve = 0.00
         self.partial_fill_threshold = 0.8  # 80% threshold for SMART mode
         
+        # Stop-loss management
+        self.stop_losses = {}  # {ticker: {price, shares, set_date, reason}}
+        self.last_run = None
+        
         # Load existing state or set defaults
         if not self.load_portfolio_state():
             self.cash = 0.00
@@ -81,6 +85,7 @@ class PortfolioManager:
             
             # Create state data
             current_time = pd.Timestamp.now()
+            self.last_run = current_time.isoformat()  # Update last run time
             state = {
                 'timestamp': current_time.isoformat(),
                 'cash': self.cash,
@@ -89,6 +94,8 @@ class PortfolioManager:
                 'partial_fill_mode': self.partial_fill_mode.value,
                 'min_cash_reserve': self.min_cash_reserve,
                 'partial_fill_threshold': self.partial_fill_threshold,
+                'stop_losses': self.stop_losses,
+                'last_run': self.last_run,
                 'last_updated': str(current_time)
             }
             
@@ -140,6 +147,10 @@ class PortfolioManager:
                 self.partial_fill_mode = PartialFillMode.from_string(state['partial_fill_mode'])
             self.min_cash_reserve = float(state.get('min_cash_reserve', 0.00))
             self.partial_fill_threshold = float(state.get('partial_fill_threshold', 0.8))
+            
+            # Load stop-loss data
+            self.stop_losses = state.get('stop_losses', {})
+            self.last_run = state.get('last_run', None)
             
             print(f"✅ Portfolio state loaded from {state_file}")
             print(f"   Cash: ${self.cash:.2f}")
