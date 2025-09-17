@@ -5,58 +5,44 @@
   "trades": [
     {
       "action": "SELL",
-      "ticker": "QS", 
-      "shares": 10,
-      "reason": "Reduce speculative position from 20% portfolio weight to manageable 12%",
+      "ticker": "IONS", 
+      "shares": 3,
+      "reason": "rim position from 21.7% to 15% portfolio weight to manage concentration risk while maintaining upside exposure to September 22 PDUFA catalyst",
       "priority": "HIGH"
     },
     {
       "action": "BUY",
-      "ticker": "XLV",
-      "shares": 1,
-      "reason": "Healthcare ETF provides defensive diversification during tech rotation",
+      "ticker": "CRNX",
+      "shares": 3,
+      "reason": "September 25 PDUFA for Paltusotine acromegaly treatment offers 118% upside to $74 analyst targets with high approval probability",
       "priority": "HIGH"
     },
     {
       "action": "BUY", 
-      "ticker": "VEA",
-      "shares": 1,
-      "reason": "International developed markets ETF capitalizes on MSCI EAFE outperformance",
+      "ticker": "MRVL",
+      "shares": 5,
+      "reason": "AI networking leader targeting $34B market by 2028, trading at discount to peers with 400G/800G Ethernet adoption accelerating",
       "priority": "HIGH"
     },
     {
-      "action": "HOLD",
-      "ticker": "NVDA",
+      "action": "BUY",
+      "ticker": "RKLB",
       "shares": 2,
-      "reason": "Maintain position through earnings catalyst",
+      "reason": "pace technology momentum with 80% YTD performance, 70 successful missions, and policy tailwinds",
       "priority": "MEDIUM"
     },
     {
-      "action": "HOLD", 
-      "ticker": "GOOGL",
-      "shares": 1,
-      "reason": "Continue holding momentum leader with AI tailwinds",
+      "action": "BUY", 
+      "ticker": "TSM",
+      "shares": 2,
+      "reason": "Essential foundry exposure for AI semiconductor plays, geopolitical discount creates opportunity with 3nm/2nm node leadership",
       "priority": "MEDIUM"
     },
     {
       "action": "BUY",
-      "ticker": "TLT", 
+      "ticker": "PANW",
       "shares": 1,
-      "reason": "Treasury bond ETF provides portfolio insurance ahead of Fed cuts",
-      "priority": "MEDIUM"
-    },
-    {
-      "action": "HOLD",
-      "ticker": "IONS", 
-      "shares": 8,
-      "reason": "Maintain biotech allocation through September 22 PDUFA decision catalyst",
-      "priority": "LOW"
-    },
-    {
-      "action": "HOLD",
-      "ticker": "AMD",
-      "shares": 1, 
-      "reason": "Keep minimal position despite China headwinds given MI350 launch catalyst",
+      "reason": "Cybersecurity leader for portfolio diversification with platformization strategy driving 40% operating margins",
       "priority": "LOW"
     }
   ],

@@ -1757,3 +1757,32 @@
 2025-08-28 11:57:31,026 - INFO - BUY TLT: 1 shares at $87.14 = $87.14
 2025-08-28 11:57:31,031 - INFO - Execution completed: 4/4 trades successful
 2025-08-28 11:57:31,031 - INFO - ============================================================
+2025-09-17 11:09:09,482 - INFO - ============================================================
+2025-09-17 11:09:09,483 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-09-17 11:09:09,483 - INFO - ============================================================
+2025-09-17 11:09:09,484 - INFO - Using manual override with 8 trades
+2025-09-17 11:09:09,484 - INFO - Parsed 8 orders from document
+2025-09-17 11:09:13,627 - INFO - SELL QS: 3 shares at $10.40 = $31.20
+2025-09-17 11:09:13,630 - INFO - BUY XLV: 1 shares at $137.90 = $137.90
+2025-09-17 11:09:13,632 - INFO - BUY VEA: 1 shares at $60.12 = $60.12
+2025-09-17 11:09:13,635 - INFO - BUY TLT: 1 shares at $90.58 = $90.58
+2025-09-17 11:09:13,637 - INFO - Execution completed: 4/4 trades successful
+2025-09-17 11:09:13,637 - INFO - ============================================================
+2025-09-17 11:30:43,963 - INFO - ============================================================
+2025-09-17 11:30:43,963 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-09-17 11:30:43,963 - INFO - ============================================================
+2025-09-17 11:30:43,965 - INFO - Processing document: /Users/robertcologero/GitHub/Trading/LLM Managed Portfolio/Portfolio Scripts Schwab/../trading_recommendations_20250916.md (Type: .MD)
+2025-09-17 11:30:43,967 - INFO - Parsed 8 orders from document
+2025-09-17 11:30:48,611 - ERROR - Cash flow validation failed - execution cancelled
+2025-09-17 11:39:38,476 - INFO - ============================================================
+2025-09-17 11:39:38,476 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-09-17 11:39:38,476 - INFO - ============================================================
+2025-09-17 11:39:38,478 - INFO - Processing document: /Users/robertcologero/GitHub/Trading/LLM Managed Portfolio/Portfolio Scripts Schwab/../trading_recommendations_20250916.md (Type: .MD)
+2025-09-17 11:39:38,481 - INFO - Parsed 8 orders from document
+2025-09-17 11:39:42,947 - ERROR - Cash flow validation failed - execution cancelled
+2025-09-17 11:46:08,321 - INFO - ============================================================
+2025-09-17 11:46:08,321 - INFO - AUTOMATED TRADE EXECUTION SESSION STARTED
+2025-09-17 11:46:08,321 - INFO - ============================================================
+2025-09-17 11:46:08,322 - INFO - Using manual override with 6 trades
+2025-09-17 11:46:08,322 - INFO - Parsed 6 orders from document
+2025-09-17 11:46:13,442 - ERROR - Cash flow validation failed - execution cancelled

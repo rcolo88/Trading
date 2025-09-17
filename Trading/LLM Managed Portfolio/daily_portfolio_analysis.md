@@ -1,79 +1,72 @@
-# Daily Portfolio Analysis - 2025-09-16
+# Daily Portfolio Analysis - 2025-09-17
 
 ## Executive Summary
-- **Total Portfolio Value**: $2,241.21
-- **Total P&L**: $+241.21 (+12.06%)
-- **Cash Position**: $675.42
-- **Active Positions**: 8
+- **Total Portfolio Value**: $2,233.49
+- **Total P&L**: $+233.49 (+11.67%)
+- **Cash Position**: $418.03
+- **Active Positions**: 7
 
 ## Benchmark Comparison
-- **SPY_daily**: -0.11%
-- **IWM_daily**: -0.67%
+- **Portfolio Return**: +11.7%
+- **SPY Benchmark**: +3.4%
+- **IWM Benchmark**: +7.5%
 
 ## Position Analysis
 ### IONS
 - Shares: 8
-- Current Price: $60.74
-- P&L: $+149.32 (+44.36%)
-- Portfolio Weight: 21.7%
-- Weight Drift: -2.8%
-
-### QS
-- Shares: 3
-- Current Price: $10.08
-- P&L: $+4.74 (+18.60%)
-- Portfolio Weight: 1.3%
-- Weight Drift: -0.5%
+- Current Price: $61.36
+- P&L: $+154.28 (+45.84%)
+- Portfolio Weight: 22.0%
+- Weight Drift: +1.4%
 
 ### AMD
 - Shares: 1
-- Current Price: $160.19
-- P&L: $-16.59 (-9.38%)
-- Portfolio Weight: 7.1%
-- Weight Drift: -5.7%
+- Current Price: $159.81
+- P&L: $-16.97 (-9.60%)
+- Portfolio Weight: 7.2%
+- Weight Drift: -3.7%
 
 ### NVDA
 - Shares: 2
-- Current Price: $174.92
-- P&L: $-8.33 (-2.32%)
-- Portfolio Weight: 15.6%
-- Weight Drift: -10.5%
+- Current Price: $170.09
+- P&L: $-17.97 (-5.02%)
+- Portfolio Weight: 15.2%
+- Weight Drift: -6.7%
 
 ### GOOGL
 - Shares: 1
-- Current Price: $251.99
-- P&L: $+58.99 (+30.56%)
-- Portfolio Weight: 11.2%
-- Weight Drift: -2.8%
+- Current Price: $247.75
+- P&L: $+54.75 (+28.37%)
+- Portfolio Weight: 11.1%
+- Weight Drift: -0.7%
 
 ### XLV
-- Shares: 1
-- Current Price: $136.95
-- P&L: $+0.94 (+0.69%)
-- Portfolio Weight: 6.1%
-- Weight Drift: -3.8%
+- Shares: 2
+- Current Price: $137.81
+- P&L: $+1.72 (+0.63%)
+- Portfolio Weight: 12.3%
+- Weight Drift: -4.4%
 
 ### VEA
-- Shares: 1
-- Current Price: $60.26
-- P&L: $+1.27 (+2.15%)
-- Portfolio Weight: 2.7%
-- Weight Drift: -1.6%
+- Shares: 2
+- Current Price: $60.15
+- P&L: $+1.19 (+1.00%)
+- Portfolio Weight: 5.4%
+- Weight Drift: -1.9%
 
 ### TLT
-- Shares: 1
-- Current Price: $90.41
-- P&L: $+3.27 (+3.76%)
-- Portfolio Weight: 4.0%
-- Weight Drift: -2.3%
+- Shares: 2
+- Current Price: $90.45
+- P&L: $+3.19 (+1.80%)
+- Portfolio Weight: 8.1%
+- Weight Drift: -2.8%
 
 ## Alerts & Recommendations
-- **MEDIUM**: AMD underweight by 5.7% - consider rebalancing
-- **MEDIUM**: NVDA underweight by 10.5% - consider rebalancing
-- **MEDIUM**: High cash level (33.0%) - consider deploying capital
+- **MEDIUM**: NVDA underweight by 6.7% - consider rebalancing
+- **MEDIUM**: High cash level (20.4%) - consider deploying capital
 
 ## Recent Performance Trend
 *Historical performance data will be populated as data accumulates*
 
 ---
-*Generated: 2025-09-16 14:19:41*
+*Generated: 2025-09-17 11:46:17*
