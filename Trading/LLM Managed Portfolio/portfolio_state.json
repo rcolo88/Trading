@@ -1,11 +1,11 @@
 {
-    "timestamp": "2025-09-17T11:46:19.679466",
-    "cash": 418.0299659633636,
+    "timestamp": "2025-09-17T12:05:04.645216",
+    "cash": 50.21996596336369,
     "holdings": {
         "IONS": {
-            "shares": 8,
+            "shares": 5,
             "entry_price": 42.0747621300107,
-            "allocation": 336.5980970400855
+            "allocation": 210.37381065005349
         },
         "AMD": {
             "shares": 1,
@@ -36,6 +36,21 @@
             "shares": 2,
             "entry_price": 88.8575,
             "allocation": 177.715
+        },
+        "CRNX": {
+            "shares": 3,
+            "entry_price": 34.385,
+            "allocation": 103.155
+        },
+        "MRVL": {
+            "shares": 5,
+            "entry_price": 70.675,
+            "allocation": 353.375
+        },
+        "RKLB": {
+            "shares": 2,
+            "entry_price": 47.65,
+            "allocation": 95.3
         }
     },
     "benchmarks": [
@@ -47,6 +62,6 @@
     "min_cash_reserve": 0.0,
     "partial_fill_threshold": 0.8,
     "stop_losses": {},
-    "last_run": "2025-09-17T11:46:19.679466",
-    "last_updated": "2025-09-17 11:46:19.679466"
+    "last_run": "2025-09-17T12:05:04.645216",
+    "last_updated": "2025-09-17 12:05:04.645216"
 }

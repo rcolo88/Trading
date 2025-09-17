@@ -30,20 +30,6 @@
       "shares": 2,
       "reason": "pace technology momentum with 80% YTD performance, 70 successful missions, and policy tailwinds",
       "priority": "MEDIUM"
-    },
-    {
-      "action": "BUY", 
-      "ticker": "TSM",
-      "shares": 2,
-      "reason": "Essential foundry exposure for AI semiconductor plays, geopolitical discount creates opportunity with 3nm/2nm node leadership",
-      "priority": "MEDIUM"
-    },
-    {
-      "action": "BUY",
-      "ticker": "PANW",
-      "shares": 1,
-      "reason": "Cybersecurity leader for portfolio diversification with platformization strategy driving 40% operating margins",
-      "priority": "LOW"
     }
   ],
   "validation": {
