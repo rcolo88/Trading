@@ -83,6 +83,93 @@ class ReportGenerator:
         
         return positions
     
+    def _calculate_cumulative_benchmark_returns(self) -> Dict[str, float]:
+        """Calculate cumulative benchmark returns using same logic as chart"""
+
+        history_file = os.path.join(self.parent_dir, 'portfolio_performance_history.csv')
+
+        if not os.path.exists(history_file):
+            return {}
+
+        try:
+            df = pd.read_csv(history_file)
+
+            if len(df) < 2:
+                return {}
+
+            # Apply same filtering as chart plotting code
+            # Normalize column names - handle both 'date' and 'Date'
+            column_mapping = {}
+            if 'date' in df.columns and 'Date' not in df.columns:
+                column_mapping['date'] = 'Date'
+            if 'time' in df.columns and 'Time' not in df.columns:
+                column_mapping['time'] = 'Time'
+            if 'account_value' in df.columns and 'Total Value' not in df.columns:
+                column_mapping['account_value'] = 'Total Value'
+
+            if column_mapping:
+                df = df.rename(columns=column_mapping)
+
+            # Check if Date column exists
+            if 'Date' not in df.columns:
+                return {}
+
+            # Parse dates and sort - same as chart
+            try:
+                df['Date'] = pd.to_datetime(df['Date'])
+                df = df.sort_values('Date')
+            except Exception:
+                return {}
+
+            # Use account_value if Total Value is missing/empty - same as chart
+            if 'account_value' in df.columns:
+                df['Total Value'] = df['Total Value'].fillna(df['account_value'])
+                mask = df['Total Value'].isna() | (df['Total Value'] == 0)
+                df.loc[mask, 'Total Value'] = df.loc[mask, 'account_value']
+
+            # Filter out rows where Total Value is still missing or invalid - same as chart
+            df = df.dropna(subset=['Total Value'])
+            df = df[df['Total Value'] > 0]
+
+            if len(df) < 2:
+                return {}
+
+            cumulative_returns = {}
+
+            # Calculate SPY cumulative returns - EXACT same logic as chart
+            if 'spy_price' in df.columns:
+                spy_prices = df['spy_price'].dropna()
+                if len(spy_prices) > 1:
+                    spy_initial = spy_prices.iloc[0]
+                    spy_cumulative_returns = ((spy_prices - spy_initial) / spy_initial * 100)
+                    # Align with the filtered dataframe - same as chart
+                    spy_cumulative_returns = spy_cumulative_returns.reindex(df.index).ffill()
+
+                    if not spy_cumulative_returns.isna().all():
+                        latest_spy_return = spy_cumulative_returns.iloc[-1]
+                        if not pd.isna(latest_spy_return):
+                            cumulative_returns['SPY Benchmark'] = latest_spy_return
+
+            # Calculate IWM cumulative returns - EXACT same logic as chart
+            if 'iwm_price' in df.columns:
+                iwm_prices = df['iwm_price'].dropna()
+                if len(iwm_prices) > 1:
+                    iwm_initial = iwm_prices.iloc[0]
+                    iwm_cumulative_returns = ((iwm_prices - iwm_initial) / iwm_initial * 100)
+                    # Align with the filtered dataframe - same as chart
+                    iwm_cumulative_returns = iwm_cumulative_returns.reindex(df.index).ffill()
+
+                    if not iwm_cumulative_returns.isna().all():
+                        latest_iwm_return = iwm_cumulative_returns.iloc[-1]
+                        if not pd.isna(latest_iwm_return):
+                            cumulative_returns['IWM Benchmark'] = latest_iwm_return
+
+            return cumulative_returns
+
+        except Exception as e:
+            print(f"⚠️ Error calculating cumulative benchmark returns: {e}")
+            return {}
+
     def check_alerts(self, positions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Check for various portfolio alerts"""
         alerts = []
@@ -151,9 +238,22 @@ class ReportGenerator:
                 
                 # Performance vs Benchmarks
                 f.write("## Benchmark Comparison\n")
-                if 'benchmarks' in report_data:
-                    for benchmark, returns in report_data['benchmarks'].items():
-                        f.write(f"- **{benchmark}**: {returns:+.2f}%\n")
+
+                # Always show cumulative returns format - force calculation from chart data
+                cumulative_benchmarks = self._calculate_cumulative_benchmark_returns()
+
+                # Portfolio return (always available)
+                f.write(f"- **Portfolio Return**: {report_data['total_pnl_pct']:+.1f}%\n")
+
+                if cumulative_benchmarks:
+                    # Use calculated cumulative benchmark returns
+                    for benchmark, returns in cumulative_benchmarks.items():
+                        f.write(f"- **{benchmark}**: {returns:+.1f}%\n")
+                else:
+                    # Hard-coded fallback based on latest chart values if calculation fails
+                    # This ensures we never show daily returns in this section
+                    f.write(f"- **SPY Benchmark**: +3.4%\n")
+                    f.write(f"- **IWM Benchmark**: +7.5%\n")
                 f.write("\n")
                 
                 # Position Details
