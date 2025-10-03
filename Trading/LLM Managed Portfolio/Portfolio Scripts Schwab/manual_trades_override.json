@@ -6,29 +6,43 @@
     {
       "action": "SELL",
       "ticker": "IONS", 
-      "shares": 3,
-      "reason": "rim position from 21.7% to 15% portfolio weight to manage concentration risk while maintaining upside exposure to September 22 PDUFA catalyst",
+      "shares": 2,
+      "reason": "Take partial profits after 52.93% gain, reduce concentration from 13.7% to ~8.5% weight while maintaining upside exposure to potential future catalysts",
       "priority": "HIGH"
+    },
+    {
+      "action": "SELL",
+      "ticker": "TLT",
+      "shares": 2,
+      "reason": "Bond yields rising despite Fed cuts, 10-year Treasury at 4.49%, exit defensive position that's underperforming",
+      "priority": "HIGH"
+    },
+    {
+      "action": "SELL", 
+      "ticker": "VEA",
+      "shares": 2,
+      "reason": "International equities showing minimal gain (+0.28%), rotate capital to higher conviction domestic opportunities",
+      "priority": "HIGH"
+    },
+    {
+      "action": "SELL",
+      "ticker": "AMD",
+      "shares": 1,
+      "reason": "Down 9.38% in portfolio despite sector strength, NVDA maintaining dominance in AI accelerators, better opportunities elsewhere",
+      "priority": "HIGHT"
+    },
+    {
+      "action": "SELL",
+      "ticker": "MRVL",
+      "shares": 2,
+      "reason": "",
+      "priority": "MEDIUM"
     },
     {
       "action": "BUY",
       "ticker": "CRNX",
-      "shares": 3,
-      "reason": "September 25 PDUFA for Paltusotine acromegaly treatment offers 118% upside to $74 analyst targets with high approval probability",
-      "priority": "HIGH"
-    },
-    {
-      "action": "BUY", 
-      "ticker": "MRVL",
-      "shares": 5,
-      "reason": "AI networking leader targeting $34B market by 2028, trading at discount to peers with 400G/800G Ethernet adoption accelerating",
-      "priority": "HIGH"
-    },
-    {
-      "action": "BUY",
-      "ticker": "RKLB",
       "shares": 2,
-      "reason": "pace technology momentum with 80% YTD performance, 70 successful missions, and policy tailwinds",
+      "reason": "",
       "priority": "MEDIUM"
     }
   ],

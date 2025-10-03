@@ -310,7 +310,13 @@ class ReportGenerator:
                 current_row[f'{ticker}_value'] = pos['current_value']
                 current_row[f'{ticker}_pnl_pct'] = pos['pnl_percent']
             
-            # Add benchmark data
+            # Add benchmark prices (critical for chart calculations)
+            if 'SPY' in current_prices:
+                current_row['spy_price'] = current_prices['SPY']
+            if 'IWM' in current_prices:
+                current_row['iwm_price'] = current_prices['IWM']
+
+            # Add benchmark daily/weekly returns
             if 'benchmarks' in report_data:
                 for benchmark, returns in report_data['benchmarks'].items():
                     current_row[f'{benchmark} Return %'] = returns
