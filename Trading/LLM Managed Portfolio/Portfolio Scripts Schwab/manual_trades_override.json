@@ -6,6 +6,13 @@
     {
       "action": "SELL",
       "ticker": "NVDA", 
+      "shares": 2,
+      "reason": "",
+      "priority": "HIGH"
+    },
+    {
+      "action": "SELL",
+      "ticker": "XLV", 
       "shares": 1,
       "reason": "",
       "priority": "HIGH"
