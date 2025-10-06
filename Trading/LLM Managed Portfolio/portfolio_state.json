@@ -1,16 +1,16 @@
 {
-    "timestamp": "2025-10-06T11:20:22.753077",
-    "cash": 723.8719659633637,
+    "timestamp": "2025-10-06T12:01:32.795652",
+    "cash": 256.69196596336354,
     "holdings": {
         "IONS": {
-            "shares": 3,
+            "shares": 1,
             "entry_price": 42.0747621300107,
-            "allocation": 126.22428639003209
+            "allocation": 42.0747621300107
         },
         "NVDA": {
-            "shares": 2,
-            "entry_price": 179.0800018310547,
-            "allocation": 358.1600036621094
+            "shares": 4,
+            "entry_price": 182.96250091552736,
+            "allocation": 731.8500036621094
         },
         "GOOGL": {
             "shares": 1,
@@ -18,9 +18,9 @@
             "allocation": 193.0
         },
         "XLV": {
-            "shares": 2,
-            "entry_price": 136.95499999999998,
-            "allocation": 273.90999999999997
+            "shares": 4,
+            "entry_price": 140.7375,
+            "allocation": 562.95
         },
         "CRNX": {
             "shares": 5,
@@ -33,9 +33,9 @@
             "allocation": 212.02499999999998
         },
         "RKLB": {
-            "shares": 2,
+            "shares": 1,
             "entry_price": 47.65,
-            "allocation": 95.3
+            "allocation": 47.65
         }
     },
     "benchmarks": [
@@ -47,6 +47,6 @@
     "min_cash_reserve": 0.0,
     "partial_fill_threshold": 0.8,
     "stop_losses": {},
-    "last_run": "2025-10-06T11:20:22.753077",
-    "last_updated": "2025-10-06 11:20:22.753077"
+    "last_run": "2025-10-06T12:01:32.795652",
+    "last_updated": "2025-10-06 12:01:32.795652"
 }

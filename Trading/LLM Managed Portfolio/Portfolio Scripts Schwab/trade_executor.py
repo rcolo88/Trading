@@ -435,7 +435,7 @@ class TradeExecutor:
         """Validate cash flow before executing trades"""
         print(f"\n💰 CASH FLOW ANALYSIS:")
         print("=" * 40)
-        
+
         simulated_cash = self.portfolio.cash
         validation_results = {
             'feasible': True,
@@ -443,40 +443,45 @@ class TradeExecutor:
             'total_buys': 0,
             'final_cash': 0,
             'warnings': [],
-            'errors': []
+            'errors': [],
+            'low_priority_failures': []
         }
-        
+
         # Separate sell and buy orders for simulation
         sell_orders = [o for o in orders if o.action == OrderType.SELL]
         buy_orders = [o for o in orders if o.action == OrderType.BUY]
-        
+
+        # Sort buy orders by priority (HIGH, MEDIUM, LOW)
+        priority_order = {OrderPriority.HIGH: 0, OrderPriority.MEDIUM: 1, OrderPriority.LOW: 2}
+        buy_orders.sort(key=lambda x: priority_order.get(x.priority, 1))
+
         # Process sells first (they generate cash)
         print(f"💵 Starting cash: ${simulated_cash:.2f}")
-        
+
         for order in sell_orders:
             if order.ticker in current_prices:
                 current_price = current_prices[order.ticker]
                 position = self.portfolio.get_position_info(order.ticker)
-                
+
                 if position and position['shares'] > 0:
                     shares_to_sell = order.shares if order.shares else position['shares']
                     shares_to_sell = min(shares_to_sell, position['shares'])
-                    
+
                     proceeds = shares_to_sell * current_price
                     simulated_cash += proceeds
                     validation_results['total_sells'] += proceeds
-                    
+
                     print(f"   📈 SELL {order.ticker}: {shares_to_sell} × ${current_price:.2f} = +${proceeds:.2f}")
                 else:
                     validation_results['warnings'].append(f"No {order.ticker} position to sell")
-        
+
         print(f"💰 Cash after sells: ${simulated_cash:.2f}")
-        
-        # Process buys (they consume cash)
+
+        # Process buys in priority order (they consume cash)
         for order in buy_orders:
             if order.ticker in current_prices:
                 current_price = current_prices[order.ticker]
-                
+
                 if order.target_value:
                     cost = order.target_value
                 elif order.shares:
@@ -484,28 +489,41 @@ class TradeExecutor:
                 else:
                     validation_results['warnings'].append(f"BUY {order.ticker}: No shares or value specified")
                     continue
-                
+
                 if cost <= simulated_cash:
                     simulated_cash -= cost
                     validation_results['total_buys'] += cost
                     shares = int(cost / current_price)
-                    print(f"   📉 BUY {order.ticker}: {shares} × ${current_price:.2f} = -${cost:.2f}")
+                    print(f"   📉 BUY {order.ticker} ({order.priority.value}): {shares} × ${current_price:.2f} = -${cost:.2f}")
                 else:
                     shortfall = cost - simulated_cash
-                    validation_results['errors'].append(f"BUY {order.ticker}: Need ${cost:.2f}, have ${simulated_cash:.2f} (short ${shortfall:.2f})")
-                    validation_results['feasible'] = False
-        
+                    error_msg = f"BUY {order.ticker} ({order.priority.value}): Need ${cost:.2f}, have ${simulated_cash:.2f} (short ${shortfall:.2f})"
+
+                    # Only block execution for HIGH and MEDIUM priority failures
+                    if order.priority == OrderPriority.LOW:
+                        validation_results['low_priority_failures'].append(error_msg)
+                        print(f"   ⚠️  {error_msg} - will skip")
+                    else:
+                        validation_results['errors'].append(error_msg)
+                        validation_results['feasible'] = False
+
         validation_results['final_cash'] = simulated_cash
-        
+
         print(f"💵 Final projected cash: ${simulated_cash:.2f}")
-        
+
         if validation_results['feasible']:
-            print("✅ All orders are financially feasible")
+            if validation_results['low_priority_failures']:
+                print("✅ HIGH/MEDIUM priority orders are financially feasible")
+                print("⚠️  LOW priority orders will be skipped due to insufficient cash:")
+                for failure in validation_results['low_priority_failures']:
+                    print(f"   • {failure}")
+            else:
+                print("✅ All orders are financially feasible")
         else:
-            print("❌ Cash flow validation failed")
+            print("❌ Cash flow validation failed for HIGH/MEDIUM priority orders")
             for error in validation_results['errors']:
                 print(f"   • {error}")
-        
+
         return validation_results
     
     def execute_automated_trading(self, document_path: Optional[str] = None) -> List[TradeResult]:
@@ -824,15 +842,29 @@ class TradeExecutor:
     
     def _handle_insufficient_cash(self, order: TradeOrder, current_price: float, available_cash: float, timestamp: datetime) -> TradeResult:
         """Handle insufficient cash scenarios based on partial fill mode"""
-        
+
         full_cost = (order.shares * current_price) if order.shares else order.target_value
         max_shares = int(available_cash / current_price)
         affordability_ratio = available_cash / full_cost
-        
+
+        # LOW priority orders are simply skipped when there's insufficient cash
+        if order.priority == OrderPriority.LOW:
+            print(f"⏭️  Skipping LOW priority order - insufficient cash:")
+            print(f"   {order.ticker}: Need ${full_cost:.2f}, Have: ${available_cash:.2f}")
+            return TradeResult(
+                order=order,
+                executed=False,
+                execution_price=current_price,
+                executed_shares=0,
+                execution_value=0,
+                error_message=f"Skipped - LOW priority with insufficient cash (need ${full_cost:.2f}, have ${available_cash:.2f})",
+                timestamp=timestamp
+            )
+
         print(f"⚠️  Insufficient cash for full order:")
         print(f"   Need: ${full_cost:.2f}, Have: ${available_cash:.2f}")
         print(f"   Can afford: {max_shares} shares ({affordability_ratio:.1%} of order)")
-        
+
         if self.portfolio.partial_fill_mode == PartialFillMode.REJECT:
             return TradeResult(
                 order=order,
@@ -843,7 +875,7 @@ class TradeExecutor:
                 error_message=f"Insufficient cash (need ${full_cost:.2f}, have ${available_cash:.2f}) - REJECT mode",
                 timestamp=timestamp
             )
-        
+
         elif self.portfolio.partial_fill_mode == PartialFillMode.AUTOMATIC:
             if max_shares > 0:
                 return self._execute_partial_fill(order, max_shares, current_price, timestamp)
@@ -857,16 +889,16 @@ class TradeExecutor:
                     error_message="Insufficient cash even for 1 share",
                     timestamp=timestamp
                 )
-        
+
         elif self.portfolio.partial_fill_mode == PartialFillMode.SMART:
             if affordability_ratio >= self.portfolio.partial_fill_threshold:
                 return self._execute_partial_fill(order, max_shares, current_price, timestamp)
             else:
                 return self._ask_partial_fill_confirmation(order, max_shares, current_price, available_cash, affordability_ratio, timestamp)
-        
+
         elif self.portfolio.partial_fill_mode == PartialFillMode.ASK_CONFIRMATION:
             return self._ask_partial_fill_confirmation(order, max_shares, current_price, available_cash, affordability_ratio, timestamp)
-        
+
         else:
             return TradeResult(
                 order=order,

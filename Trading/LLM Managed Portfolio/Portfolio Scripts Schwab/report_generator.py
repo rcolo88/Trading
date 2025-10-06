@@ -60,12 +60,10 @@ class ReportGenerator:
                 pnl_dollar = current_value - cost_basis
                 pnl_percent = (pnl_dollar / cost_basis) * 100
                 daily_change = ((current_price - position['entry_price']) / position['entry_price']) * 100
-                
+
                 # Fixed: Use the complete total for weight calculations
                 current_weight = (current_value / total_current_value) * 100 if total_current_value > 0 else 0
-                target_weight = (cost_basis / total_cost_basis) * 100  # Fixed to use actual total cost basis
-                weight_drift = current_weight - target_weight
-                
+
                 positions.append({
                     'ticker': ticker,
                     'shares': position['shares'],
@@ -76,9 +74,7 @@ class ReportGenerator:
                     'pnl_dollar': pnl_dollar,
                     'pnl_percent': pnl_percent,
                     'daily_change': daily_change,
-                    'current_weight': current_weight,
-                    'target_weight': target_weight,
-                    'weight_drift': weight_drift
+                    'current_weight': current_weight
                 })
         
         return positions
@@ -173,7 +169,7 @@ class ReportGenerator:
     def check_alerts(self, positions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Check for various portfolio alerts"""
         alerts = []
-        
+
         for pos in positions:
             # Price alerts
             if pos['pnl_percent'] > 50:
@@ -190,17 +186,7 @@ class ReportGenerator:
                     'message': f"{pos['ticker']} down {pos['pnl_percent']:+.1f}% - consider stop loss",
                     'severity': 'HIGH'
                 })
-            
-            # Weight drift alerts
-            if abs(pos['weight_drift']) > 5:
-                drift_direction = "overweight" if pos['weight_drift'] > 0 else "underweight"
-                alerts.append({
-                    'type': 'WEIGHT_DRIFT',
-                    'ticker': pos['ticker'],
-                    'message': f"{pos['ticker']} {drift_direction} by {abs(pos['weight_drift']):.1f}% - consider rebalancing",
-                    'severity': 'MEDIUM'
-                })
-        
+
         # Cash level alerts
         cash_ratio = (self.portfolio.cash / (self.portfolio.get_total_investment() + self.portfolio.cash)) * 100
         if cash_ratio > 20:
@@ -217,7 +203,7 @@ class ReportGenerator:
                 'message': f"Low cash reserves ({cash_ratio:.1f}%) - consider building buffer",
                 'severity': 'MEDIUM'
             })
-        
+
         return alerts
     
     def generate_analysis_file(self, report_data: Dict[str, Any]):
@@ -263,8 +249,7 @@ class ReportGenerator:
                     f.write(f"- Shares: {pos['shares']}\n")
                     f.write(f"- Current Price: ${pos['current_price']:.2f}\n")
                     f.write(f"- P&L: ${pos['pnl_dollar']:+,.2f} ({pos['pnl_percent']:+.2f}%)\n")
-                    f.write(f"- Portfolio Weight: {pos['current_weight']:.1f}%\n")
-                    f.write(f"- Weight Drift: {pos['weight_drift']:+.1f}%\n\n")
+                    f.write(f"- Portfolio Weight: {pos['current_weight']:.1f}%\n\n")
                 
                 # Alerts
                 if report_data.get('alerts'):
@@ -575,15 +560,8 @@ class ReportGenerator:
             ax2.axhline(y=0, color='black', linestyle='-', alpha=0.3)
             plt.setp(ax2.get_xticklabels(), rotation=45)
             
-            # Chart 3: Weight Drift (Bar Chart) - positions only
-            weight_drifts = [pos['weight_drift'] for pos in positions]
-            colors_drift = ['blue' if drift >= 0 else 'orange' for drift in weight_drifts]
-            
-            ax3.bar(position_tickers, weight_drifts, color=colors_drift, alpha=0.7)
-            ax3.set_title('Weight Drift from Target')
-            ax3.set_ylabel('Drift (%)')
-            ax3.axhline(y=0, color='black', linestyle='-', alpha=0.3)
-            plt.setp(ax3.get_xticklabels(), rotation=45)
+            # Chart 3: Removed (previously Weight Drift)
+            ax3.axis('off')  # Hide the unused subplot
             
             # Chart 4: Performance Percentages - positions only
             pnl_pcts = [pos['pnl_percent'] for pos in positions]

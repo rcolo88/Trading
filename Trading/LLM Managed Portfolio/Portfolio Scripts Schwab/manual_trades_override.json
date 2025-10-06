@@ -3,47 +3,19 @@
   "description": "Manual trading override system - takes priority over document parsing",
   "instructions": "Set 'enabled' to true to use these trades instead of parsing documents. Each trade must specify action, ticker, and either shares or target_value.",
   "trades": [
-    // {
-    //   "action": "SELL",
-    //   "ticker": "IONS", 
-    //   "shares": 2,
-    //   "reason": "",
-    //   "priority": "HIGH"
-    // },
-    // {
-    //   "action": "BUY",
-    //   "ticker": "NVDA",
-    //   "shares": 3,
-    //   "reason": "",
-    //   "priority": "HIGH"
-    // },
     {
-      "action": "BUY", 
-      "ticker": "IONQ",
-      "shares": 2,
+      "action": "SELL",
+      "ticker": "NVDA", 
+      "shares": 1,
       "reason": "",
       "priority": "HIGH"
     },
     {
       "action": "BUY",
-      "ticker": "XLV",
-      "shares": 2,
-      "reason": "",
-      "priority": "MEDIUM"
-    },
-    {
-      "action": "BUY",
       "ticker": "MSFT",
-      "shares": 3,
+      "shares": 1,
       "reason": "",
-      "priority": "MEDIUM"
-    },
-    {
-      "action": "BUY",
-      "ticker": "RGTI",
-      "shares": 2,
-      "reason": "",
-      "priority": "LOW"
+      "priority": "HIGH"
     }
   ],
   "validation": {
