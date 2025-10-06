@@ -3,47 +3,47 @@
   "description": "Manual trading override system - takes priority over document parsing",
   "instructions": "Set 'enabled' to true to use these trades instead of parsing documents. Each trade must specify action, ticker, and either shares or target_value.",
   "trades": [
+    // {
+    //   "action": "SELL",
+    //   "ticker": "IONS", 
+    //   "shares": 2,
+    //   "reason": "",
+    //   "priority": "HIGH"
+    // },
+    // {
+    //   "action": "BUY",
+    //   "ticker": "NVDA",
+    //   "shares": 3,
+    //   "reason": "",
+    //   "priority": "HIGH"
+    // },
     {
-      "action": "SELL",
-      "ticker": "IONS", 
+      "action": "BUY", 
+      "ticker": "IONQ",
       "shares": 2,
-      "reason": "Take partial profits after 52.93% gain, reduce concentration from 13.7% to ~8.5% weight while maintaining upside exposure to potential future catalysts",
+      "reason": "",
       "priority": "HIGH"
     },
     {
-      "action": "SELL",
-      "ticker": "TLT",
-      "shares": 2,
-      "reason": "Bond yields rising despite Fed cuts, 10-year Treasury at 4.49%, exit defensive position that's underperforming",
-      "priority": "HIGH"
-    },
-    {
-      "action": "SELL", 
-      "ticker": "VEA",
-      "shares": 2,
-      "reason": "International equities showing minimal gain (+0.28%), rotate capital to higher conviction domestic opportunities",
-      "priority": "HIGH"
-    },
-    {
-      "action": "SELL",
-      "ticker": "AMD",
-      "shares": 1,
-      "reason": "Down 9.38% in portfolio despite sector strength, NVDA maintaining dominance in AI accelerators, better opportunities elsewhere",
-      "priority": "HIGHT"
-    },
-    {
-      "action": "SELL",
-      "ticker": "MRVL",
+      "action": "BUY",
+      "ticker": "XLV",
       "shares": 2,
       "reason": "",
       "priority": "MEDIUM"
     },
     {
       "action": "BUY",
-      "ticker": "CRNX",
-      "shares": 2,
+      "ticker": "MSFT",
+      "shares": 3,
       "reason": "",
       "priority": "MEDIUM"
+    },
+    {
+      "action": "BUY",
+      "ticker": "RGTI",
+      "shares": 2,
+      "reason": "",
+      "priority": "LOW"
     }
   ],
   "validation": {
