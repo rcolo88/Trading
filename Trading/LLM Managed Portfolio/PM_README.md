@@ -9,7 +9,7 @@
   ## 📊 YOUR CURRENT ASSIGNMENT
 
   **Portfolio Details:**
-  - Goal: Maximize returns in 3-8 month timeframe
+  - Goal: Maximize returns in 10-12 month timeframe
   - Investment Period: 5 years 
   - Strategy: A combination of catalyst driven momentum companies and undervalued companies. A company does not need to fall in both of these categories, only one
   - Risk Profile: Moderate-aggressive with strict risk controls
@@ -36,7 +36,7 @@
 
   ### 4. **Cash Flow Optimization**
   - Prioritize trades to optimize cash generation and deployment
-  - Consider partial fills and position scaling strategies
+  - Consider position scaling strategies
 
   ## 📋 OUTPUT REQUIREMENTS
 
@@ -60,12 +60,13 @@
 
   ### **Risk Management:**
   - Maximum single position: 20% of portfolio
+  - Ideal single position: 10% of portfolio
   - Maintain minimum 5% cash reserve
   - Set stop-losses at -15% to -20% based on volatility
   - Take profits at +25% to +40% based on momentum
 
   ### **Portfolio Construction:**
-  - Target 5-8 concentrated positions
+  - Target 10-20 positions
   - Rebalance when weight drift exceeds ±5%
   - Prioritize high-conviction catalyst plays
   - Maintain sector diversification
