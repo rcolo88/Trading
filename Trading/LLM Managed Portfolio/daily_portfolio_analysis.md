@@ -1,70 +1,70 @@
-# Daily Portfolio Analysis - 2025-10-06
+# Daily Portfolio Analysis - 2025-10-09
 
 ## Executive Summary
-- **Total Portfolio Value**: $2,433.73
-- **Total P&L**: $+433.73 (+21.69%)
+- **Total Portfolio Value**: $2,474.40
+- **Total P&L**: $+474.40 (+23.72%)
 - **Cash Position**: $250.18
 - **Active Positions**: 8
 
 ## Benchmark Comparison
-- **Portfolio Return**: +21.7%
+- **Portfolio Return**: +23.7%
 - **SPY Benchmark**: +6.4%
-- **IWM Benchmark**: +12.6%
+- **IWM Benchmark**: +11.8%
 
 ## Position Analysis
 ### IONS
 - Shares: 1
-- Current Price: $69.16
-- P&L: $+27.09 (+64.37%)
-- Portfolio Weight: 2.8%
+- Current Price: $70.69
+- P&L: $+28.61 (+68.00%)
+- Portfolio Weight: 2.9%
 
 ### NVDA
 - Shares: 2
-- Current Price: $186.46
-- P&L: $+7.00 (+1.91%)
-- Portfolio Weight: 15.3%
+- Current Price: $194.25
+- P&L: $+22.57 (+6.17%)
+- Portfolio Weight: 15.7%
 
 ### GOOGL
 - Shares: 1
-- Current Price: $248.36
-- P&L: $+55.36 (+28.68%)
-- Portfolio Weight: 10.2%
+- Current Price: $241.43
+- P&L: $+48.43 (+25.09%)
+- Portfolio Weight: 9.8%
 
 ### XLV
 - Shares: 3
-- Current Price: $144.47
-- P&L: $+11.21 (+2.66%)
-- Portfolio Weight: 17.8%
+- Current Price: $144.64
+- P&L: $+11.71 (+2.77%)
+- Portfolio Weight: 17.5%
 
 ### CRNX
 - Shares: 5
-- Current Price: $42.04
-- P&L: $+23.88 (+12.82%)
-- Portfolio Weight: 8.6%
+- Current Price: $45.45
+- P&L: $+40.94 (+21.97%)
+- Portfolio Weight: 9.2%
 
 ### MRVL
 - Shares: 3
-- Current Price: $89.39
-- P&L: $+56.16 (+26.49%)
-- Portfolio Weight: 11.0%
+- Current Price: $91.85
+- P&L: $+63.52 (+29.96%)
+- Portfolio Weight: 11.1%
 
 ### RKLB
 - Shares: 1
-- Current Price: $57.37
-- P&L: $+9.72 (+20.39%)
-- Portfolio Weight: 2.4%
+- Current Price: $67.22
+- P&L: $+19.57 (+41.08%)
+- Portfolio Weight: 2.7%
 
 ### MSFT
 - Shares: 1
-- Current Price: $523.93
-- P&L: $+0.02 (+0.00%)
-- Portfolio Weight: 21.5%
+- Current Price: $519.67
+- P&L: $-4.24 (-0.81%)
+- Portfolio Weight: 21.0%
 
 ## Alerts & Recommendations
-- **HIGH**: IONS up +64.4% - consider taking profits
+- **HIGH**: IONS up +68.0% - consider taking profits
 
 ## Recent Performance Trend
 *Historical performance data will be populated as data accumulates*
 
 ---
-*Generated: 2025-10-06 12:39:45*
+*Generated: 2025-10-09 12:00:11*
