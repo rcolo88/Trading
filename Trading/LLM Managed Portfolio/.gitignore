@@ -1,0 +1,122 @@
+# ============================================
+# CRITICAL: API CREDENTIALS & SENSITIVE DATA
+# ============================================
+# Schwab API credentials - NEVER COMMIT
+**/schwab_credentials.json
+**/schwab_token.json
+**/*_credentials.json
+**/*_token.json
+*.token
+**/oauth_token*.json
+
+# Trading account information
+**/account_data.json
+**/linked_accounts.json
+
+# Personal trading history
+**/personal_trades.json
+**/trade_history_*.json
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+trading_env/
+options/
+
+# ============================================
+# IDE & Editors
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# ============================================
+# Operating System
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============================================
+# Logs & Temporary Files
+# ============================================
+*.log
+trade_execution*.log
+portfolio_analysis*.log
+schwab_api*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# ============================================
+# Local Configuration
+# ============================================
+local_config.json
+test_credentials.json
+.env
+.env.local
+
+# ============================================
+# Jupyter Notebooks (checkpoints)
+# ============================================
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# ============================================
+# Documentation Build
+# ============================================
+docs/_build/
+site/
+
+# ============================================
+# Test & Coverage
+# ============================================
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ============================================
+# macOS
+# ============================================
+.AppleDouble
+.LSOverride
+Icon

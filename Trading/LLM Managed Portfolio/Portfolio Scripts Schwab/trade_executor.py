@@ -27,25 +27,29 @@ except ImportError:
 
 class TradeExecutor:
     """Handles all trading operations including document parsing and order execution"""
-    
-    def __init__(self, portfolio_manager, data_fetcher):
+
+    def __init__(self, portfolio_manager, data_fetcher, live_executor=None):
         self.portfolio = portfolio_manager
         self.data_fetcher = data_fetcher
-        
+        self.live_executor = live_executor  # Optional SchwabTradeExecutor for live trading
+
         # Configure trade execution logger
         self.trade_logger = logging.getLogger('trade_execution')
         self.trade_logger.setLevel(logging.INFO)
-        
+
         # Create file handler if not already exists
         if not self.trade_logger.handlers:
             # Get the parent directory (one level up from Pieced Portfolio Scripts)
             parent_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
             log_file = os.path.join(parent_dir, 'trade_execution.log')
-            
+
             handler = logging.FileHandler(log_file)
             formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
             self.trade_logger.addHandler(handler)
+
+        mode = "LIVE" if live_executor and not live_executor.dry_run else "SIMULATED"
+        self.trade_logger.info(f"TradeExecutor initialized in {mode} mode")
     
     def check_manual_override(self) -> Optional[List[TradeOrder]]:
         """Check for manual trading override file"""
@@ -676,10 +680,10 @@ class TradeExecutor:
         }
     
     def _execute_single_order(self, order: TradeOrder, current_prices: Dict[str, float]) -> TradeResult:
-        """Execute a single trading order"""
-        
+        """Execute a single trading order (supports both simulated and live execution)"""
+
         timestamp = datetime.now()
-        
+
         if order.ticker not in current_prices:
             return TradeResult(
                 order=order,
@@ -690,9 +694,20 @@ class TradeExecutor:
                 error_message=f"No price data available for {order.ticker}",
                 timestamp=timestamp
             )
-        
+
         current_price = current_prices[order.ticker]
-        
+
+        # If live executor is configured, use it for real trades
+        if self.live_executor:
+            try:
+                self.trade_logger.info(f"Using live executor for {order.action.value} {order.ticker}")
+                result = self.live_executor.place_market_order(order, current_price)
+                return result
+            except Exception as e:
+                self.trade_logger.error(f"Live execution failed: {e}, falling back to simulation")
+                # Fall through to simulated execution on error
+
+        # Simulated execution (original logic)
         try:
             if order.action == OrderType.SELL:
                 return self._execute_sell_order(order, current_price, timestamp)
@@ -710,7 +725,7 @@ class TradeExecutor:
                     error_message=f"Unknown order action: {order.action}",
                     timestamp=timestamp
                 )
-                
+
         except Exception as e:
             return TradeResult(
                 order=order,
