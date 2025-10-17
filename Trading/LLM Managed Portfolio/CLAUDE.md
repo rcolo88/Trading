@@ -2,9 +2,9 @@
 
 ## ⚠️ IMPORTANT: Current Implementation Location
 
-**ALWAYS use the modular implementation in `Pieced Portfolio Scripts/` directory.**
+**ALWAYS use the modular implementation in `Portfolio Scripts Schwab/` directory.**
 
-- ✅ **Current/Recommended**: `Pieced Portfolio Scripts/` - Fully modular system
+- ✅ **Current/Recommended**: `Portfolio Scripts Schwab/` - Fully modular Schwab API system
 - ❌ **Legacy/Deprecated**: `Daily_Portfolio_Script.py` - Monolithic file (kept for reference only)
 
 ## Environment Setup
@@ -30,20 +30,17 @@ conda activate options
 Execute from the main project directory:
 
 ```bash
-# Full execution (trading + reporting)
-conda run -n trading_env python "Pieced Portfolio Scripts/main.py"
+# Full execution (trading + reporting) - REQUIRES MARKET HOURS
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py"
 
-# Report generation only (no trading)
-conda run -n trading_env python "Pieced Portfolio Scripts/main.py" --report-only
+# Read-only operations (available 24/7)
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --report-only
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --account-status --dry-run
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --risk-summary --dry-run
 
-# Test document parsing functionality
-conda run -n trading_env python "Pieced Portfolio Scripts/main.py" --test-parser
-```
-
-### Alternative with Legacy Environment
-```bash
-# Use legacy environment if trading_env not available
-conda run -n options python "Pieced Portfolio Scripts/main.py" --report-only
+# Testing operations (available 24/7)
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --test-parser
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --dry-run
 ```
 
 ### ❌ Legacy Scripts (DO NOT USE)
@@ -55,16 +52,17 @@ conda run -n options python Daily_Portfolio_Script_new_parse.py --test-parser
 
 ## Modular System Architecture
 
-### Core Modules in `Pieced Portfolio Scripts/`
+### Core Modules in `Portfolio Scripts Schwab/`
 1. **`main.py`** - System orchestrator and entry point
 2. **`portfolio_manager.py`** - Holdings, cash, and state management
-3. **`data_fetcher.py`** - Market data retrieval and yfinance integration
-4. **`trade_executor.py`** - Document parsing and trade execution
-5. **`report_generator.py`** - Analysis, reporting, and chart generation
-6. **`market_hours.py`** - Market hours validation
-7. **`trading_models.py`** - Data structures and enums
-8. **`performance_validator.py`** - Multi-method performance validation
-9. **`utils.py`** - Utility functions
+3. **`schwab_data_fetcher.py`** - Schwab API market data retrieval
+4. **`schwab_account_manager.py`** - Account synchronization with Schwab
+5. **`schwab_trade_executor.py`** - Live trade execution via Schwab API
+6. **`schwab_safety_validator.py`** - Pre-trade safety validation
+7. **`trade_executor.py`** - Document parsing and order execution
+8. **`report_generator.py`** - Analysis, reporting, and chart generation
+9. **`market_hours.py`** - Market hours validation
+10. **`trading_models.py`** - Data structures and enums
 
 ### Key Benefits of Modular System
 - **Smaller, manageable code chunks** for easier Claude interaction
@@ -101,39 +99,53 @@ conda run -n options python Daily_Portfolio_Script_new_parse.py --test-parser
 ## Claude Integration Notes
 
 ### When Working on Code
-1. **Always reference `Pieced Portfolio Scripts/` modules** for current implementation
+1. **Always reference `Portfolio Scripts Schwab/` modules** for current implementation
 2. **Individual modules are sized** for optimal Claude processing (~200-700 lines each)
 3. **Clear interfaces** between modules make changes easier to implement
 4. **State persistence** ensures changes don't break portfolio continuity
+5. **Read-only operations** (account status, reports, risk analysis) can run 24/7
+6. **Trading operations** (live trading, account sync) require market hours (Mon-Fri 9:30AM-4PM ET)
 
 ### Common Tasks
-- **Portfolio analysis**: Focus on `report_generator.py` and `performance_validator.py`
+- **Portfolio analysis**: Focus on `report_generator.py`
+- **Schwab integration**: Work with `schwab_account_manager.py`, `schwab_trade_executor.py`
 - **Trading logic**: Work with `trade_executor.py` and `trading_models.py`
-- **Data issues**: Examine `data_fetcher.py` for yfinance integration
+- **Data issues**: Examine `schwab_data_fetcher.py` for Schwab API integration
 - **State management**: Check `portfolio_manager.py` for holdings/cash operations
 
 ### Execution for Testing
 ```bash
-# Test parsing without trading
-conda run -n trading_env python "Pieced Portfolio Scripts/main.py" --test-parser
+# Test parsing without trading (available 24/7)
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --test-parser
 
-# Generate report only (safe for any time)  
-conda run -n trading_env python "Pieced Portfolio Scripts/main.py" --report-only
+# Generate report only (available 24/7)
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --report-only
+
+# Check account status (available 24/7)
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --account-status --dry-run
 ```
 
 ## System Flow
 
-1. **Market Hours Validation** - Prevents execution outside trading hours
-2. **Module Initialization** - Load portfolio state, configure data fetchers
+1. **Market Hours Validation** - Enforces market hours for trading operations only
+   - **Trading operations** (--live-trading, --sync-schwab-account): Require market hours
+   - **Read-only operations** (--report-only, --account-status, --risk-summary): Available 24/7
+2. **Module Initialization** - Load portfolio state, configure Schwab API client
 3. **Document Processing** - Parse trading recommendations (PDF/Markdown)
-4. **Trade Execution** - Execute orders with cash flow validation
+4. **Trade Execution** - Execute orders via Schwab API with safety validation
 5. **Portfolio Updates** - Update holdings and save state
 6. **Report Generation** - Create analysis, charts, and export data
 7. **State Persistence** - Save all changes for next run
 
-## Recent Updates (2025-09-10)
+## Recent Updates
 
-### Portfolio Analysis Consolidation  
+### Market Hours Policy Update (2025-10-13)
+- **ENHANCED**: Market hours validation now distinguishes between trading and read-only operations
+- **READ-ONLY 24/7**: `--account-status`, `--risk-summary`, `--report-only`, `--test-schwab-api`, `--dry-run` available anytime
+- **TRADING HOURS**: `--live-trading`, `--sync-schwab-account` require market open (Mon-Fri 9:30AM-4PM ET)
+- **BENEFIT**: Check account status, run reports, and test functionality outside market hours
+
+### Portfolio Analysis Consolidation (2025-09-10)  
 - **REMOVED**: `portfolio_analysis_output.txt` (legacy JSON format) - **File completely removed from codebase**
 - **ENHANCED**: `daily_portfolio_analysis.md` - Now comprehensive single source for all analysis
 - **INCLUDES**: Portfolio weights, cash %, risk alerts, raw JSON data for LLM processing

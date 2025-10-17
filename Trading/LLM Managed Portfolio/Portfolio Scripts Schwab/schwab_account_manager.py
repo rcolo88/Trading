@@ -9,9 +9,19 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 import pandas as pd
 
-# Set up logging
+# Set up logging first (before imports that may fail)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Schwab API imports for proper field handling
+# We need the Client class to access Account.Fields.POSITIONS enum
+try:
+    from schwab.client import Client as SchwabClient
+    SCHWAB_CLIENT_AVAILABLE = True
+except ImportError:
+    SchwabClient = None
+    SCHWAB_CLIENT_AVAILABLE = False
+    logger.warning("⚠️  schwab-py Client not available - some features may be limited")
 
 
 class SchwabAccountManager:
@@ -117,10 +127,16 @@ class SchwabAccountManager:
 
             logger.info(f"📡 Fetching account data from Schwab...")
 
-            response = self.client.get_account(
-                account_hash,
-                fields=['positions']  # Request position details
-            )
+            # Use proper Client.Account.Fields.POSITIONS enum for field specification
+            # This is required by schwab-py to avoid type checking errors
+            if SCHWAB_CLIENT_AVAILABLE and SchwabClient is not None:
+                response = self.client.get_account(
+                    account_hash,
+                    fields=SchwabClient.Account.Fields.POSITIONS
+                )
+            else:
+                # Fallback for when schwab-py import failed
+                response = self.client.get_account(account_hash)
 
             if response.status_code == 200:
                 account_data = response.json()
@@ -290,7 +306,7 @@ class SchwabAccountManager:
 
             if success:
                 print("\n✅ SYNC COMPLETED SUCCESSFULLY")
-                print(f"   Positions: {len(schwab_positions)}")
+                print(f"   Positions: {', '.join(sorted(schwab_positions.keys())) if schwab_positions else 'None'}")
                 print(f"   Cash: ${schwab_cash:.2f}")
                 print(f"   Total value: ${sum(p['allocation'] for p in schwab_positions.values()) + schwab_cash:.2f}")
                 return True

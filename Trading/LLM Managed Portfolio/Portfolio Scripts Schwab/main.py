@@ -14,23 +14,22 @@ This orchestrates all the modular components:
 - ReportGenerator: Analysis and reporting
 
 Usage:
-    # Account Management
-    python main.py --sync-schwab-account       # Sync portfolio with real Schwab account
-    python main.py --account-status --dry-run  # Display account summary
+    # Read-Only Operations (Available 24/7)
+    python main.py --report-only               # Generate portfolio report
+    python main.py --account-status --dry-run  # Display Schwab account summary
     python main.py --risk-summary --dry-run    # Show portfolio risk analysis
-
-    # Trading Modes
-    python main.py                             # Execute trades (simulated by default)
-    python main.py --dry-run                   # Simulate trades with real account data
-    python main.py --live-trading              # Execute REAL trades (requires explicit flag)
-
-    # Read-Only Operations
-    python main.py --report-only               # Generate report without executing trades
+    python main.py --sync-schwab-account       # Sync local state with Schwab account
     python main.py --test-schwab-api           # Test Schwab API connection
     python main.py --test-parser               # Test document parsing
-
-    # Utilities
+    python main.py --dry-run                   # Simulate trades (testing only)
     python main.py --load-previous-day         # Load positions from saved state
+
+    # Trading Modes (Market Hours Only)
+    python main.py                             # Execute trades (simulated by default)
+    python main.py --live-trading              # Execute REAL trades (requires explicit flag)
+
+Market Hours: Trading operations require market to be open (Mon-Fri 9:30AM-4PM ET).
+              Read-only operations can run anytime.
 """
 
 import argparse
@@ -176,32 +175,59 @@ def main():
     
     # Conditional market hours validation
     market_is_open = is_market_open()
-    
-    if args.report_only:
-        # --report-only mode: Allow anytime, but note market status
-        et_tz = pytz.timezone('US/Eastern')
-        current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+    et_tz = pytz.timezone('US/Eastern')
+    current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+
+    # Define read-only operations that can run anytime
+    # These operations do NOT place trades - they only read data or update local state
+    read_only_operations = (
+        args.report_only or
+        args.account_status or
+        args.risk_summary or
+        args.test_schwab_api or
+        args.test_parser or
+        args.load_previous_day or
+        args.sync_schwab_account or  # Syncing just reads from Schwab and updates local state
+        args.dry_run  # Dry-run is safe for testing anytime
+    )
+
+    # Define operations that actually place trades and require market hours
+    trading_operations = (
+        args.live_trading or
+        (not read_only_operations and not args.report_only)  # Full execution mode without --dry-run
+    )
+
+    if read_only_operations and not trading_operations:
+        # Read-only modes: Allow anytime, but note market status
         if market_is_open:
-            print(f"📊 Market is open - Report-only mode enabled with current prices - {current_time}")
-            print("ℹ️  Note: Using current market prices during trading hours")
+            print(f"📊 Market is open - Read-only mode with current prices - {current_time}")
         else:
-            print(f"✅ Market is closed - Report-only mode enabled with close prices - {current_time}")
-    else:
-        # All other modes: Require market to be OPEN
+            print(f"✅ Market is closed - Read-only mode enabled - {current_time}")
+            print("ℹ️  Account status and risk analysis available 24/7")
+    elif trading_operations:
+        # Trading operations: Require market to be OPEN
         if not market_is_open:
-            et_tz = pytz.timezone('US/Eastern')
-            current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
-            print("🚫 TRADING MODES REQUIRE MARKET TO BE OPEN")
+            print("🚫 TRADING OPERATIONS REQUIRE MARKET TO BE OPEN")
             print(f"Current time: {current_time}")
             print("Trading operations can only run during US market hours:")
             print("• Monday-Friday, 9:30 AM - 4:00 PM Eastern Time")
             print("• On days when NYSE/NASDAQ are open (no holidays)")
-            print("\nTo generate reports when market is closed, use: --report-only")
+            print("\nRead-only operations available anytime:")
+            print("  --report-only              Generate portfolio report")
+            print("  --account-status           View account summary")
+            print("  --risk-summary             View risk analysis")
+            print("  --sync-schwab-account      Sync local state with Schwab account")
+            print("  --test-schwab-api          Test API connection")
+            print("  --dry-run                  Simulate trades (testing only)")
             exit(1)
         else:
-            et_tz = pytz.timezone('US/Eastern')
-            current_time = datetime.now(et_tz).strftime('%Y-%m-%d %H:%M:%S %Z')
             print(f"✅ Market is open - Trading mode enabled - {current_time}")
+    else:
+        # Default: show market status
+        if market_is_open:
+            print(f"📊 Market is open - {current_time}")
+        else:
+            print(f"✅ Market is closed - {current_time}")
     
     print("\n" + "=" * 60)
     if args.load_previous_day:
