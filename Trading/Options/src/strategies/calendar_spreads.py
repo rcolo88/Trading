@@ -10,7 +10,6 @@ Calendar spreads (also known as time spreads or horizontal spreads) involve:
 Types implemented:
 1. Call Calendar Spread - Sell near-term call, buy far-term call (same strike)
 2. Put Calendar Spread - Sell near-term put, buy far-term put (same strike)
-3. Diagonal Spread - Similar to calendar but different strikes (future enhancement)
 """
 
 from datetime import datetime
@@ -451,25 +450,3 @@ class PutCalendarSpread(CalendarSpread):
 
     def __init__(self, config: Dict):
         super().__init__("Put Calendar Spread", config, "put_calendar")
-
-
-class DiagonalSpread(CalendarSpread):
-    """
-    Diagonal Spread (Time + Vertical Spread).
-
-    Similar to calendar spread but with different strikes.
-
-    Setup: Sell near-term option, buy far-term option (different strikes)
-    - Call diagonal: Sell lower strike near-term, buy higher strike far-term
-    - Put diagonal: Sell higher strike near-term, buy lower strike far-term
-
-    This combines time decay with directional bias.
-
-    Note: This is a future enhancement. For now, it inherits calendar spread
-    logic but can be extended to support different strikes.
-    """
-
-    def __init__(self, config: Dict, diagonal_type: str = "call"):
-        spread_type = f"{diagonal_type}_diagonal"
-        super().__init__(f"{diagonal_type.title()} Diagonal Spread", config, spread_type)
-        # Future: Override strike selection logic for different strikes

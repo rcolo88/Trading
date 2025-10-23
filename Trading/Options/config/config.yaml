@@ -113,41 +113,6 @@ strategies:
       dte_exit: 7
       max_underlying_move: 0.10
 
-  # Diagonal Spreads - Combination of time and vertical spreads
-  call_diagonal:
-    enabled: false
-    entry:
-      near_dte: 30
-      far_dte: 60
-      dte_tolerance: 5
-      strike_selection: "delta"
-      target_delta: 0.50     # ATM for near-term
-      moneyness: 0.02        # Slightly OTM for far-term
-      min_debit: 0.5
-      max_debit: 5.0
-    exit:
-      profit_target: 0.30
-      stop_loss: -0.50
-      dte_exit: 7
-      max_underlying_move: 0.15
-
-  put_diagonal:
-    enabled: false
-    entry:
-      near_dte: 30
-      far_dte: 60
-      dte_tolerance: 5
-      strike_selection: "delta"
-      target_delta: 0.50
-      moneyness: -0.02       # Slightly OTM for far-term
-      min_debit: 0.5
-      max_debit: 5.0
-    exit:
-      profit_target: 0.30
-      stop_loss: -0.50
-      dte_exit: 7
-      max_underlying_move: 0.15
-
 # Position sizing
 position_sizing:
   method: "fixed_risk"  # Options: fixed_risk, fixed_contracts, kelly

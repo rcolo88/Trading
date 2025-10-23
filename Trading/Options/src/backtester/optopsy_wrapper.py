@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import pandas as pd
 import numpy as np
-# import optopsy as op  # Will be imported once data is ready
+import optopsy as op  # Will be imported once data is ready
 
 from ..strategies.base_strategy import BaseStrategy, Position, Signal
 

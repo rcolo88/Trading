@@ -6,7 +6,7 @@ A comprehensive Python-based backtesting framework for options trading strategie
 
 - **Strategy Implementations**:
   - **Vertical Spreads**: Bull put spread, bear call spread, bull call spread, bear put spread
-  - **Calendar Spreads**: Call calendar spread, put calendar spread, diagonal spreads (framework)
+  - **Calendar Spreads**: Call calendar spread, put calendar spread
 - **Flexible Configuration**: YAML-based configuration for easy parameter tuning
 - **Comprehensive Exit Logic**: Profit targets, stop losses, DTE-based exits, and underlying movement thresholds
 - **Comprehensive Analysis**: Performance metrics, equity curves, drawdown analysis, and more
@@ -190,11 +190,6 @@ Options/
 - **Max Loss**: Net debit paid
 - **Best Conditions**: Low IV environment, expecting IV to increase
 - **Exit Criteria**: Profit target %, stop loss %, DTE threshold (exit before near-term expiration), underlying movement threshold
-
-#### Diagonal Spread (Framework)
-- **Setup**: Sell near-term option, buy far-term option at different strikes
-- **Outlook**: Combines time decay with directional bias
-- **Status**: Framework implemented, available for future enhancement
 
 ## Performance Metrics
 

@@ -324,15 +324,6 @@ Calendar spreads (also called time spreads or horizontal spreads) profit from ti
 - **Use case**: Neutral to slightly bearish, expect low volatility
 - **Best conditions**: Low IV environment, expecting IV to increase
 
-#### 3. Diagonal Spread (Time + Vertical Combination)
-- **Setup**: Sell near-term option, buy far-term option (different strikes)
-- **Call diagonal**: Sell lower strike near-term call, buy higher strike far-term call
-- **Put diagonal**: Sell higher strike near-term put, buy lower strike far-term put
-- **Max profit**: Varies based on strikes and expiration
-- **Max loss**: Net debit paid
-- **Use case**: Combines time decay with directional bias
-- **Status**: Framework implemented, available for future enhancement
-
 ### Strategy Parameters
 
 #### Vertical Spread Parameters
