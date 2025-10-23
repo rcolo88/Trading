@@ -26,59 +26,59 @@ costs:
 
 # Strategy parameters - Vertical Spreads
 strategies:
-  bull_put_spread:
+  bull_put_spread:          # This is a credit spread
     enabled: true
     entry:
-      dte_min: 30  # Days to expiration
+      dte_min: 30           # Days to expiration
       dte_max: 45
-      short_delta: 0.30  # Sell put with ~30 delta
-      long_delta: 0.20   # Buy put with ~20 delta
-      strike_width: 5    # Dollar width between strikes
+      short_delta: 0.30     # Sell put with ~30 delta
+      long_delta: 0.20      # Buy put with ~20 delta
+      strike_width: 5       # Dollar width between strikes
     exit:
-      profit_target: 0.50  # Close at 50% of max profit
-      stop_loss: 0.50      # Stop at 50% of max loss
-      dte_min: 21          # Close if DTE drops below 21
+      profit_target: 0.50   # Close at 50% of max profit
+      stop_loss: 0.50       # Stop at 50% of max loss
+      dte_min: 21           # Close if DTE drops below 21
 
-  bear_call_spread:
+  bear_call_spread:         # This is a credit spread
     enabled: true
     entry:
       dte_min: 30
       dte_max: 45
-      short_delta: 0.30  # Sell call with ~30 delta
-      long_delta: 0.20   # Buy call with ~20 delta
+      short_delta: 0.30     # Sell call with ~30 delta
+      long_delta: 0.20      # Buy call with ~20 delta
       strike_width: 5
     exit:
-      profit_target: 0.50  # Close at 50% of max profit
-      stop_loss: 0.50      # Stop at 50% of max loss
+      profit_target: 0.50   # Close at 50% of max profit
+      stop_loss: 0.50       # Stop at 50% of max loss
       dte_min: 21
 
-  bull_call_spread:
-    enabled: false  # Start with credit spreads
+  bull_call_spread:         # This is a debit spread
+    enabled: false          # Start with credit spreads
     entry:
       dte_min: 30
       dte_max: 60
-      long_delta: 0.60   # Buy call with ~60 delta
-      short_delta: 0.40  # Sell call with ~40 delta
+      long_delta: 0.60      # Buy call with ~60 delta
+      short_delta: 0.40     # Sell call with ~40 delta
       strike_width: 5
     exit:
-      profit_target: 0.75  # Target 75% of max profit
-      stop_loss: 0.50      # Stop at 50% of max loss
+      profit_target: 0.75   # Target 75% of max profit
+      stop_loss: 0.50       # Stop at 50% of max loss
       dte_min: 14
 
-  bear_put_spread:
+  bear_put_spread:          # This is a debit spread
     enabled: false
     entry:
       dte_min: 30
       dte_max: 60
-      long_delta: 0.60   # Buy put with ~60 delta
-      short_delta: 0.40  # Sell put with ~40 delta
+      long_delta: 0.60      # Buy put with ~60 delta
+      short_delta: 0.40     # Sell put with ~40 delta
       strike_width: 5
     exit:
-      profit_target: 0.75  # Target 75% of max profit
-      stop_loss: 0.50      # Stop at 50% of max loss
+      profit_target: 0.75   # Target 75% of max profit
+      stop_loss: 0.50       # Stop at 50% of max loss
       dte_min: 14
 
-  # Calendar Spreads - Time-based strategies
+  # Calendar Spreads - Time-based strategies - these are all debit calendar spreads
   call_calendar:
     enabled: true
     entry:
@@ -112,6 +112,41 @@ strategies:
       stop_loss: -0.50
       dte_exit: 7
       max_underlying_move: 0.10
+
+  # Diagonal Spreads - Combination of time and vertical spreads
+  call_diagonal:
+    enabled: false
+    entry:
+      near_dte: 30
+      far_dte: 60
+      dte_tolerance: 5
+      strike_selection: "delta"
+      target_delta: 0.50     # ATM for near-term
+      moneyness: 0.02        # Slightly OTM for far-term
+      min_debit: 0.5
+      max_debit: 5.0
+    exit:
+      profit_target: 0.30
+      stop_loss: -0.50
+      dte_exit: 7
+      max_underlying_move: 0.15
+
+  put_diagonal:
+    enabled: false
+    entry:
+      near_dte: 30
+      far_dte: 60
+      dte_tolerance: 5
+      strike_selection: "delta"
+      target_delta: 0.50
+      moneyness: -0.02       # Slightly OTM for far-term
+      min_debit: 0.5
+      max_debit: 5.0
+    exit:
+      profit_target: 0.30
+      stop_loss: -0.50
+      dte_exit: 7
+      max_underlying_move: 0.15
 
 # Position sizing
 position_sizing:
