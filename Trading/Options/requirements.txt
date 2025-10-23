@@ -1,0 +1,39 @@
+# Core backtesting and data libraries
+optopsy>=2.0.1
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Data sources
+yfinance>=0.2.30
+schwab-py>=0.5.0  # Schwab API wrapper for future live trading
+
+# Financial calculations
+scipy>=1.11.0
+py_vollib>=1.0.1  # Black-Scholes and options pricing
+
+# Visualization
+matplotlib>=3.7.0
+plotly>=5.17.0
+seaborn>=0.12.0
+
+# Configuration
+pyyaml>=6.0
+python-dotenv>=1.0.0  # For API keys and secrets
+
+# Jupyter notebooks
+jupyter>=1.0.0
+ipykernel>=6.25.0
+ipywidgets>=8.1.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Code quality
+black>=23.7.0
+flake8>=6.1.0
+mypy>=1.5.0
+
+# Utilities
+tqdm>=4.66.0  # Progress bars
+requests>=2.31.0

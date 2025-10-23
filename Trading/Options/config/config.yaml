@@ -1,0 +1,188 @@
+# Options Backtesting Configuration
+
+# Target underlying asset
+underlying:
+  symbol: SPY
+  name: "SPDR S&P 500 ETF Trust"
+
+# Backtesting period
+backtest:
+  start_date: "2020-01-01"  # Adjust based on available data
+  end_date: "2024-12-31"
+  initial_capital: 10000
+
+# Data source configuration
+data_source:
+  primary: "quantconnect"  # Options: quantconnect, yahoo, polygon, schwab
+  backup: "yahoo"  # For underlying price data
+  cache_enabled: true
+  cache_dir: "data/processed"
+
+# Transaction costs
+costs:
+  commission_per_contract: 0.65  # Per contract per side
+  slippage_percent: 0.01  # 1% slippage estimate
+  bid_ask_spread_percent: 0.02  # 2% bid-ask spread estimate
+
+# Strategy parameters - Vertical Spreads
+strategies:
+  bull_put_spread:
+    enabled: true
+    entry:
+      dte_min: 30  # Days to expiration
+      dte_max: 45
+      short_delta: 0.30  # Sell put with ~30 delta
+      long_delta: 0.20   # Buy put with ~20 delta
+      strike_width: 5    # Dollar width between strikes
+    exit:
+      profit_target: 0.50  # Close at 50% of max profit
+      stop_loss: 0.50      # Stop at 50% of max loss
+      dte_min: 21          # Close if DTE drops below 21
+
+  bear_call_spread:
+    enabled: true
+    entry:
+      dte_min: 30
+      dte_max: 45
+      short_delta: 0.30  # Sell call with ~30 delta
+      long_delta: 0.20   # Buy call with ~20 delta
+      strike_width: 5
+    exit:
+      profit_target: 0.50  # Close at 50% of max profit
+      stop_loss: 0.50      # Stop at 50% of max loss
+      dte_min: 21
+
+  bull_call_spread:
+    enabled: false  # Start with credit spreads
+    entry:
+      dte_min: 30
+      dte_max: 60
+      long_delta: 0.60   # Buy call with ~60 delta
+      short_delta: 0.40  # Sell call with ~40 delta
+      strike_width: 5
+    exit:
+      profit_target: 0.75  # Target 75% of max profit
+      stop_loss: 0.50      # Stop at 50% of max loss
+      dte_min: 14
+
+  bear_put_spread:
+    enabled: false
+    entry:
+      dte_min: 30
+      dte_max: 60
+      long_delta: 0.60   # Buy put with ~60 delta
+      short_delta: 0.40  # Sell put with ~40 delta
+      strike_width: 5
+    exit:
+      profit_target: 0.75  # Target 75% of max profit
+      stop_loss: 0.50      # Stop at 50% of max loss
+      dte_min: 14
+
+  # Calendar Spreads - Time-based strategies
+  call_calendar:
+    enabled: true
+    entry:
+      near_dte: 30           # Sell 30 DTE call
+      far_dte: 60            # Buy 60 DTE call
+      dte_tolerance: 5       # +/- 5 days tolerance
+      strike_selection: "atm"  # Options: atm, delta, moneyness
+      target_delta: 0.50     # Used if strike_selection = "delta"
+      moneyness: 0.0         # Used if strike_selection = "moneyness" (0.0 = ATM)
+      min_debit: 0.5         # Minimum debit to enter (optional)
+      max_debit: 5.0         # Maximum debit to enter (optional)
+    exit:
+      profit_target: 0.25    # Close at 25% profit
+      stop_loss: -0.50       # Stop at 50% loss
+      dte_exit: 7            # Exit when near-term has 7 DTE left
+      max_underlying_move: 0.10  # Exit if underlying moves >10% from strike
+
+  put_calendar:
+    enabled: false
+    entry:
+      near_dte: 30           # Sell 30 DTE put
+      far_dte: 60            # Buy 60 DTE put
+      dte_tolerance: 5
+      strike_selection: "atm"
+      target_delta: 0.50
+      moneyness: 0.0
+      min_debit: 0.5
+      max_debit: 5.0
+    exit:
+      profit_target: 0.25
+      stop_loss: -0.50
+      dte_exit: 7
+      max_underlying_move: 0.10
+
+  # Diagonal Spreads - Combination of time and vertical spreads
+  call_diagonal:
+    enabled: false
+    entry:
+      near_dte: 30
+      far_dte: 60
+      dte_tolerance: 5
+      strike_selection: "delta"
+      target_delta: 0.50     # ATM for near-term
+      moneyness: 0.02        # Slightly OTM for far-term
+      min_debit: 0.5
+      max_debit: 5.0
+    exit:
+      profit_target: 0.30
+      stop_loss: -0.50
+      dte_exit: 7
+      max_underlying_move: 0.15
+
+  put_diagonal:
+    enabled: false
+    entry:
+      near_dte: 30
+      far_dte: 60
+      dte_tolerance: 5
+      strike_selection: "delta"
+      target_delta: 0.50
+      moneyness: -0.02       # Slightly OTM for far-term
+      min_debit: 0.5
+      max_debit: 5.0
+    exit:
+      profit_target: 0.30
+      stop_loss: -0.50
+      dte_exit: 7
+      max_underlying_move: 0.15
+
+# Position sizing
+position_sizing:
+  method: "fixed_risk"  # Options: fixed_risk, fixed_contracts, kelly
+  risk_per_trade_percent: 2.0  # Risk 2% of capital per trade
+  max_positions: 5  # Maximum concurrent positions
+  max_positions_per_strategy: 3
+
+# Market filters (optional entry conditions)
+market_filters:
+  vix_max: 40  # Don't enter if VIX > 40
+  vix_min: 12  # Don't enter if VIX < 12 (too low premium)
+  iv_rank_min: 30  # Prefer IV rank > 30
+
+# Analysis and reporting
+analysis:
+  metrics:
+    - "total_pnl"
+    - "annualized_return"
+    - "win_rate"
+    - "profit_factor"
+    - "max_drawdown"
+    - "sharpe_ratio"
+    - "calmar_ratio"
+    - "average_win"
+    - "average_loss"
+    - "trade_count"
+
+  visualization:
+    plot_equity_curve: true
+    plot_drawdown: true
+    plot_monthly_returns: true
+    plot_greeks_exposure: true
+
+# Logging
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  file: "logs/backtest.log"
+  console: true

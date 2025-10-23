@@ -1,424 +1,443 @@
-# SPY Regime Identification Model for Options Trading
+# Options Backtesting System
 
-## Overview
+A comprehensive Python-based backtesting framework for options trading strategies, focusing on vertical spreads (bull/bear put/call spreads) and calendar spreads (time spreads) on SPY/SPX.
 
-This comprehensive Python model addresses a critical problem in options trading: **determining optimal strategy selection based on market conditions**. The system uses Geometric Brownian Motion (GBM) simulation combined with empirically-derived regime identification to provide quantitative trading signals for SPY options strategies.
+## Features
 
-> **Note**: Currently optimized for Jupyter notebook development and testing. Production-ready module coming soon.
+- **Strategy Implementations**:
+  - **Vertical Spreads**: Bull put spread, bear call spread, bull call spread, bear put spread
+  - **Calendar Spreads**: Call calendar spread, put calendar spread, diagonal spreads (framework)
+- **Flexible Configuration**: YAML-based configuration for easy parameter tuning
+- **Comprehensive Exit Logic**: Profit targets, stop losses, DTE-based exits, and underlying movement thresholds
+- **Comprehensive Analysis**: Performance metrics, equity curves, drawdown analysis, and more
+- **Data Integration**: Support for multiple data sources (Yahoo Finance, QuantConnect, Polygon.io)
+- **Synthetic Data Generation**: Black-Scholes-based options data generator for free historical backtesting
+- **Interactive Notebooks**: Jupyter notebooks for exploratory analysis and backtesting
 
-### The Core Problem
+## Data Options
 
-Many options traders experience systematic losses by using the wrong strategies for current market conditions. For example:
-- Selling **call spreads in persistent bull markets** (like the user's original problem)
-- Using **iron condors in trending markets**
-- Applying **put spreads during bear market conditions**
+### Free Historical Data (Recommended for Getting Started)
 
-This model solves these issues by automatically classifying market regimes and recommending appropriate strategies with confidence scores.
-
-## Installation & Dependencies
+**Synthetic Data Generation (Black-Scholes)**
+Generate 2+ years of realistic options data for free using actual SPY prices:
 
 ```bash
-pip install numpy pandas matplotlib seaborn scipy yfinance jupyter
+python generate_synthetic_data.py
 ```
 
-## Quick Start (Jupyter Notebook)
+This will:
+- Fetch SPY prices from Yahoo Finance (free)
+- Calculate historical volatility
+- Generate options chains using Black-Scholes pricing
+- Include Greeks (delta, gamma, theta, vega)
+- Save to `data/processed/SPY_synthetic_options_*.csv`
+
+**Pros:** Free, realistic for most backtests, includes all necessary data
+**Cons:** Less accurate during crises, assumes constant volatility per strike
+
+**OptionsDX (Real Historical Data - Free Tier)**
+- Visit https://www.optionsdx.com
+- Create free account
+- Download SPY historical options data (EOD back to 2010)
+- Free tier available with account signup
+
+**Polygon.io (Real Historical Data - Free Trial)**
+- Sign up at https://polygon.io
+- Free tier: 2 years of options data, 5 API calls/min
+- May require paid upgrade for practical backtesting
+
+See `CLAUDE.md` for detailed comparison and instructions.
+
+## Quick Start
+
+### 1. Installation
+
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 2. Configuration
+
+Edit `config/config.yaml` to customize:
+- Backtest period and initial capital
+- Strategy parameters (DTE, delta targets, strike selection)
+- **Exit rules** (profit targets, stop losses, DTE thresholds) - See **"Exit Criteria Explained"** section below
+- Position sizing and risk management
+- Transaction costs
+
+**Important**: Read the **"Exit Criteria Explained"** section to understand how profit targets and stop losses work!
+
+### 3. Run a Backtest
+
+**Option A: Using Jupyter Notebook (Recommended)**
+
+```bash
+jupyter notebook notebooks/backtest_analysis.ipynb
+```
+
+Follow the notebook cells to:
+1. Load data
+2. Configure strategies
+3. Run backtests
+4. Analyze results
+
+**Option B: Using Python Script**
 
 ```python
-# Cell 1: Copy the SPYRegimeModel class definition
-# [Paste the complete class code from spy_regime_model.py]
+import yaml
+from src.strategies.vertical_spreads import BullPutSpread
+from src.strategies.calendar_spreads import CallCalendarSpread
+from src.backtester.optopsy_wrapper import OptopsyBacktester
+from src.data_fetchers.quantconnect import load_sample_spy_options_data
+from src.data_fetchers.yahoo_options import fetch_spy_data
 
-# Cell 2: Initialize and run analysis
-model = SPYRegimeModel()
-regimes, signals = model.run_full_analysis(use_historical_data=True)
+# Load config
+with open('config/config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
 
-# Cell 3: Visualize results
-model.plot_regime_analysis()
+# Get data
+options_data = load_sample_spy_options_data()  # Sample data
+underlying_data = fetch_spy_data('2023-01-01', '2023-12-31')
 
-# Cell 4: Get current recommendation
-print(model.get_current_recommendation())
+# Create strategy (choose one)
+# Vertical spread:
+strategy = BullPutSpread(config['strategies']['bull_put_spread'])
+# Or calendar spread:
+# strategy = CallCalendarSpread(config['strategies']['call_calendar'])
+
+# Run backtest
+backtester = OptopsyBacktester(config)
+results = backtester.run_backtest(strategy, options_data, underlying_data)
+
+# Print results
+backtester.print_results(results)
 ```
 
-**Recommended Notebook Structure:**
-1. **Setup Cell**: Import libraries and define the SPYRegimeModel class
-2. **Configuration Cell**: Set parameters for your trading style
-3. **Analysis Cell**: Run the full analysis
-4. **Visualization Cell**: Generate plots and charts
-5. **Results Cell**: Extract trading recommendations and insights
+## Project Structure
 
-## Core Model Architecture
+```
+Options/
+├── CLAUDE.md                    # Detailed project documentation
+├── README.md                    # This file
+├── requirements.txt             # Python dependencies
+├── config/
+│   └── config.yaml             # Configuration file
+├── data/
+│   ├── raw/                    # Raw historical data
+│   └── processed/              # Processed data
+├── src/
+│   ├── data_fetchers/          # Data acquisition modules
+│   ├── strategies/             # Strategy implementations
+│   ├── backtester/             # Backtesting engine
+│   └── analysis/               # Performance analysis
+├── notebooks/
+│   └── backtest_analysis.ipynb # Interactive analysis
+└── tests/
+    └── test_strategies.py      # Unit tests
+```
 
-### 1. Data Integration Layer
+## Strategies
 
-**Historical Price Data (yfinance)**
-- Fetches SPY historical data with configurable periods
-- Calculates daily returns and rolling statistics
-- Updates model parameters based on recent market behavior
+### Vertical Spreads
 
-**Options Data & IV Calculation**
-- Retrieves real-time options chains for specified expiration
-- Calculates implied volatility using Black-Scholes inversion
-- Computes IV rank using historical volatility percentiles
-- Volume-weighted IV metrics for accuracy
+#### Bull Put Spread (Credit Spread)
+- **Setup**: Sell higher strike put, buy lower strike put
+- **Outlook**: Neutral to bullish
+- **Max Profit**: Premium collected
+- **Max Loss**: Strike width - premium
+- **Exit Criteria**: Profit target %, stop loss %, DTE threshold
 
-**Why This Approach:**
-- **yfinance**: Reliable, free, comprehensive historical data
-- **Internal IV calculation**: Full control, real-time accuracy, no API limits
-- **Historical volatility**: Robust baseline for IV rank calculations
+#### Bear Call Spread (Credit Spread)
+- **Setup**: Sell lower strike call, buy higher strike call
+- **Outlook**: Neutral to bearish
+- **Max Profit**: Premium collected
+- **Max Loss**: Strike width - premium
+- **Exit Criteria**: Profit target %, stop loss %, DTE threshold
 
-### 2. Regime Identification System
+#### Bull Call Spread (Debit Spread)
+- **Setup**: Buy lower strike call, sell higher strike call
+- **Outlook**: Moderately bullish
+- **Max Profit**: Strike width - premium paid
+- **Max Loss**: Premium paid
+- **Exit Criteria**: Profit target %, stop loss %, DTE threshold
 
-The model identifies four distinct market regimes based on **rolling volatility** and **trend analysis**:
+#### Bear Put Spread (Debit Spread)
+- **Setup**: Buy higher strike put, sell lower strike put
+- **Outlook**: Moderately bearish
+- **Max Profit**: Strike width - premium paid
+- **Max Loss**: Premium paid
+- **Exit Criteria**: Profit target %, stop loss %, DTE threshold
 
-#### Regime Classifications
+### Calendar Spreads (Time Spreads)
 
-| Regime | Condition | Optimal Strategy | Typical Market |
-|--------|-----------|------------------|----------------|
-| **Trending Up** | Low vol, positive trend | Put Credit Spreads | Bull markets, steady climbs |
-| **Trending Down** | Low vol, negative trend | Call Credit Spreads | Bear markets, steady declines |
-| **Range Bound** | Low vol, minimal trend | Iron Condors | Sideways markets, low VIX |
-| **High Volatility** | High vol (any trend) | Defensive/Cash | Market stress, high VIX |
+#### Call Calendar Spread
+- **Setup**: Sell near-term call (e.g., 30 DTE), buy far-term call (e.g., 60 DTE) at same strike
+- **Outlook**: Neutral to slightly bullish, low volatility expected
+- **Max Profit**: When underlying is at strike at near-term expiration
+- **Max Loss**: Net debit paid
+- **Best Conditions**: Low IV environment, expecting IV to increase
+- **Exit Criteria**: Profit target %, stop loss %, DTE threshold (exit before near-term expiration), underlying movement threshold
 
-#### Threshold Methodology
+#### Put Calendar Spread
+- **Setup**: Sell near-term put (e.g., 30 DTE), buy far-term put (e.g., 60 DTE) at same strike
+- **Outlook**: Neutral to slightly bearish, low volatility expected
+- **Max Profit**: When underlying is at strike at near-term expiration
+- **Max Loss**: Net debit paid
+- **Best Conditions**: Low IV environment, expecting IV to increase
+- **Exit Criteria**: Profit target %, stop loss %, DTE threshold (exit before near-term expiration), underlying movement threshold
 
-**Adaptive Thresholds (Recommended)**
+#### Diagonal Spread (Framework)
+- **Setup**: Sell near-term option, buy far-term option at different strikes
+- **Outlook**: Combines time decay with directional bias
+- **Status**: Framework implemented, available for future enhancement
+
+## Performance Metrics
+
+The framework calculates comprehensive metrics including:
+
+- **P&L Metrics**: Total return, annualized return, total P&L
+- **Risk Metrics**: Sharpe ratio, Sortino ratio, Calmar ratio, max drawdown
+- **Trade Statistics**: Win rate, profit factor, average win/loss
+- **Time-Based**: Monthly returns, positive months percentage
+
+## Data Sources
+
+### Currently Implemented
+- **Yahoo Finance**: Free underlying price data (yfinance)
+- **Sample Data**: Synthetic options data for testing
+
+### Future Integration
+- **QuantConnect**: Free hour-level historical options data (requires account)
+- **Polygon.io**: Premium minute-level historical data (paid)
+- **Schwab API**: Real-time data for paper/live trading (requires developer account)
+
+### Getting Real Historical Data
+
+**QuantConnect (Free)**
+1. Sign up at https://www.quantconnect.com
+2. Access their research notebooks
+3. Export historical options data
+4. Save to `data/raw/`
+
+**Polygon.io (Paid - $200+/month)**
+1. Subscribe at https://polygon.io
+2. Get API key
+3. Use their Python SDK to download data
+
+See `CLAUDE.md` for detailed data acquisition instructions.
+
+## Exit Criteria Explained
+
+### How Profit Targets and Stop Losses Work
+
+All strategies use **percentage-based exit criteria** for consistency and clarity.
+
+#### Vertical Spreads (Credit and Debit)
+
+**Profit Target** = Percentage of maximum profit to capture before exiting
+**Stop Loss** = Percentage of maximum loss to tolerate before exiting
+
+**Example 1: Bull Put Spread (Credit Spread)**
+```
+Entry: Sell $420 put / Buy $415 put for $2.00 credit
+Strike width: $5
+Max profit: $2.00 (credit received)
+Max loss: $3.00 ($5 width - $2 credit)
+
+Config:
+  profit_target: 0.50  # Exit at 50% of max profit
+  stop_loss: 0.50      # Exit at 50% of max loss
+
+Exit conditions:
+✓ Profit target: Exit when spread is worth $1.00 (captured $1.00 profit = 50% of $2.00 max profit)
+✓ Stop loss: Exit when you've lost $1.50 (50% of $3.00 max loss)
+```
+
+**Example 2: Bull Call Spread (Debit Spread)**
+```
+Entry: Buy $410 call / Sell $415 call for $2.00 debit
+Strike width: $5
+Max profit: $3.00 ($5 width - $2 debit)
+Max loss: $2.00 (debit paid)
+
+Config:
+  profit_target: 0.75  # Exit at 75% of max profit
+  stop_loss: 0.50      # Exit at 50% of max loss
+
+Exit conditions:
+✓ Profit target: Exit when spread is worth $4.25 (gained $2.25 = 75% of $3.00 max profit)
+✓ Stop loss: Exit when spread is worth $1.00 (lost $1.00 = 50% of $2.00 max loss)
+```
+
+#### Calendar Spreads
+
+**Profit Target** = Percentage gain on the debit paid
+**Stop Loss** = Percentage loss on the debit paid (negative value)
+
+**Example: Call Calendar Spread**
+```
+Entry: Sell 30 DTE call / Buy 60 DTE call at $420 strike for $3.00 debit
+Max loss: $3.00 (debit paid)
+
+Config:
+  profit_target: 0.25    # Exit at 25% profit
+  stop_loss: -0.50       # Exit at 50% loss
+  dte_exit: 7            # Exit when near-term ≤ 7 DTE
+  max_underlying_move: 0.10  # Exit if underlying moves >10% from strike
+
+Exit conditions:
+✓ Profit target: Exit when spread is worth $3.75 (25% profit = $0.75 gain)
+✓ Stop loss: Exit when spread is worth $1.50 (50% loss = $1.50 loss)
+✓ DTE exit: Exit 7 days before near-term expiration (mandatory)
+✓ Movement: Exit if SPY moves from $420 to >$462 or <$378 (>10% move)
+```
+
+### Recommended Settings
+
+**Credit Spreads** (Bull Put, Bear Call):
+- `profit_target: 0.50` - Take profits at 50% of max profit (common wisdom)
+- `stop_loss: 0.50` - Cut losses at 50% of max loss
+- `dte_min: 21` - Exit when DTE drops below 21 days
+
+**Debit Spreads** (Bull Call, Bear Put):
+- `profit_target: 0.75` - Take profits at 75% of max profit
+- `stop_loss: 0.50` - Cut losses at 50% of max loss
+- `dte_min: 14` - Exit when DTE drops below 14 days
+
+**Calendar Spreads**:
+- `profit_target: 0.25` - Take 25% profit on debit paid
+- `stop_loss: -0.50` - Cut losses at 50% of debit paid
+- `dte_exit: 7` - Exit 7 days before near-term expiration
+- `max_underlying_move: 0.10` - Exit if underlying moves >10%
+
+## Configuration
+
+Key configuration parameters in `config/config.yaml`:
+
+**Vertical Spread Example:**
+```yaml
+strategies:
+  bull_put_spread:
+    entry:
+      dte_min: 30          # Enter with 30-45 DTE
+      dte_max: 45
+      short_delta: 0.30    # Sell 30 delta put
+      long_delta: 0.20     # Buy 20 delta put
+      strike_width: 5      # $5 wide spread
+    exit:
+      profit_target: 0.50  # Close at 50% of max profit
+      stop_loss: 0.50      # Stop at 50% of max loss
+      dte_min: 21          # Close if < 21 DTE
+```
+
+**Calendar Spread Example:**
+```yaml
+strategies:
+  call_calendar:
+    entry:
+      near_dte: 30              # Sell 30 DTE call
+      far_dte: 60               # Buy 60 DTE call
+      strike_selection: "atm"   # ATM, delta, or moneyness
+      min_debit: 0.5            # Minimum debit to enter
+    exit:
+      profit_target: 0.25       # Close at 25% profit
+      stop_loss: -0.50          # Stop at 50% loss
+      dte_exit: 7               # Exit when near-term ≤ 7 DTE
+      max_underlying_move: 0.10 # Exit if underlying moves >10% from strike
+```
+
+## How to Modify Exit Criteria
+
+### Step 1: Edit config/config.yaml
+
+Open `config/config.yaml` and locate the strategy you want to modify:
+
+```yaml
+strategies:
+  bull_put_spread:
+    exit:
+      profit_target: 0.50  # Change this to your desired profit %
+      stop_loss: 0.50      # Change this to your desired loss %
+      dte_min: 21          # Change this to your desired DTE threshold
+```
+
+### Step 2: Understanding the Values
+
+**Profit Target** (0.0 to 1.0):
+- `0.50` = Exit at 50% of max profit
+- `0.75` = Exit at 75% of max profit
+- `0.25` = Exit at 25% of max profit
+
+**Stop Loss** (0.0 to 1.0):
+- `0.50` = Exit at 50% of max loss
+- `0.75` = Exit at 75% of max loss (more risk tolerant)
+- `0.25` = Exit at 25% of max loss (less risk tolerant)
+
+**DTE Minimum** (integer):
+- `21` = Exit when position has 21 or fewer days to expiration
+- `14` = Exit when position has 14 or fewer days to expiration
+- `7` = Exit when position has 7 or fewer days to expiration
+
+### Step 3: Run Backtest and Compare
+
 ```python
-# Volatility Threshold = max(75th percentile, mean + 1σ)
-# Trend Threshold = max(60th percentile, mean + 0.5σ)
+# Run backtest with your new parameters
+python example_backtest.py
+
+# Or use the Jupyter notebook to compare multiple configurations
+jupyter notebook notebooks/backtest_analysis.ipynb
 ```
 
-**Benefits:**
-- Adapts to changing market conditions
-- Prevents overfitting to historical periods
-- More robust regime classification
-- Reduces false regime switches
+### Step 4: Analyze Results
 
-### 3. Trading Signal Generation
+The backtester will show:
+- How many trades hit profit target vs stop loss
+- Average days in trade
+- Win rate and profit factor
+- Overall P&L and Sharpe ratio
 
-Each regime generates specific trading recommendations with confidence scores:
+Use these metrics to optimize your exit criteria.
 
-**Signal Confidence Calculation:**
-- Distance from thresholds determines confidence
-- Volume-weighted IV metrics enhance accuracy
-- Historical regime stability influences recommendations
+## Next Steps
 
-## Key Parameters & Configuration
+1. **Install and test** with sample data
+2. **Generate synthetic data** using `python generate_synthetic_data.py`
+3. **Run your first backtest** with default parameters
+4. **Modify exit criteria** in config.yaml based on results
+5. **Optimize parameters** by testing different configurations
+6. **Backtest multiple strategies** and compare results
+7. **Paper trade** using Schwab API integration (future enhancement)
 
-### Model Parameters (`model_params`)
+## Documentation
 
-```python
-model_params = {
-    'mu': 0.12,      # Annual expected return (auto-updated from data)
-    'sigma': 0.18,   # Annual volatility (auto-updated from data)
-    'S0': 600,       # Initial/current price (auto-updated)
-    'days': 252,     # Trading days for simulation
-    'dt': 1/252      # Daily time step
-}
-```
+- **CLAUDE.md**: Comprehensive project documentation
+- **Jupyter Notebook**: Interactive tutorials and examples
+- **Code Comments**: Detailed inline documentation
 
-**When to Modify:**
-- `mu`, `sigma`: Generally auto-updated, but can override for stress testing
-- `days`: Increase for longer backtests (500-1000 days)
-- Keep `dt = 1/252` for daily analysis
+## Requirements
 
-### Regime Parameters (`regime_params`)
+- Python 3.8+
+- See `requirements.txt` for full dependencies
 
-```python
-regime_params = {
-    'lookback_period': 20,                    # Rolling window for statistics
-    'volatility_threshold': 0.25,            # Manual vol threshold (if not adaptive)
-    'trend_threshold': 0.02,                  # Manual trend threshold (if not adaptive)
-    'regime_min_duration': 5,                 # Minimum days to maintain regime
-    'threshold_estimation_period': 252,       # Days for adaptive threshold calculation
-    'use_adaptive_thresholds': True           # Enable adaptive threshold estimation
-}
-```
+## Contributing
 
-#### Critical Parameter Guidance
+This is a personal project, but feel free to use as reference or template for your own options backtesting.
 
-**`lookback_period`** - **MOST IMPORTANT PARAMETER**
-- **Should match your options DTE**
-- 20 days → Short-term strategies (0-30 DTE)
-- 45 days → Standard strategies (30-60 DTE)  
-- 60 days → Longer-term strategies (60+ DTE)
+## Disclaimer
 
-**`threshold_estimation_period`**
-- 252 days (1 year): Good for stable markets
-- 500 days (2 years): Better for volatile periods
-- 1000+ days: Maximum historical context
+This software is for educational and research purposes only. Past performance does not guarantee future results. Options trading involves risk and is not suitable for all investors. Always do your own research and consult with financial professionals before trading.
 
-**`regime_min_duration`**
-- 3-5 days: More responsive, more noise
-- 5-7 days: Balanced (recommended)
-- 10+ days: Smoother, less responsive
+## License
 
-**`use_adaptive_thresholds`**
-- **True (recommended)**: Adapts to market conditions
-- **False**: Uses fixed thresholds (good for backtesting specific periods)
-
-## Jupyter Notebook Examples
-
-### Basic Analysis Notebook
-```python
-# === CELL 1: SETUP ===
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy.optimize import minimize_scalar
-from scipy.stats import norm
-import yfinance as yf
-from datetime import datetime, timedelta
-import warnings
-warnings.filterwarnings('ignore')
-
-# [Paste complete SPYRegimeModel class here]
-
-# === CELL 2: QUICK ANALYSIS ===
-model = SPYRegimeModel()
-regimes, signals = model.run_full_analysis(use_historical_data=True)
-
-# === CELL 3: VISUALIZATION ===
-model.plot_regime_analysis()
-
-# === CELL 4: CURRENT RECOMMENDATION ===
-print(model.get_current_recommendation())
-
-# === CELL 5: DETAILED INSIGHTS ===
-# Regime distribution
-print("REGIME DISTRIBUTION:")
-print(regimes['regime'].value_counts(normalize=True).round(3))
-
-# Recent signals
-print("\nRECENT SIGNALS:")
-print(signals.tail()[['day', 'regime', 'strategy', 'confidence']].to_string(index=False))
-```
-
-### 1. Match Your Trading Timeframe
-
-```python
-# For 45 DTE strategies (your original problem)
-model = SPYRegimeModel()
-model.regime_params['lookback_period'] = 45
-model.regime_params['threshold_estimation_period'] = 500  # 2 years
-regimes, signals = model.run_full_analysis()
-```
-
-### 2. Stress Test Different Market Conditions
-
-```python
-# Test bear market conditions
-model.model_params['mu'] = -0.15  # -15% annual return
-model.model_params['sigma'] = 0.35  # 35% volatility
-regimes, signals = model.run_full_analysis(use_historical_data=False, simulation_days=252)
-```
-
-### 3. Compare Threshold Methods
-
-```python
-# Compare fixed vs adaptive thresholds
-regimes_fixed, regimes_adaptive = compare_threshold_methods()
-
-# Analyze threshold sensitivity
-model.regime_params['use_adaptive_thresholds'] = False
-for vol_thresh in [0.20, 0.25, 0.30, 0.35]:
-    model.regime_params['volatility_threshold'] = vol_thresh
-    regimes, _ = model.run_full_analysis()
-    print(f"Vol {vol_thresh}: {regimes['regime'].value_counts(normalize=True)}")
-```
-
-### 4. Real-Time Trading Integration
-
-```python
-# Get current market conditions
-model = SPYRegimeModel()
-model.fetch_spy_data(period='1y')
-iv_metrics, iv_df = model.calculate_current_iv_metrics()
-
-# Daily regime check
-regimes, signals = model.run_full_analysis()
-current_rec = model.get_current_recommendation()
-
-# Position sizing based on confidence
-current_signal = signals.iloc[-1]
-position_size = min(0.05, current_signal['confidence'] * 0.06)  # Max 5% risk
-print(f"Recommended position size: {position_size:.1%} of account")
-```
-
-## Key Insights & Interpretation
-
-### Regime Distribution Analysis
-
-**Healthy Market Characteristics:**
-- Trending Up: 40-60% (Bull market)
-- Range Bound: 20-35% (Consolidation)
-- Trending Down: 10-25% (Normal corrections)
-- High Volatility: 5-15% (Occasional stress)
-
-**Warning Signs:**
-- High Volatility > 25%: Sustained market stress
-- Trending Down > 40%: Bear market conditions
-- Range Bound > 50%: Stagnant market (challenging for directional strategies)
-
-### Signal Confidence Interpretation
-
-**Confidence Levels:**
-- **90%+**: Extremely strong signal, consider larger position sizes
-- **75-90%**: Strong signal, standard position sizing
-- **60-75%**: Moderate signal, reduced position sizing
-- **<60%**: Weak signal, consider waiting or defensive positioning
-
-### IV Rank Integration
-
-**IV Rank Guidance:**
-- **<20%**: Low volatility environment, favor premium selling
-- **20-50%**: Moderate volatility, standard strategies work well
-- **50-80%**: Elevated volatility, be selective with entries
-- **>80%**: High volatility, favor premium buying or defensive strategies
-
-## Risk Management Integration
-
-### Position Sizing Framework
-
-```python
-# Dynamic position sizing based on regime confidence
-def calculate_position_size(signal_confidence, iv_rank, base_risk=0.05):
-    """
-    Calculate position size based on signal strength and market conditions
-    """
-    # Reduce size in high volatility environments
-    vol_adjustment = max(0.5, (100 - iv_rank) / 100)
-    
-    # Adjust for signal confidence
-    confidence_adjustment = signal_confidence
-    
-    # Final position size
-    position_size = base_risk * vol_adjustment * confidence_adjustment
-    
-    return min(position_size, 0.05)  # Cap at 5% account risk
-```
-
-### Trade Management Rules
-
-**Entry Rules:**
-- Only enter trades with >70% confidence
-- Avoid entries when IV rank >80% (unless defensive strategy)
-- Wait for regime confirmation (3+ consecutive days)
-
-**Exit Rules:**
-- Take profits at 50% of maximum gain
-- Stop losses at 25% of premium collected
-- Close all positions at 21 DTE (avoid gamma explosion)
-- Exit if regime changes unfavorably
-
-## Backtesting & Performance Analysis
-
-### Historical Performance Validation
-
-```python
-# Backtest regime-based strategy selection
-def backtest_regime_strategy(model, start_date, end_date):
-    """
-    Backtest trading performance using regime signals
-    """
-    results = []
-    
-    for signal in model.trading_signals.itertuples():
-        # Simulate trade outcomes based on regime
-        expected_win_rate = {
-            'PUT_CREDIT_SPREAD': 0.85,
-            'CALL_CREDIT_SPREAD': 0.65,  # Lower in trending markets
-            'IRON_CONDOR': 0.75,
-            'DEFENSIVE': 0.0  # Capital preservation
-        }
-        
-        trade_outcome = np.random.random() < expected_win_rate[signal.signal]
-        profit_loss = signal.confidence * 0.1 if trade_outcome else -signal.confidence * 0.3
-        
-        results.append({
-            'date': signal.day,
-            'strategy': signal.signal,
-            'confidence': signal.confidence,
-            'outcome': trade_outcome,
-            'pnl': profit_loss
-        })
-    
-    return pd.DataFrame(results)
-```
-
-## Common Issues & Troubleshooting
-
-### Data Quality Issues
-
-**"No options data available"**
-- Check market hours (options trade 9:30 AM - 4:00 PM ET)
-- Verify SPY has active options chain
-- Try different expiration dates
-
-**"Insufficient data for estimation"**
-- Increase `threshold_estimation_period`
-- Use longer historical data period
-- Switch to fixed thresholds temporarily
-
-### Regime Classification Problems
-
-**Too many regime switches**
-- Increase `regime_min_duration`
-- Use longer `lookback_period`
-- Check for data quality issues
-
-**Unrealistic regime distribution**
-- Verify adaptive thresholds are reasonable
-- Check underlying data for anomalies
-- Consider using fixed thresholds for specific periods
-
-### Performance Issues
-
-**Slow IV calculations**
-- Reduce options chain size (filter by volume)
-- Limit strike price range (±20% from current price)
-- Use cached calculations for repeated analysis
-
-## Model Validation & Limitations
-
-### Strengths
-- **Empirically-derived thresholds** adapt to market conditions
-- **Multiple timeframe support** for different trading styles
-- **Quantitative confidence scoring** for position sizing
-- **Real-time integration** with market data
-
-### Limitations
-- **Assumes regime persistence** (market conditions continue)
-- **Black-Scholes assumptions** (constant volatility, normal distributions)
-- **Historical bias** (past patterns may not repeat)
-- **Transaction cost neglect** (commissions, slippage not included)
-
-### Validation Recommendations
-1. **Out-of-sample testing**: Use 70% data for calibration, 30% for testing
-2. **Walk-forward analysis**: Recalibrate thresholds monthly
-3. **Regime persistence testing**: Measure how long regimes actually last
-4. **Strategy performance validation**: Compare model recommendations to actual trade outcomes
-
-## Future Enhancements
-
-**Planned Features:**
-- Machine learning regime classification
-- Multi-asset regime analysis (VIX, bonds, currencies)
-- Real-time alert system
-- Portfolio-level risk management
-- Options Greeks integration for precise position sizing
-
-**Contributing:**
-Submit issues or feature requests focusing on:
-- Alternative regime identification methods
-- Additional data sources integration
-- Performance optimization
-- Trading strategy enhancements
-
-## License & Disclaimer
-
-This model is for educational and research purposes. Options trading involves substantial risk of loss. Past performance does not guarantee future results. Always conduct your own analysis and consider consulting with a financial advisor before making trading decisions.
+MIT License - see LICENSE file for details
 
 ---
 
-*Last updated: July 2025*
-*Model version: 1.0*
+**Project Status**: 🚀 Ready for Backtesting - Vertical & Calendar Spreads Implemented
+
+**Last Updated**: 2025-10-22
