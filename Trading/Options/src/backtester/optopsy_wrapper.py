@@ -121,15 +121,41 @@ class OptopsyBacktester:
         strategy.positions = []
         strategy.closed_positions = []
 
+        # Determine actual trading date range from available data
+        # Use the intersection of config dates and available data
+        options_start = optopsy_data['quote_date'].min()
+        options_end = optopsy_data['quote_date'].max()
+        underlying_start = underlying_data.index.min()
+        underlying_end = underlying_data.index.max()
+
+        # Remove timezone info for comparison if present
+        if hasattr(underlying_start, 'tz') and underlying_start.tz is not None:
+            underlying_start = underlying_start.tz_localize(None)
+            underlying_end = underlying_end.tz_localize(None)
+            underlying_data.index = underlying_data.index.tz_localize(None)
+
+        # Use the overlapping period
+        actual_start = max(self.start_date, options_start, underlying_start)
+        actual_end = min(self.end_date, options_end, underlying_end)
+
+        if actual_start > actual_end:
+            raise ValueError(
+                f"No overlapping data found!\n"
+                f"Config dates: {self.start_date.date()} to {self.end_date.date()}\n"
+                f"Options data: {options_start.date()} to {options_end.date()}\n"
+                f"Underlying data: {underlying_start.date()} to {underlying_end.date()}"
+            )
+
         # Get trading dates
         trading_dates = pd.date_range(
-            start=self.start_date,
-            end=self.end_date,
+            start=actual_start,
+            end=actual_end,
             freq='B'  # Business days
         )
 
         print(f"Running backtest for {strategy.name}")
-        print(f"Period: {self.start_date.date()} to {self.end_date.date()}")
+        print(f"Config period: {self.start_date.date()} to {self.end_date.date()}")
+        print(f"Actual period: {actual_start.date()} to {actual_end.date()}")
         print(f"Initial capital: ${self.initial_capital:,.2f}")
         print(f"Trading days: {len(trading_dates)}")
 
@@ -301,6 +327,13 @@ class OptopsyBacktester:
 
     def _compile_results(self, strategy: BaseStrategy) -> Dict:
         """Compile backtest results."""
+        if not self.equity_curve:
+            raise ValueError(
+                "No equity curve data recorded during backtest!\n"
+                "This usually means no valid trading days were found.\n"
+                "Check that your options_data and underlying_data have overlapping dates."
+            )
+
         equity_df = pd.DataFrame(self.equity_curve)
         trades_df = pd.DataFrame(self.all_trades)
 

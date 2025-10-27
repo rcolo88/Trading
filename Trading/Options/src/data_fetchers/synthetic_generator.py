@@ -36,7 +36,8 @@ class SyntheticOptionsGenerator:
         symbol: str = "SPY",
         risk_free_rate: float = 0.04,
         dividend_yield: float = 0.015,
-        volatility_window: int = 30
+        volatility_window: int = 30,
+        use_vix_for_iv: bool = True
     ):
         """
         Initialize synthetic data generator.
@@ -46,11 +47,13 @@ class SyntheticOptionsGenerator:
             risk_free_rate: Annual risk-free rate (default: 4%)
             dividend_yield: Annual dividend yield for SPY (default: 1.5%)
             volatility_window: Days for rolling volatility calculation (default: 30)
+            use_vix_for_iv: If True, use VIX as IV proxy; if False, use historical vol (default: True)
         """
         self.symbol = symbol
         self.risk_free_rate = risk_free_rate
         self.dividend_yield = dividend_yield
         self.volatility_window = volatility_window
+        self.use_vix_for_iv = use_vix_for_iv
 
         self.underlying_data = None
         self.volatility = None
@@ -61,26 +64,74 @@ class SyntheticOptionsGenerator:
         end_date: str
     ) -> pd.DataFrame:
         """
-        Fetch historical underlying price data from Yahoo Finance.
+        Fetch historical underlying price data and VIX from Yahoo Finance.
+        Calculates IV Rank based on VIX data.
 
         Args:
             start_date: Start date (YYYY-MM-DD)
             end_date: End date (YYYY-MM-DD)
 
         Returns:
-            DataFrame with OHLCV data
+            DataFrame with OHLCV data, VIX, and IV Rank
         """
         print(f"Fetching {self.symbol} price data from Yahoo Finance...")
         print(f"Date range: {start_date} to {end_date}")
 
+        # Fetch underlying (SPY) data
         ticker = yf.Ticker(self.symbol)
         data = ticker.history(start=start_date, end=end_date)
 
         if data.empty:
             raise ValueError(f"No data found for {self.symbol}")
 
+        # Remove timezone info to avoid datetime arithmetic issues
+        data.index = data.index.tz_localize(None)
+
         # Standardize column names
         data.columns = [col.lower() for col in data.columns]
+
+        # Fetch VIX data (implied volatility index)
+        print(f"Fetching VIX data from Yahoo Finance...")
+        vix_ticker = yf.Ticker("^VIX")
+        vix_data = vix_ticker.history(start=start_date, end=end_date)
+
+        if not vix_data.empty:
+            # Remove timezone and get close prices
+            vix_data.index = vix_data.index.tz_localize(None)
+            vix_close = vix_data['Close'].rename('vix')
+
+            # Merge VIX data with underlying data
+            data = data.join(vix_close, how='left')
+
+            # Forward fill any missing VIX values (for holidays/weekends)
+            data['vix'] = data['vix'].ffill()
+
+            # Calculate IV Rank using 52-week (252 trading days) lookback
+            # IV Rank = (Current IV - 52w Low) / (52w High - 52w Low) * 100
+            lookback_period = 252  # ~1 year of trading days
+
+            data['vix_52w_high'] = data['vix'].rolling(window=lookback_period, min_periods=30).max()
+            data['vix_52w_low'] = data['vix'].rolling(window=lookback_period, min_periods=30).min()
+
+            # Calculate IV Rank
+            data['iv_rank'] = (
+                (data['vix'] - data['vix_52w_low']) /
+                (data['vix_52w_high'] - data['vix_52w_low']) * 100
+            )
+
+            # Handle edge cases (when high = low)
+            data['iv_rank'] = data['iv_rank'].fillna(50.0)  # Use 50 as neutral default
+
+            # Drop intermediate calculation columns
+            data = data.drop(columns=['vix_52w_high', 'vix_52w_low'])
+
+            print(f"✓ VIX data merged")
+            print(f"  VIX range: {data['vix'].min():.2f} - {data['vix'].max():.2f}")
+            print(f"  IV Rank range: {data['iv_rank'].min():.1f} - {data['iv_rank'].max():.1f}")
+        else:
+            print(f"⚠️  Warning: Could not fetch VIX data")
+            data['vix'] = np.nan
+            data['iv_rank'] = 50.0  # Default to neutral
 
         # Calculate returns
         data['returns'] = data['close'].pct_change()
@@ -91,7 +142,7 @@ class SyntheticOptionsGenerator:
         ).std() * np.sqrt(252)
 
         # Forward fill any NaN volatility values
-        data['volatility'] = data['volatility'].fillna(method='bfill')
+        data['volatility'] = data['volatility'].bfill()
 
         # Use median volatility for any remaining NaN
         median_vol = data['volatility'].median()
@@ -201,6 +252,8 @@ class SyntheticOptionsGenerator:
         expiration_date: datetime,
         spot_price: float,
         volatility: float,
+        vix: float = None,
+        iv_rank: float = None,
         num_strikes: int = 40,
         strike_interval: float = 5.0,
         add_spread: bool = True,
@@ -269,6 +322,8 @@ class SyntheticOptionsGenerator:
                 'quote_date': quote_date,
                 'underlying_symbol': self.symbol,
                 'underlying_price': spot_price,
+                'vix': vix if vix is not None else np.nan,
+                'iv_rank': iv_rank if iv_rank is not None else np.nan,
                 'expiration': expiration_date,
                 'dte': dte,
                 'strike': strike,
@@ -280,6 +335,7 @@ class SyntheticOptionsGenerator:
                 'open_interest': np.random.randint(500, 20000),  # Synthetic OI
                 'iv': volatility,
                 'delta': call_data['delta'],
+                'abs_delta': abs(call_data['delta']),  # Absolute delta for filtering
                 'gamma': call_data['gamma'],
                 'theta': call_data['theta'] / 365,  # Convert to daily
                 'vega': call_data['vega']
@@ -297,6 +353,8 @@ class SyntheticOptionsGenerator:
                 'quote_date': quote_date,
                 'underlying_symbol': self.symbol,
                 'underlying_price': spot_price,
+                'vix': vix if vix is not None else np.nan,
+                'iv_rank': iv_rank if iv_rank is not None else np.nan,
                 'expiration': expiration_date,
                 'dte': dte,
                 'strike': strike,
@@ -308,6 +366,7 @@ class SyntheticOptionsGenerator:
                 'open_interest': np.random.randint(500, 20000),
                 'iv': volatility,
                 'delta': put_data['delta'],
+                'abs_delta': abs(put_data['delta']),  # Absolute delta for filtering
                 'gamma': put_data['gamma'],
                 'theta': put_data['theta'] / 365,
                 'vega': put_data['vega']
@@ -376,6 +435,18 @@ class SyntheticOptionsGenerator:
             spot_price = self.underlying_data.loc[quote_date, 'close']
             vol = self.underlying_data.loc[quote_date, 'volatility']
 
+            # Get VIX and IV Rank if available
+            vix = self.underlying_data.loc[quote_date, 'vix'] if 'vix' in self.underlying_data.columns else None
+            iv_rank = self.underlying_data.loc[quote_date, 'iv_rank'] if 'iv_rank' in self.underlying_data.columns else None
+
+            # Determine which volatility to use for pricing
+            if self.use_vix_for_iv and vix is not None and not np.isnan(vix):
+                # Use VIX as implied volatility (convert from percentage to decimal)
+                pricing_vol = vix / 100.0
+            else:
+                # Fall back to historical volatility
+                pricing_vol = vol
+
             # Generate chains for all valid expirations
             for exp_date in expirations:
                 dte = (exp_date - quote_date).days
@@ -388,7 +459,9 @@ class SyntheticOptionsGenerator:
                     quote_date=quote_date,
                     expiration_date=exp_date,
                     spot_price=spot_price,
-                    volatility=vol
+                    volatility=pricing_vol,  # Use VIX-based IV instead of historical vol
+                    vix=vix,
+                    iv_rank=iv_rank
                 )
 
                 if not chain.empty:
@@ -426,7 +499,8 @@ class SyntheticOptionsGenerator:
 def generate_spy_synthetic_data(
     start_date: str = "2022-01-01",
     end_date: str = "2024-12-31",
-    save_to_csv: bool = True
+    save_to_csv: bool = True,
+    use_vix_for_iv: bool = True
 ) -> pd.DataFrame:
     """
     Quick function to generate 2 years of SPY synthetic options data.
@@ -435,6 +509,7 @@ def generate_spy_synthetic_data(
         start_date: Start date (default: 2022-01-01)
         end_date: End date (default: 2024-12-31)
         save_to_csv: Save to CSV file
+        use_vix_for_iv: Use VIX as IV proxy for realistic pricing (default: True)
 
     Returns:
         DataFrame with synthetic options data
@@ -443,7 +518,8 @@ def generate_spy_synthetic_data(
         symbol="SPY",
         risk_free_rate=0.04,  # 4% annual
         dividend_yield=0.015,  # 1.5% for SPY
-        volatility_window=30
+        volatility_window=30,
+        use_vix_for_iv=use_vix_for_iv
     )
 
     return generator.generate_historical_chains(
@@ -453,3 +529,67 @@ def generate_spy_synthetic_data(
         max_dte=60,
         save_to_csv=save_to_csv
     )
+
+
+def load_sample_spy_options_data() -> pd.DataFrame:
+    """
+    Load SPY options data from pre-generated synthetic data CSV.
+
+    This function loads the full synthetic dataset generated by
+    generate_synthetic_data.py script. If no CSV file is found,
+    it will generate a minimal sample dataset.
+
+    The data is based on real SPY closing prices from Yahoo Finance
+    with option prices calculated using the Black-Scholes-Merton model.
+
+    Returns:
+        DataFrame with synthetic options data
+    """
+    import os
+    import glob
+    from pathlib import Path
+
+    print("Loading SPY options data...")
+
+    # Get the project root directory (parent of src/)
+    project_root = Path(__file__).parent.parent.parent
+    data_dir = project_root / "data" / "processed"
+    pattern = str(data_dir / "SPY_synthetic_options_*.csv")
+    csv_files = glob.glob(pattern)
+
+    if csv_files:
+        # Use the most recent file (by filename)
+        csv_file = sorted(csv_files)[-1]
+        print(f"Loading data from: {os.path.basename(csv_file)}")
+
+        data = pd.read_csv(csv_file)
+
+        # Convert date columns to datetime
+        data['quote_date'] = pd.to_datetime(data['quote_date'])
+        data['expiration'] = pd.to_datetime(data['expiration'])
+
+        print(f"✓ Loaded {len(data):,} option contracts")
+        print(f"  Date range: {data['quote_date'].min().date()} to {data['quote_date'].max().date()}")
+        print(f"  Trading days: {data['quote_date'].nunique()}")
+        print(f"  Expirations: {data['expiration'].nunique()}")
+
+        return data
+
+    # If no CSV found, generate a small sample
+    print("⚠️  No synthetic data CSV found in data/processed/")
+    print("   Run: python generate_synthetic_data.py")
+    print("   Generating minimal sample dataset...")
+
+    # Generate a small sample dataset (2 months for quick testing)
+    generator = SyntheticOptionsGenerator(symbol="SPY")
+
+    # Generate limited dataset for quick tests
+    data = generator.generate_historical_chains(
+        start_date="2024-01-01",
+        end_date="2024-02-29",
+        include_weekly=False,  # Monthly only for speed
+        max_dte=45,
+        save_to_csv=False
+    )
+
+    return data

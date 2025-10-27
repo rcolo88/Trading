@@ -144,13 +144,6 @@ class VerticalSpread(BaseStrategy):
         if not short_strike or not long_strike:
             return None
 
-        # Verify strike width is appropriate
-        expected_width = self.entry_config.get('strike_width', 5)
-        actual_width = abs(short_strike - long_strike)
-
-        if not (expected_width * 0.8 <= actual_width <= expected_width * 1.2):
-            return None  # Strike width outside acceptable range
-
         # Get spread price
         spread_price = self._get_spread_price(
             valid_options, short_strike, long_strike, option_type

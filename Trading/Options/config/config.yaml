@@ -7,8 +7,8 @@ underlying:
 
 # Backtesting period
 backtest:
-  start_date: "2020-01-01"  # Adjust based on available data
-  end_date: "2024-12-31"
+  start_date: "2021-01-03"  # Matches synthetic data start date
+  end_date: "2025-6-30"    # Matches synthetic data end date
   initial_capital: 10000
 
 # Data source configuration
@@ -33,7 +33,6 @@ strategies:
       dte_max: 45
       short_delta: 0.30     # Sell put with ~30 delta
       long_delta: 0.20      # Buy put with ~20 delta
-      strike_width: 5       # Dollar width between strikes
     exit:
       profit_target: 0.50   # Close at 50% of max profit
       stop_loss: 0.50       # Stop at 50% of max loss
@@ -46,7 +45,6 @@ strategies:
       dte_max: 45
       short_delta: 0.30     # Sell call with ~30 delta
       long_delta: 0.20      # Buy call with ~20 delta
-      strike_width: 5
     exit:
       profit_target: 0.50   # Close at 50% of max profit
       stop_loss: 0.50       # Stop at 50% of max loss
@@ -59,7 +57,6 @@ strategies:
       dte_max: 60
       long_delta: 0.60      # Buy call with ~60 delta
       short_delta: 0.40     # Sell call with ~40 delta
-      strike_width: 5
     exit:
       profit_target: 0.75   # Target 75% of max profit
       stop_loss: 0.50       # Stop at 50% of max loss
@@ -72,7 +69,6 @@ strategies:
       dte_max: 60
       long_delta: 0.60      # Buy put with ~60 delta
       short_delta: 0.40     # Sell put with ~40 delta
-      strike_width: 5
     exit:
       profit_target: 0.75   # Target 75% of max profit
       stop_loss: 0.50       # Stop at 50% of max loss

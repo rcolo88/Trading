@@ -17,7 +17,7 @@ import pandas as pd
 from src.strategies.vertical_spreads import BullPutSpread, BearCallSpread
 from src.strategies.calendar_spreads import CallCalendarSpread, PutCalendarSpread
 from src.backtester.optopsy_wrapper import OptopsyBacktester
-from src.data_fetchers.quantconnect import load_sample_spy_options_data
+from src.data_fetchers.synthetic_generator import load_sample_spy_options_data
 from src.data_fetchers.yahoo_options import fetch_spy_data
 from src.analysis.metrics import PerformanceAnalyzer
 

@@ -19,39 +19,57 @@ Output:
 """
 
 import sys
+import os
 from datetime import datetime, timedelta
 
-# Add src to path
-sys.path.append('src')
+# Add project root to path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from data_fetchers.synthetic_generator import SyntheticOptionsGenerator
+from src.data_fetchers.synthetic_generator import SyntheticOptionsGenerator
 
 
 def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Generate synthetic options data')
+    parser.add_argument('-y', '--yes', action='store_true',
+                       help='Skip confirmation prompt')
+    args = parser.parse_args()
+
     print("\n" + "="*70)
     print("SYNTHETIC OPTIONS DATA GENERATOR")
     print("="*70)
     print("\nThis script generates realistic options data using Black-Scholes pricing")
     print("based on actual historical SPY prices from Yahoo Finance.")
+    print("\nData frequency: END-OF-DAY prices (one data point per trading day)")
+    print("Volatility source: VIX (implied volatility) - more realistic than historical vol")
     print("\nWARNING: This may take several minutes to complete.")
     print("The script will download ~2 years of price data and generate options chains.")
 
     # Configuration
     symbol = "SPY"
-    start_date = "2022-01-01"
-    end_date = "2024-12-31"
+    start_date = "2021-01-01"
+    end_date = "2025-6-30"
 
     print(f"\nConfiguration:")
     print(f"  Symbol: {symbol}")
     print(f"  Date range: {start_date} to {end_date}")
+    print(f"  Data frequency: End-of-Day (EOD)")
     print(f"  Include weekly expirations: Yes")
     print(f"  Maximum DTE: 60 days")
 
-    # User confirmation
-    response = input("\nProceed with data generation? (y/n): ")
-    if response.lower() != 'y':
-        print("Cancelled by user.")
-        return
+    # User confirmation (skip if -y flag is used)
+    if not args.yes:
+        try:
+            response = input("\nProceed with data generation? (y/n): ")
+            if response.lower() != 'y':
+                print("Cancelled by user.")
+                return
+        except (EOFError, KeyboardInterrupt):
+            print("\nCancelled.")
+            return
+    else:
+        print("\nProceeding with data generation (auto-confirmed)...")
 
     # Initialize generator
     print("\nInitializing generator...")
@@ -59,7 +77,8 @@ def main():
         symbol=symbol,
         risk_free_rate=0.04,      # 4% annual
         dividend_yield=0.015,     # 1.5% for SPY
-        volatility_window=30      # 30-day rolling volatility
+        volatility_window=30,     # 30-day rolling volatility
+        use_vix_for_iv=True       # Use VIX as IV proxy for realistic pricing
     )
 
     # Generate data

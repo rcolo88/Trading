@@ -93,7 +93,7 @@ import yaml
 from src.strategies.vertical_spreads import BullPutSpread
 from src.strategies.calendar_spreads import CallCalendarSpread
 from src.backtester.optopsy_wrapper import OptopsyBacktester
-from src.data_fetchers.quantconnect import load_sample_spy_options_data
+from src.data_fetchers.synthetic_generator import load_sample_spy_options_data
 from src.data_fetchers.yahoo_options import fetch_spy_data
 
 # Load config
@@ -101,7 +101,7 @@ with open('config/config.yaml', 'r') as f:
     config = yaml.safe_load(f)
 
 # Get data
-options_data = load_sample_spy_options_data()  # Sample data
+options_data = load_sample_spy_options_data()  # Synthetic data from Yahoo prices
 underlying_data = fetch_spy_data('2023-01-01', '2023-12-31')
 
 # Create strategy (choose one)
@@ -323,7 +323,6 @@ strategies:
       dte_max: 45
       short_delta: 0.30    # Sell 30 delta put
       long_delta: 0.20     # Buy 20 delta put
-      strike_width: 5      # $5 wide spread
     exit:
       profit_target: 0.50  # Close at 50% of max profit
       stop_loss: 0.50      # Stop at 50% of max loss
