@@ -14,8 +14,8 @@ import yaml
 from datetime import datetime
 import pandas as pd
 
-from src.strategies.vertical_spreads import BullPutSpread, BearCallSpread
-from src.strategies.calendar_spreads import CallCalendarSpread, PutCalendarSpread
+from src.strategies.vertical_spreads import BullPutSpread, BullCallSpread
+from src.strategies.calendar_spreads import CallCalendarSpread
 from src.backtester.optopsy_wrapper import OptopsyBacktester
 from src.data_fetchers.synthetic_generator import load_sample_spy_options_data
 from src.data_fetchers.yahoo_options import fetch_spy_data
@@ -59,8 +59,18 @@ def main():
     print(f"   Short delta: {bull_put_config['entry']['short_delta']}")
     print(f"   Long delta: {bull_put_config['entry']['long_delta']}")
 
-    # Option 2: Call Calendar Spread (Time Spread - Debit)
-    # Uncomment the following lines to test calendar spreads instead:
+    # Option 2: Bull Call Spread (Vertical Spread - Debit)
+    # Uncomment the following lines to test bull call spread instead:
+    # print("\n3. Creating Bull Call Spread strategy...")
+    # bull_call_config = config['strategies']['bull_call_spread']
+    # strategy = BullCallSpread(bull_call_config)
+    # print(f"   Strategy: {strategy.name}")
+    # print(f"   Entry DTE range: {bull_call_config['entry']['dte_min']}-{bull_call_config['entry']['dte_max']}")
+    # print(f"   Long delta: {bull_call_config['entry']['long_delta']}")
+    # print(f"   Short delta: {bull_call_config['entry']['short_delta']}")
+
+    # Option 3: Call Calendar Spread (Time Spread - Debit)
+    # Uncomment the following lines to test calendar spread instead:
     # print("\n3. Creating Call Calendar Spread strategy...")
     # call_calendar_config = config['strategies']['call_calendar']
     # strategy = CallCalendarSpread(call_calendar_config)
@@ -68,14 +78,6 @@ def main():
     # print(f"   Near DTE: {call_calendar_config['entry']['near_dte']}")
     # print(f"   Far DTE: {call_calendar_config['entry']['far_dte']}")
     # print(f"   Strike selection: {call_calendar_config['entry']['strike_selection']}")
-
-    # Option 3: Put Calendar Spread (Time Spread - Debit)
-    # print("\n3. Creating Put Calendar Spread strategy...")
-    # put_calendar_config = config['strategies']['put_calendar']
-    # strategy = PutCalendarSpread(put_calendar_config)
-    # print(f"   Strategy: {strategy.name}")
-    # print(f"   Near DTE: {put_calendar_config['entry']['near_dte']}")
-    # print(f"   Far DTE: {put_calendar_config['entry']['far_dte']}")
 
     # 4. Run backtest
     print("\n4. Running backtest...")

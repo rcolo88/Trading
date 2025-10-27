@@ -24,9 +24,9 @@ costs:
   slippage_percent: 0.01  # 1% slippage estimate
   bid_ask_spread_percent: 0.02  # 2% bid-ask spread estimate
 
-# Strategy parameters - Vertical Spreads
+# Strategy parameters
 strategies:
-  bull_put_spread:          # This is a credit spread
+  bull_put_spread:          # Credit spread - neutral to bullish
     enabled: true
     entry:
       dte_min: 30           # Days to expiration
@@ -38,20 +38,8 @@ strategies:
       stop_loss: 0.50       # Stop at 50% of max loss
       dte_min: 21           # Close if DTE drops below 21
 
-  bear_call_spread:         # This is a credit spread
+  bull_call_spread:         # Debit spread - moderately bullish
     enabled: true
-    entry:
-      dte_min: 30
-      dte_max: 45
-      short_delta: 0.30     # Sell call with ~30 delta
-      long_delta: 0.20      # Buy call with ~20 delta
-    exit:
-      profit_target: 0.50   # Close at 50% of max profit
-      stop_loss: 0.50       # Stop at 50% of max loss
-      dte_min: 21
-
-  bull_call_spread:         # This is a debit spread
-    enabled: false          # Start with credit spreads
     entry:
       dte_min: 30
       dte_max: 60
@@ -62,20 +50,7 @@ strategies:
       stop_loss: 0.50       # Stop at 50% of max loss
       dte_min: 14
 
-  bear_put_spread:          # This is a debit spread
-    enabled: false
-    entry:
-      dte_min: 30
-      dte_max: 60
-      long_delta: 0.60      # Buy put with ~60 delta
-      short_delta: 0.40     # Sell put with ~40 delta
-    exit:
-      profit_target: 0.75   # Target 75% of max profit
-      stop_loss: 0.50       # Stop at 50% of max loss
-      dte_min: 14
-
-  # Calendar Spreads - Time-based strategies - these are all debit calendar spreads
-  call_calendar:
+  call_calendar:            # Time spread - neutral to slightly bullish
     enabled: true
     entry:
       near_dte: 30           # Sell 30 DTE call
@@ -92,64 +67,21 @@ strategies:
       dte_exit: 7            # Exit when near-term has 7 DTE left
       max_underlying_move: 0.10  # Exit if underlying moves >10% from strike
 
-  put_calendar:
-    enabled: false
-    entry:
-      near_dte: 30           # Sell 30 DTE put
-      far_dte: 60            # Buy 60 DTE put
-      dte_tolerance: 5
-      strike_selection: "atm"
-      target_delta: 0.50
-      moneyness: 0.0
-      min_debit: 0.5
-      max_debit: 5.0
-    exit:
-      profit_target: 0.25
-      stop_loss: -0.50
-      dte_exit: 7
-      max_underlying_move: 0.10
-
-  # Diagonal Spreads - Combination of time and vertical spreads
-  call_diagonal:
-    enabled: false
-    entry:
-      near_dte: 30
-      far_dte: 60
-      dte_tolerance: 5
-      strike_selection: "delta"
-      target_delta: 0.50     # ATM for near-term
-      moneyness: 0.02        # Slightly OTM for far-term
-      min_debit: 0.5
-      max_debit: 5.0
-    exit:
-      profit_target: 0.30
-      stop_loss: -0.50
-      dte_exit: 7
-      max_underlying_move: 0.15
-
-  put_diagonal:
-    enabled: false
-    entry:
-      near_dte: 30
-      far_dte: 60
-      dte_tolerance: 5
-      strike_selection: "delta"
-      target_delta: 0.50
-      moneyness: -0.02       # Slightly OTM for far-term
-      min_debit: 0.5
-      max_debit: 5.0
-    exit:
-      profit_target: 0.30
-      stop_loss: -0.50
-      dte_exit: 7
-      max_underlying_move: 0.15
-
 # Position sizing
 position_sizing:
-  method: "fixed_risk"  # Options: fixed_risk, fixed_contracts, kelly
-  risk_per_trade_percent: 2.0  # Risk 2% of capital per trade
+  method: "fixed_risk"  # Options: fixed_risk, kelly 
+  risk_per_trade_percent: 2.0  # Used when method = "fixed_risk"
   max_positions: 5  # Maximum concurrent positions
   max_positions_per_strategy: 3
+
+  # Kelly Criterion percentages (manually updated from Kelly_Criteria notebook)
+  # Workflow:
+  #   1. Run backtest → 2. Calculate Kelly in notebook → 3. Update values below
+  # Important: Use Half Kelly (multiply by 0.5) or Quarter Kelly (multiply by 0.25)
+  kelly_pct:
+    bull_put_spread: 0.06    # Example: 6% (Half Kelly of 12%)
+    bull_call_spread: 0.04   # Example: 4% (Half Kelly of 8%)
+    call_calendar: 0.05      # Example: 5% (Half Kelly of 10%)
 
 # Market filters (optional entry conditions)
 market_filters:

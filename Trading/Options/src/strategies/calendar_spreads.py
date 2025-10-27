@@ -401,16 +401,35 @@ class CalendarSpread(BaseStrategy):
         Calculate position size based on risk management rules.
 
         For calendar spreads, max risk is the debit paid.
+        Supports both fixed risk and Kelly Criterion methods.
         """
-        risk_per_trade_pct = kwargs.get('risk_per_trade_percent', 2.0)
-        max_risk_dollars = account_value * (risk_per_trade_pct / 100)
-
-        # For calendar spreads, we'd need the actual spread price
-        # This is a simplified calculation
-        # In practice, we'd get the exact debit from entry signal
+        # For calendar spreads, max risk = debit paid
+        # Estimated debit for position sizing (would be actual in practice)
         estimated_debit = 2.0  # Placeholder, would be from actual data
         max_risk_per_contract = estimated_debit * 100  # $100 per point
 
+        # Check if full_config provided
+        full_config = kwargs.get('full_config')
+
+        if full_config:
+            position_sizing = full_config.get('position_sizing', {})
+            method = position_sizing.get('method', 'fixed_risk')
+
+            if method == 'kelly':
+                # Use Kelly Criterion from config
+                kelly_pct_dict = position_sizing.get('kelly_pct', {})
+                kelly_pct = kelly_pct_dict.get(self.spread_type)
+
+                if kelly_pct is not None:
+                    max_risk_dollars = account_value * kelly_pct
+                    contracts = int(max_risk_dollars / max_risk_per_contract)
+                    return max(1, contracts)
+                else:
+                    print(f"⚠ Kelly % not found for {self.spread_type}, using fixed risk")
+
+        # Fallback to fixed risk percentage
+        risk_per_trade_pct = kwargs.get('risk_per_trade_percent', 2.0)
+        max_risk_dollars = account_value * (risk_per_trade_pct / 100)
         contracts = int(max_risk_dollars / max_risk_per_contract)
 
         return max(1, contracts)  # At least 1 contract

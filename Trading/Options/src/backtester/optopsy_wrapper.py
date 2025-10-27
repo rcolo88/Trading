@@ -204,10 +204,16 @@ class OptopsyBacktester:
                     self.account_value -= commission
 
                     # Record trade
+                    # Get entry DTE from position notes if available
+                    entry_dte = None
+                    if hasattr(position, 'entry_dte'):
+                        entry_dte = position.entry_dte
+
                     self.all_trades.append({
                         'entry_date': position.entry_date,
                         'exit_date': position.exit_date,
                         'strategy': strategy.name,
+                        'entry_dte': entry_dte,
                         'pnl': position.realized_pnl,
                         'commission': commission,
                         'net_pnl': position.realized_pnl - commission,
@@ -231,7 +237,8 @@ class OptopsyBacktester:
                     contracts = strategy.calculate_position_size(
                         signal=entry_signal,
                         account_value=self.account_value,
-                        risk_per_trade_percent=self.config.get('position_sizing', {}).get('risk_per_trade_percent', 2.0)
+                        risk_per_trade_percent=self.config.get('position_sizing', {}).get('risk_per_trade_percent', 2.0),
+                        full_config=self.config  # Pass full config for Kelly parameters
                     )
 
                     # Get entry price
@@ -258,6 +265,10 @@ class OptopsyBacktester:
                             ],
                             notes=entry_signal.notes
                         )
+
+                        # Store entry DTE for Kelly analysis
+                        if hasattr(entry_signal, 'dte') and entry_signal.dte is not None:
+                            position.entry_dte = entry_signal.dte
 
                         strategy.positions.append(position)
 

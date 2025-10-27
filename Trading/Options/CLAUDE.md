@@ -4,10 +4,13 @@
 A Python-based backtesting system for options trading strategies, focusing on vertical spreads (bull/bear put/call spreads) and calendar spreads (time spreads) on SPY/SPX. Built using the Optopsy library for robust options strategy analysis.
 
 ## Goals
-- Backtest vertical spread and calendar spread strategies on 3-5 years of SPY/SPX historical data
+- Backtest three core strategies on 3-5 years of SPY/SPX historical data:
+  - Bull Put Spread (credit spread)
+  - Bull Call Spread (debit spread)
+  - Call Calendar Spread (time spread)
 - Analyze performance metrics: P&L, win rate, max drawdown, Sharpe ratio
-- Identify optimal entry/exit parameters for credit spreads, debit spreads, and time spreads
-- Build a flexible framework that can be extended to other strategies and underlyings
+- Identify optimal entry/exit parameters and position sizing using Kelly Criterion
+- Build a focused framework for these proven strategies
 
 ## Architecture
 
@@ -280,69 +283,58 @@ Based on academic studies comparing Black-Scholes to real market data:
 
 ## Strategy Implementations
 
-### Vertical Spreads
+### Core Strategies
 
 #### 1. Bull Put Spread (Credit Spread)
 - **Setup**: Sell higher strike put, buy lower strike put
 - **Max profit**: Premium collected
 - **Max loss**: Strike difference - premium
 - **Use case**: Neutral to bullish outlook
+- **Why**: High win rate (60-80%), consistent income generation
 
-#### 2. Bear Call Spread (Credit Spread)
-- **Setup**: Sell lower strike call, buy higher strike call
-- **Max profit**: Premium collected
-- **Max loss**: Strike difference - premium
-- **Use case**: Neutral to bearish outlook
-
-#### 3. Bull Call Spread (Debit Spread)
+#### 2. Bull Call Spread (Debit Spread)
 - **Setup**: Buy lower strike call, sell higher strike call
 - **Max profit**: Strike difference - premium paid
 - **Max loss**: Premium paid
 - **Use case**: Moderately bullish outlook
+- **Why**: Limited risk, defined reward, directional play
 
-#### 4. Bear Put Spread (Debit Spread)
-- **Setup**: Buy higher strike put, sell lower strike put
-- **Max profit**: Strike difference - premium paid
-- **Max loss**: Premium paid
-- **Use case**: Moderately bearish outlook
-
-### Calendar Spreads
-
-Calendar spreads (also called time spreads or horizontal spreads) profit from time decay differential between two expiration dates.
-
-#### 1. Call Calendar Spread (Time Spread)
+#### 3. Call Calendar Spread (Time Spread)
 - **Setup**: Sell near-term call, buy far-term call (same strike)
 - **Max profit**: When underlying is at strike at near-term expiration
 - **Max loss**: Net debit paid
 - **Use case**: Neutral to slightly bullish, expect low volatility
 - **Best conditions**: Low IV environment, expecting IV to increase
-
-#### 2. Put Calendar Spread (Time Spread)
-- **Setup**: Sell near-term put, buy far-term put (same strike)
-- **Max profit**: When underlying is at strike at near-term expiration
-- **Max loss**: Net debit paid
-- **Use case**: Neutral to slightly bearish, expect low volatility
-- **Best conditions**: Low IV environment, expecting IV to increase
+- **Why**: Profits from time decay and volatility expansion
 
 ### Strategy Parameters
 
-#### Vertical Spread Parameters
-- **Delta targeting**: e.g., sell 30 delta, buy 20 delta
-- **DTE (Days to Expiration)**: e.g., 30-45 DTE entry, close at 21 DTE or 50% profit
-- **Strike width**: e.g., 5-point or 10-point spreads
-- **Position sizing**: Risk per trade
-- **Exit rules**: Profit target, stop loss, time-based
+All strategy parameters are defined in [config/config.yaml](config/config.yaml) including:
+- Entry criteria (DTE ranges, delta targets)
+- Exit rules (profit targets, stop losses)
+- Position sizing (Kelly Criterion percentages)
 
-#### Calendar Spread Parameters
-- **Near-term DTE**: e.g., 30 DTE (short leg expiration)
-- **Far-term DTE**: e.g., 60 DTE (long leg expiration)
-- **Strike selection**: ATM, delta-based, or moneyness-based
-- **DTE tolerance**: Acceptable range for finding expirations (±5 days)
-- **Exit rules**:
-  - Mandatory exit before near-term expiration (e.g., 7 DTE)
-  - Profit target (e.g., 25% of debit paid)
-  - Stop loss (e.g., 50% of debit paid)
-  - Underlying movement threshold (e.g., exit if moves >10% from strike)
+#### Kelly Criterion Position Sizing
+
+Position sizing uses the Kelly Criterion formula:
+```
+f* = (p × b - q) / b
+
+Where:
+  f* = Fraction of capital to risk (Kelly %)
+  p = Win rate (probability of winning)
+  q = Loss rate (1 - p)
+  b = Payoff ratio = Average Win / Average Loss
+```
+
+**Workflow:**
+1. Configure strategy parameters in `config.yaml`
+2. Run backtest to generate trade history
+3. Open `notebooks/Kelly_Criteria.ipynb` to calculate Kelly %
+4. Manually update `kelly_pct` in `config.yaml` for each strategy
+5. Re-run backtest using Kelly-based position sizing
+
+**Important**: Use Half Kelly (50%) or Quarter Kelly (25%) - Full Kelly is too aggressive
 
 ## Performance Metrics
 
