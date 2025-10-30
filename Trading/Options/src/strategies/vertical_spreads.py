@@ -125,13 +125,14 @@ class VerticalSpread(BaseStrategy):
         if valid_options.empty:
             return None
 
-        # Check market filters if provided
+        # Check VIX filters - strategy-specific first, then global fallback
         vix = kwargs.get('vix')
-        vix_max = kwargs.get('vix_max', float('inf'))
-        vix_min = kwargs.get('vix_min', 0)
+        # Use strategy-specific VIX criteria from entry config, fallback to global
+        vix_max = self.entry_config.get('vix_max', kwargs.get('vix_max', float('inf')))
+        vix_min = self.entry_config.get('vix_min', kwargs.get('vix_min', 0))
 
         if vix and (vix > vix_max or vix < vix_min):
-            return None  # Market conditions not favorable
+            return None  # VIX outside strategy's acceptable range
 
         # Find strikes based on delta targeting
         option_type = self._get_option_type()

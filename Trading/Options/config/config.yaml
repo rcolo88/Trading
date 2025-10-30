@@ -33,6 +33,8 @@ strategies:
       dte_max: 45
       short_delta: 0.30     # Sell put with ~30 delta
       long_delta: 0.20      # Buy put with ~20 delta
+      vix_min: 15           # Don't enter if VIX < 15 (need decent premium)
+      vix_max: 50           # Don't enter if VIX > 50 (too risky)
     exit:
       profit_target: 0.50   # Close at 50% of max profit
       stop_loss: 0.50       # Stop at 50% of max loss
@@ -45,6 +47,8 @@ strategies:
       dte_max: 60
       long_delta: 0.60      # Buy call with ~60 delta
       short_delta: 0.40     # Sell call with ~40 delta
+      vix_min: 10           # Can enter in lower volatility (cheaper debit)
+      vix_max: 40           # Don't enter if VIX > 40 (too expensive)
     exit:
       profit_target: 0.75   # Target 75% of max profit
       stop_loss: 0.50       # Stop at 50% of max loss
@@ -61,6 +65,8 @@ strategies:
       moneyness: 0.0         # Used if strike_selection = "moneyness" (0.0 = ATM)
       min_debit: 0.5         # Minimum debit to enter (optional)
       max_debit: 5.0         # Maximum debit to enter (optional)
+      vix_min: 12           # Prefer low IV environment
+      vix_max: 30           # Don't enter if VIX too high (defeats calendar purpose)
     exit:
       profit_target: 0.25    # Close at 25% profit
       stop_loss: -0.50       # Stop at 50% loss
@@ -83,11 +89,11 @@ position_sizing:
     bull_call_spread: 0.04   # Example: 4% (Half Kelly of 8%)
     call_calendar: 0.05      # Example: 5% (Half Kelly of 10%)
 
-# Market filters (optional entry conditions)
+# Market filters (global fallback - each strategy has its own VIX criteria in entry section)
 market_filters:
-  vix_max: 40  # Don't enter if VIX > 40
-  vix_min: 12  # Don't enter if VIX < 12 (too low premium)
-  iv_rank_min: 30  # Prefer IV rank > 30
+  vix_max: 40  # Global fallback: Don't enter if VIX > 40
+  vix_min: 12  # Global fallback: Don't enter if VIX < 12
+  iv_rank_min: 30  # Prefer IV rank > 30 (not yet implemented)
 
 # Analysis and reporting
 analysis:
