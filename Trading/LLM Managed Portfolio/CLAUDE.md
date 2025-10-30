@@ -35,6 +35,7 @@ conda run -n trading_env python "Portfolio Scripts Schwab/main.py"
 
 # Read-only operations (available 24/7)
 conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --report-only
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --generate-hf-recommendations
 conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --account-status --dry-run
 conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --risk-summary --dry-run
 
@@ -63,6 +64,9 @@ conda run -n options python Daily_Portfolio_Script_new_parse.py --test-parser
 8. **`report_generator.py`** - Analysis, reporting, and chart generation
 9. **`market_hours.py`** - Market hours validation
 10. **`trading_models.py`** - Data structures and enums
+11. **`hf_recommendation_generator.py`** - HuggingFace AI recommendation orchestrator
+12. **`hf_config.py`** - HuggingFace model configurations
+13. **`agents/`** - HuggingFace agent modules (news, market, risk, tone)
 
 ### Key Benefits of Modular System
 - **Smaller, manageable code chunks** for easier Claude interaction
@@ -80,6 +84,10 @@ conda run -n options python Daily_Portfolio_Script_new_parse.py --test-parser
 - **numpy** - Numerical operations
 - **pandas-market-calendars** - Market hours validation
 - **pytz** - Timezone handling
+
+### HuggingFace Agent System
+- **requests** >= 2.31.0 - HuggingFace API communication
+- **transformers** >= 4.30.0 - Model configurations and utilities
 
 ### Optional (for PDF parsing)
 - **pdfplumber** or **PyPDF2** - PDF document parsing
@@ -178,72 +186,114 @@ conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --account-sta
 
 **Always use `Portfolio Scripts Schwab/` for the latest Schwab-compatible implementation.**
 
-## 🤖 Local LLM Runtime System (NEW)
+## 🤖 HuggingFace Agent System (NEW)
 
 ### Overview
-A complete standalone local LLM-powered trading system that operates entirely within `local_runtime/` directory. This system provides an alternative to external LLM dependencies by using locally-hosted specialized financial models.
+An AI-powered trading recommendation system that uses HuggingFace Inference API to analyze portfolio data and generate trading recommendations. The system produces human-readable markdown documents following the `trading_template.md` format, which you manually review and approve before execution.
 
 ### Quick Start
 ```bash
-# Navigate to local LLM system
-cd local_runtime
+# Step 1: Generate portfolio analysis (available 24/7)
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --report-only
 
-# View system information and options
-python local_start.py
+# Step 2: Generate AI trading recommendations (available 24/7)
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --generate-hf-recommendations
 
-# Test components (CPU mode - no GPU required)
-python main_local.py --test-components --force-cpu
+# Step 3: Review generated recommendations
+# Open: trading_recommendations/trading_recommendations_YYYYMMDD.md
 
-# Analysis only mode (generates recommendations without trading)
-python main_local.py --analysis-only --force-cpu
+# Step 4: Manually edit manual_trades_override.json with approved trades
+# Set "enabled": true in the file
 
-# Full trading execution (requires GPU for optimal performance)
-python main_local.py
+# Step 5: Execute approved trades (requires market hours)
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py"
 ```
 
 ### Architecture
-The local LLM system uses 4 specialized financial models:
-1. **News Analysis**: `AdaptLLM/Llama-3-FinMA-8B-Instruct` - Financial news sentiment
-2. **Market Analysis**: `Qwen/Qwen2.5-14B-Instruct` - Technical analysis
-3. **Trading Decision**: `deepseek-ai/DeepSeek-R1-Distill-Qwen-14B` - Core recommendations  
-4. **Risk Validation**: `microsoft/Phi-3-medium-4k-instruct` - Safety checks
+The HF agent system uses 4 specialized FinBERT models via HuggingFace Inference API:
+1. **News Sentiment**: `mrm8488/distilroberta-finetuned-financial-news-sentiment` - Financial news analysis
+2. **Market Sentiment**: `StephanAkkerman/FinTwitBERT` - Market outlook and trends
+3. **Risk Assessment**: `ProsusAI/finbert` - Portfolio risk analysis with conservative bias
+4. **Market Tone**: `yiyanghkust/finbert-tone` - Overall market tone detection
 
-### Key Features
-- **Standalone Operation**: Complete copy of Portfolio Scripts Schwab system
-- **Compatible Output**: Generates standard `trading_recommendation_*.md` files
-- **Flexible Modes**: CPU/GPU, quick/full pipeline, analysis/trading
-- **Safety Layers**: Multi-model risk validation and hard-coded limits
-- **Zero Impact**: Does not modify original `Portfolio Scripts Schwab/` directory
+### Key Components in `Portfolio Scripts Schwab/`
+1. **`hf_config.py`** - Model configurations and trading parameters
+2. **`agents/base_agent.py`** - Base agent with smart retry logic and caching
+3. **`agents/news_agent.py`** - News sentiment analysis with ticker extraction
+4. **`agents/market_agent.py`** - Market sentiment and trend analysis
+5. **`agents/risk_agent.py`** - Risk assessment with conservative bias
+6. **`agents/tone_agent.py`** - Market tone analysis
+7. **`hf_recommendation_generator.py`** - Orchestrates agents and generates markdown
 
-### Integration with Existing System
+### Workflow Features
+- **AI Analysis → Human Review → Manual Execution**: Complete separation of AI recommendations and trading decisions
+- **Manual Override Priority**: `manual_trades_override.json` always takes precedence
+- **Template-Based Output**: Generates documents matching `trading_template.md` format
+- **No Automatic Trading**: AI never executes trades directly - all trades require manual approval
+- **24/7 Availability**: Recommendation generation works anytime (no market hours required)
+- **Smart Retry Logic**: Handles HuggingFace API rate limits (503, 429) automatically
+- **In-Memory Caching**: 5-minute cache reduces redundant API calls
+
+### HuggingFace Agent Workflow
 ```bash
-# Original Schwab system (unchanged)
+# Full workflow example
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --report-only
+conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --generate-hf-recommendations
+
+# Review: trading_recommendations/trading_recommendations_20251030.md
+# Edit: Portfolio Scripts Schwab/manual_trades_override.json
+# Add approved trades and set "enabled": true
+
+# Execute (market hours only)
 conda run -n trading_env python "Portfolio Scripts Schwab/main.py"
-
-# Local LLM alternative
-cd local_runtime && python main_local.py
-
-# Both systems use same portfolio state files and output formats
 ```
 
-### Resource Requirements
-- **CPU Mode**: 16GB+ RAM, any modern CPU (slower but functional)
-- **GPU Mode (Quick)**: 8GB+ VRAM, 16GB+ RAM
-- **GPU Mode (Full)**: 20GB+ VRAM, 32GB+ RAM
+### Manual Override JSON Format
+```json
+{
+  "enabled": true,
+  "trades": [
+    {
+      "action": "BUY",
+      "ticker": "NVDA",
+      "shares": 5,
+      "reason": "AI infrastructure growth - approved from HF recommendation",
+      "priority": "HIGH"
+    },
+    {
+      "action": "SELL",
+      "ticker": "XLV",
+      "shares": 2,
+      "reason": "Profit taking at 15% gain",
+      "priority": "HIGH"
+    }
+  ]
+}
+```
 
 ### Dependencies
 ```bash
-# Core LLM dependencies
-pip install vllm transformers torch accelerate
+# HuggingFace dependencies
+pip install requests>=2.31.0 transformers>=4.30.0
 
-# Existing portfolio system dependencies
+# Existing portfolio system dependencies (already installed)
 pip install yfinance pandas numpy matplotlib pandas-market-calendars pytz
 ```
 
-### Development Workflow
-1. **Testing**: Use `python main_local.py --test-components --force-cpu`
-2. **Analysis**: Use `python main_local.py --analysis-only --force-cpu` 
-3. **Production**: Use `python main_local.py` for full execution
-4. **Documentation**: See `local_runtime/README_LOCAL.md` for complete details
+### Safety Features
+- **Conservative Risk Bias**: Risk agent defaults to higher risk levels when uncertain
+- **Manual Review Required**: No trades execute without explicit human approval
+- **Priority-Based Execution**: HIGH → MEDIUM → LOW execution order
+- **Position Limits**: 20% max position size enforced
+- **Stop Loss & Profit Targets**: Risk management built into recommendations
+- **Cash Reserve Management**: Dynamic cash allocation based on risk level
 
-The local LLM system provides a complete alternative to external LLM dependencies while maintaining full compatibility with the existing portfolio management workflow.
+### Integration with Existing System
+The HF system integrates seamlessly with the existing Schwab trading workflow:
+- Reads from `daily_portfolio_analysis.md` (generated by --report-only)
+- Outputs to `trading_recommendations/trading_recommendations_YYYYMMDD.md`
+- Executes via `manual_trades_override.json` (same mechanism as manual trading)
+- Uses existing `trade_executor.py` for order execution
+- Maintains all safety validations and market hours enforcement
+
+The HuggingFace Agent System provides AI-powered trading analysis while keeping humans firmly in control of all trading decisions.

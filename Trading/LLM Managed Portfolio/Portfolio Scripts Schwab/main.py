@@ -15,18 +15,19 @@ This orchestrates all the modular components:
 
 Usage:
     # Read-Only Operations (Available 24/7)
-    python main.py --report-only               # Generate portfolio report
-    python main.py --account-status --dry-run  # Display Schwab account summary
-    python main.py --risk-summary --dry-run    # Show portfolio risk analysis
-    python main.py --sync-schwab-account       # Sync local state with Schwab account
-    python main.py --test-schwab-api           # Test Schwab API connection
-    python main.py --test-parser               # Test document parsing
-    python main.py --dry-run                   # Simulate trades (testing only)
-    python main.py --load-previous-day         # Load positions from saved state
+    python main.py --report-only                      # Generate portfolio report
+    python main.py --generate-hf-recommendations      # Generate HF AI trading recommendations
+    python main.py --account-status --dry-run         # Display Schwab account summary
+    python main.py --risk-summary --dry-run           # Show portfolio risk analysis
+    python main.py --sync-schwab-account              # Sync local state with Schwab account
+    python main.py --test-schwab-api                  # Test Schwab API connection
+    python main.py --test-parser                      # Test document parsing
+    python main.py --dry-run                          # Simulate trades (testing only)
+    python main.py --load-previous-day                # Load positions from saved state
 
     # Trading Modes (Market Hours Only)
-    python main.py                             # Execute trades (simulated by default)
-    python main.py --live-trading              # Execute REAL trades (requires explicit flag)
+    python main.py                                    # Execute trades (uses manual_trades_override.json if enabled)
+    python main.py --live-trading                     # Execute REAL trades (requires explicit flag)
 
 Market Hours: Trading operations require market to be open (Mon-Fri 9:30AM-4PM ET).
               Read-only operations can run anytime.
@@ -43,6 +44,7 @@ from schwab_trade_executor import SchwabTradeExecutor
 from schwab_safety_validator import SafetyValidator
 from trade_executor import TradeExecutor
 from report_generator import ReportGenerator
+from hf_recommendation_generator import HFRecommendationGenerator
 
 
 class LLMManagedPortfolio:
@@ -171,6 +173,8 @@ def main():
                       help='Display comprehensive Schwab account status')
     parser.add_argument('--risk-summary', action='store_true',
                       help='Display portfolio risk analysis')
+    parser.add_argument('--generate-hf-recommendations', action='store_true',
+                      help='Generate trading recommendations using HuggingFace agents (creates markdown document)')
     args = parser.parse_args()
     
     # Conditional market hours validation
@@ -188,7 +192,8 @@ def main():
         args.test_parser or
         args.load_previous_day or
         args.sync_schwab_account or  # Syncing just reads from Schwab and updates local state
-        args.dry_run  # Dry-run is safe for testing anytime
+        args.dry_run or  # Dry-run is safe for testing anytime
+        args.generate_hf_recommendations  # HF analysis and document generation (no trading)
     )
 
     # Define operations that actually place trades and require market hours
@@ -244,6 +249,8 @@ def main():
         print("📊 LLM MANAGED PORTFOLIO - ACCOUNT STATUS MODE")
     elif args.risk_summary:
         print("🛡️  LLM MANAGED PORTFOLIO - RISK ANALYSIS MODE")
+    elif args.generate_hf_recommendations:
+        print("🤖 LLM MANAGED PORTFOLIO - HF RECOMMENDATION GENERATION MODE")
     elif args.live_trading:
         print("🚀 LLM MANAGED PORTFOLIO - LIVE TRADING MODE")
     elif args.dry_run:
@@ -392,7 +399,33 @@ def main():
                     print(f"   {order.action.value} {order.ticker} - {order.reason}")
             else:
                 print("❌ No trading document found")
-                
+
+        elif args.generate_hf_recommendations:
+            # Generate trading recommendations using HuggingFace agents
+            print("🤖 Generating HuggingFace trading recommendations...")
+
+            try:
+                # Create HF recommendation generator
+                hf_generator = HFRecommendationGenerator()
+
+                # Generate full recommendation document
+                filepath = hf_generator.generate_full_recommendation()
+
+                print("\n✅ HuggingFace recommendation generation complete")
+                print(f"\n📄 Review the recommendations at: {filepath}")
+                print("\n📋 Next steps:")
+                print("   1. Review the AI-generated trading recommendations")
+                print("   2. Edit Portfolio Scripts Schwab/manual_trades_override.json")
+                print("   3. Set 'enabled': true in manual_trades_override.json")
+                print("   4. Execute trades with: python main.py")
+
+            except FileNotFoundError as e:
+                print(f"\n❌ {e}")
+                print("   Generate portfolio report first with: python main.py --report-only")
+            except Exception as e:
+                print(f"\n❌ Error generating HF recommendations: {e}")
+                raise
+
         elif args.report_only:
             # Only generate the report without executing trades
             print("🔍 Running in read-only mode - no trades will be executed")

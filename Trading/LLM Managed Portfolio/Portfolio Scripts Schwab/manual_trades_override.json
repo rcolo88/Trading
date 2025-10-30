@@ -1,29 +1,8 @@
 {
-  "enabled": true,
-  "description": "Manual trading override system - takes priority over document parsing",
+  "enabled": false,
+  "description": "Manual trading override system - takes priority over document parsing and HF recommendations",
   "instructions": "Set 'enabled' to true to use these trades instead of parsing documents. Each trade must specify action, ticker, and either shares or target_value.",
   "trades": [
-    {
-      "action": "SELL",
-      "ticker": "NVDA", 
-      "shares": 2,
-      "reason": "",
-      "priority": "HIGH"
-    },
-    {
-      "action": "SELL",
-      "ticker": "XLV", 
-      "shares": 1,
-      "reason": "",
-      "priority": "HIGH"
-    },
-    {
-      "action": "BUY",
-      "ticker": "MSFT",
-      "shares": 1,
-      "reason": "",
-      "priority": "HIGH"
-    }
   ],
   "validation": {
     "allowed_actions": ["BUY", "SELL", "HOLD", "REDUCE"],
@@ -38,5 +17,13 @@
     "Priority affects execution order: HIGH → MEDIUM → LOW",
     "SELL orders execute first to generate cash for BUY orders",
     "HOLD orders are informational only and don't trigger trades"
+  ],
+  "hf_workflow": [
+    "1. Generate HF recommendations: python main.py --generate-hf-recommendations",
+    "2. Review the generated trading_recommendations_YYYYMMDD.md file",
+    "3. Manually add approved trades to the 'trades' array above",
+    "4. Set 'enabled': true to activate manual trades",
+    "5. Execute trades: python main.py (uses this file if enabled)",
+    "6. After execution, set 'enabled': false to prevent re-execution"
   ]
 }
