@@ -1,0 +1,21 @@
+# HuggingFace Agent System Requirements
+# Additional dependencies for the HuggingFace sentiment analysis agents
+
+# Core HuggingFace dependencies
+requests>=2.31.0
+transformers>=4.30.0
+
+# Optional: For local model inference (if not using API)
+# torch>=2.0.0
+# tokenizers>=0.13.0
+
+# Logging and utilities (likely already installed)
+python-dateutil>=2.8.0
+
+# Existing dependencies (should already be installed in trading_env)
+# pandas>=1.5.0
+# numpy>=1.24.0
+# yfinance>=0.2.0
+# matplotlib>=3.7.0
+# pandas-market-calendars>=4.0.0
+# pytz>=2023.3
