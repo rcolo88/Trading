@@ -7,8 +7,8 @@ underlying:
 
 # Backtesting period
 backtest:
-  start_date: "2021-01-03"  # Matches synthetic data start date
-  end_date: "2025-6-30"    # Matches synthetic data end date
+  start_date: "2025-04-03"  # Matches synthetic data start date
+  end_date: "2025-8-30"    # Matches synthetic data end date
   initial_capital: 10000
 
 # Data source configuration
@@ -21,7 +21,7 @@ data_source:
 # Transaction costs
 costs:
   commission_per_contract: 0.65  # Per contract per side
-  slippage_percent: 0.01  # 1% slippage estimate
+  slippage_percent: 0.02  # 1% slippage estimate
   bid_ask_spread_percent: 0.02  # 2% bid-ask spread estimate
 
 # Strategy parameters
@@ -32,7 +32,7 @@ strategies:
       dte_min: 30           # Days to expiration
       dte_max: 45
       short_delta: 0.30     # Sell put with ~30 delta
-      long_delta: 0.20      # Buy put with ~20 delta
+      long_delta: 0.10      # Buy put with ~20 delta
       vix_min: 15           # Don't enter if VIX < 15 (need decent premium)
       vix_max: 50           # Don't enter if VIX > 50 (too risky)
     exit:
