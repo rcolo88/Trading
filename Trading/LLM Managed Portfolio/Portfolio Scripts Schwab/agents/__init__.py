@@ -9,6 +9,7 @@ from .market_agent import MarketAgent, MarketAnalysis
 from .risk_agent import RiskAgent, RiskAnalysis
 from .tone_agent import ToneAgent
 from .trade_agent import TradeAgent, TradeDecision
+from .quality_agent import QualityAgent, QualityAgentResult
 
 __all__ = [
     "BaseAgent",
@@ -21,5 +22,7 @@ __all__ = [
     "RiskAnalysis",
     "ToneAgent",
     "TradeAgent",
-    "TradeDecision"
+    "TradeDecision",
+    "QualityAgent",
+    "QualityAgentResult"
 ]
