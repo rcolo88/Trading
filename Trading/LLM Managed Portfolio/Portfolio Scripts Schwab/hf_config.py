@@ -50,6 +50,8 @@ class HFConfig:
     HF_API_URL = "https://api-inference.huggingface.co/models/"
     HF_TOKEN = os.getenv("HUGGINGFACE_TOKEN")  # Optional for public models
 
+    # News Source: Yahoo Finance via yfinance (no API key required)
+
     # Model Configurations
     MODELS = {
         "news": ModelConfig(
@@ -79,6 +81,14 @@ class HFConfig:
             task="sentiment-analysis",
             max_length=512,
             temperature=0.5
+        ),
+        "reasoning": ModelConfig(
+            name="Reasoning Agent (Decision Synthesis)",
+            model_id="deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+            task="text-generation",
+            max_length=2048,
+            temperature=0.1,  # Lower temp for more deterministic reasoning
+            top_k=40
         )
     }
 
@@ -98,6 +108,32 @@ class HFConfig:
         max_delay=60.0,
         exponential_base=2.0
     )
+
+    # Quality Metrics Thresholds (for core 80% allocation)
+    QUALITY_MIN_SCORE = 70  # Minimum quality score for core holdings
+    QUALITY_IDEAL_SCORE = 85  # Ideal score for elite compounders
+    QUALITY_SWAP_THRESHOLD = 15  # Min quality score difference to recommend swap
+
+    # Thematic Metrics Thresholds (for opportunistic 20% allocation)
+    THEMATIC_MIN_SCORE = 28  # Minimum thematic score (out of 50)
+    THEMATIC_IDEAL_SCORE = 40  # Leader-level thematic score
+
+    # Portfolio Allocation Rules
+    MAX_POSITION_SIZE = 0.20  # 20% max per position
+    MAX_OPPORTUNISTIC_ALLOCATION = 0.20  # 20% total for thematic
+    MIN_CASH_RESERVE = 0.05  # 5% minimum cash
+
+    # Watchlist Configuration
+    # Note: Set to None to fetch S&P 500 dynamically via get_sp500_tickers()
+    # Or provide manual list: ["NVDA", "AMD", "AAPL", "MSFT", ...]
+    WATCHLIST_TICKERS = None  # Defaults to S&P 500 screening
+
+    # Active Themes for Opportunistic Screening
+    ACTIVE_THEMES = [
+        "AI Infrastructure",
+        "Nuclear Renaissance",
+        "Defense Modernization"
+    ]
 
     # Request Headers
     @classmethod

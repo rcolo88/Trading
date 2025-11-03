@@ -21,7 +21,7 @@ data_source:
 # Transaction costs
 costs:
   commission_per_contract: 0.65  # Per contract per side
-  slippage_percent: 0.02  # 1% slippage estimate
+  slippage_percent: 0.02  # 2% slippage estimate
   bid_ask_spread_percent: 0.02  # 2% bid-ask spread estimate
 
 # Strategy parameters

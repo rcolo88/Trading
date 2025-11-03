@@ -1,0 +1,19 @@
+============================================================
+NEWS SENTIMENT ANALYSIS SUMMARY
+============================================================
+Generated: 2025-11-01 14:29:12
+Period: Last 7 days
+Tickers Analyzed: 1
+Total Articles: 4
+============================================================
+
+GSL:
+  Sentiment: NEUTRAL
+  Confidence: 100.0%
+  Articles Analyzed: 4
+  Breakdown: 0 positive, 0 negative, 4 neutral
+  Latest Article:
+    Title: Should Value Investors Buy Global Ship Lease (GSL) Stock?
+    Source: Zacks
+    Sentiment: neutral
+
