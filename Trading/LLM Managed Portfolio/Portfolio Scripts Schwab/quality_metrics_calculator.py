@@ -54,7 +54,7 @@ class RedFlag:
 
 @dataclass
 class QualityAnalysisResult:
-    """Complete quality analysis result."""
+    """Complete quality analysis result (supports both DEFAULT and STEPS frameworks)."""
     ticker: str
     metric_scores: List[MetricScore]
     composite_score: float
@@ -63,6 +63,9 @@ class QualityAnalysisResult:
     is_consistent_roe_performer: bool
     summary: str
     raw_metrics: Dict[str, float]
+    framework: str = 'DEFAULT'  # 'DEFAULT' or 'STEPS'
+    dimension_scores: Optional[Dict[str, float]] = None  # For STEPS mode transparency
+    dimension_weights: Optional[Dict[str, float]] = None  # Document weights used
 
 
 class QualityMetricsCalculator:
@@ -96,13 +99,21 @@ class QualityMetricsCalculator:
         >>> print(f"Tier: {result.tier.value}")
     """
 
-    # Metric weights (must sum to 1.0)
+    # Metric weights (must sum to 1.0) - DEFAULT framework
     METRIC_WEIGHTS = {
         'gross_profitability': 0.25,
         'roe': 0.20,
         'operating_profitability': 0.20,
         'fcf_yield': 0.20,
         'roic': 0.15
+    }
+
+    # STEPS framework weights (4 dimensions, must sum to 1.0)
+    STEPS_WEIGHTS = {
+        'gross_profitability': 0.30,
+        'roe_persistence': 0.25,
+        'earnings_quality': 0.25,
+        'conservative_growth': 0.20
     }
 
     # Tier classification thresholds
@@ -165,9 +176,13 @@ class QualityMetricsCalculator:
 
         logger.info("QualityMetricsCalculator initialized")
 
-    def calculate_quality_metrics(self, financial_data: Dict[str, Any]) -> QualityAnalysisResult:
+    def calculate_quality_metrics(self, financial_data: Dict[str, Any], framework: str = 'DEFAULT') -> QualityAnalysisResult:
         """
         Calculate all quality metrics and generate comprehensive analysis.
+
+        Supports two frameworks:
+        - DEFAULT: 5-metric system (Gross Profitability, ROE, Operating Profitability, FCF Yield, ROIC)
+        - STEPS: 4-dimension system (Gross Profitability, ROE Persistence, Earnings Quality, Conservative Growth)
 
         Args:
             financial_data: Dictionary containing financial metrics with keys:
@@ -182,12 +197,15 @@ class QualityMetricsCalculator:
                 - market_cap: Market capitalization
                 - total_debt: Total debt
                 - nopat: Net operating profit after tax
-                - roe_history: (Optional) List of historical ROE values
+                - roe_history: (Optional) List of historical ROE values (required for STEPS)
+                - operating_cash_flow: (Optional) Operating cash flow (required for STEPS)
                 - accruals: (Optional) Accruals as % of assets
                 - asset_growth: (Optional) YoY asset growth rate
                 - margin_change: (Optional) YoY margin change
                 - prior_year_revenue: (Optional) Prior year revenue
                 - prior_year_cogs: (Optional) Prior year COGS
+                - ebitda: (Optional) EBITDA (required for STEPS Conservative Growth)
+            framework: 'DEFAULT' or 'STEPS' (default: 'DEFAULT')
 
         Returns:
             QualityAnalysisResult: Complete analysis with scores, tier, and red flags
@@ -196,10 +214,33 @@ class QualityMetricsCalculator:
             ValueError: If required financial data is missing or invalid
         """
         ticker = financial_data.get('ticker', 'UNKNOWN')
-        logger.info(f"Calculating quality metrics for {ticker}")
+        logger.info(f"Calculating quality metrics for {ticker} using {framework} framework")
+
+        # Validate framework parameter
+        if framework not in ['DEFAULT', 'STEPS']:
+            raise ValueError(f"Invalid framework '{framework}'. Must be 'DEFAULT' or 'STEPS'")
 
         # Validate required fields
-        self._validate_financial_data(financial_data)
+        self._validate_financial_data(financial_data, framework)
+
+        # Branch based on framework
+        if framework == 'STEPS':
+            return self._calculate_steps_metrics(financial_data)
+        else:
+            return self._calculate_default_metrics(financial_data)
+
+    def _calculate_default_metrics(self, financial_data: Dict[str, Any]) -> QualityAnalysisResult:
+        """
+        Calculate quality metrics using DEFAULT framework (5-metric system).
+        This preserves the original calculation logic.
+
+        Args:
+            financial_data: Financial data dictionary
+
+        Returns:
+            QualityAnalysisResult with DEFAULT framework
+        """
+        ticker = financial_data.get('ticker', 'UNKNOWN')
 
         # Calculate individual metrics
         raw_metrics = self._calculate_raw_metrics(financial_data)
@@ -237,18 +278,20 @@ class QualityMetricsCalculator:
             red_flags=red_flags,
             is_consistent_roe_performer=is_consistent_roe,
             summary=summary,
-            raw_metrics=raw_metrics
+            raw_metrics=raw_metrics,
+            framework='DEFAULT'
         )
 
         logger.info(f"Quality analysis complete for {ticker}: {tier.value} tier, score {composite_score:.1f}")
         return result
 
-    def _validate_financial_data(self, data: Dict[str, Any]) -> None:
+    def _validate_financial_data(self, data: Dict[str, Any], framework: str = 'DEFAULT') -> None:
         """
         Validate that required financial data fields are present and valid.
 
         Args:
             data: Financial data dictionary
+            framework: 'DEFAULT' or 'STEPS'
 
         Raises:
             ValueError: If required fields are missing or invalid
@@ -259,9 +302,13 @@ class QualityMetricsCalculator:
             'total_debt', 'nopat'
         ]
 
+        # Additional fields required for STEPS framework
+        if framework == 'STEPS':
+            required_fields.extend(['operating_cash_flow'])  # For earnings quality
+
         missing_fields = [field for field in required_fields if field not in data]
         if missing_fields:
-            raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
+            raise ValueError(f"Missing required fields for {framework} framework: {', '.join(missing_fields)}")
 
         # Validate no negative values for key metrics
         for field in required_fields:
@@ -705,6 +752,348 @@ class QualityMetricsCalculator:
 
         logger.info(f"Percentile scores calculated for {ticker} against {len(peer_metrics)} peers")
         return result
+
+    # ==================== STEPS FRAMEWORK METHODS ====================
+
+    def _calculate_steps_metrics(self, financial_data: Dict[str, Any]) -> QualityAnalysisResult:
+        """
+        Calculate quality metrics using STEPS framework (4-dimension system).
+
+        STEPS Framework:
+        - Gross Profitability (30%)
+        - ROE Persistence (25%)
+        - Earnings Quality (25%)
+        - Conservative Growth (20%)
+
+        Args:
+            financial_data: Financial data dictionary
+
+        Returns:
+            Quality AnalysisResult with STEPS framework
+        """
+        ticker = financial_data.get('ticker', 'UNKNOWN')
+        logger.info(f"Calculating STEPS quality metrics for {ticker}")
+
+        # Calculate STEPS dimensions
+        gp_score = self._calculate_gross_profitability_score_steps(financial_data)
+        roe_persistence_score = self._calculate_roe_persistence_score(financial_data)
+        earnings_quality_score = self._calculate_earnings_quality_score(financial_data)
+        conservative_growth_score = self._calculate_conservative_growth_score(financial_data)
+
+        # Build dimension scores dict
+        dimension_scores = {
+            'gross_profitability': gp_score,
+            'roe_persistence': roe_persistence_score,
+            'earnings_quality': earnings_quality_score,
+            'conservative_growth': conservative_growth_score
+        }
+
+        # Build dimension weights dict
+        dimension_weights = dict(self.STEPS_WEIGHTS)
+
+        # Calculate weighted composite score (convert to 0-100 scale)
+        composite_score = (
+            gp_score * self.STEPS_WEIGHTS['gross_profitability'] +
+            roe_persistence_score * self.STEPS_WEIGHTS['roe_persistence'] +
+            earnings_quality_score * self.STEPS_WEIGHTS['earnings_quality'] +
+            conservative_growth_score * self.STEPS_WEIGHTS['conservative_growth']
+        ) * 10  # Convert 0-10 scale to 0-100
+
+        # Create MetricScore objects for display
+        metric_scores = [
+            MetricScore(
+                name='Gross Profitability',
+                value=financial_data.get('revenue', 0) - financial_data.get('cogs', 0) / financial_data.get('total_assets', 1),
+                score=gp_score,
+                weight=self.STEPS_WEIGHTS['gross_profitability'],
+                weighted_score=gp_score * self.STEPS_WEIGHTS['gross_profitability']
+            ),
+            MetricScore(
+                name='ROE Persistence',
+                value=financial_data.get('net_income', 0) / financial_data.get('shareholder_equity', 1),
+                score=roe_persistence_score,
+                weight=self.STEPS_WEIGHTS['roe_persistence'],
+                weighted_score=roe_persistence_score * self.STEPS_WEIGHTS['roe_persistence']
+            ),
+            MetricScore(
+                name='Earnings Quality',
+                value=0.0,  # Composite metric
+                score=earnings_quality_score,
+                weight=self.STEPS_WEIGHTS['earnings_quality'],
+                weighted_score=earnings_quality_score * self.STEPS_WEIGHTS['earnings_quality']
+            ),
+            MetricScore(
+                name='Conservative Growth',
+                value=financial_data.get('asset_growth', 0),
+                score=conservative_growth_score,
+                weight=self.STEPS_WEIGHTS['conservative_growth'],
+                weighted_score=conservative_growth_score * self.STEPS_WEIGHTS['conservative_growth']
+            )
+        ]
+
+        # Classify tier
+        tier = self._classify_tier(composite_score)
+
+        # Check for consistent ROE performance
+        is_consistent_roe = self._check_consistent_roe(financial_data)
+
+        # Detect red flags (use raw metrics for compatibility)
+        raw_metrics = self._calculate_raw_metrics(financial_data)
+        red_flags = self._detect_red_flags(financial_data, raw_metrics)
+
+        # Generate STEPS-specific summary
+        summary = f"STEPS Quality Analysis: {ticker} - {tier.value} tier (Score: {composite_score:.1f}/100)\n"
+        summary += f"Dimensions: GP {gp_score:.1f}/10, ROE Persistence {roe_persistence_score:.1f}/10, "
+        summary += f"Earnings Quality {earnings_quality_score:.1f}/10, Conservative Growth {conservative_growth_score:.1f}/10"
+
+        result = QualityAnalysisResult(
+            ticker=ticker,
+            metric_scores=metric_scores,
+            composite_score=composite_score,
+            tier=tier,
+            red_flags=red_flags,
+            is_consistent_roe_performer=is_consistent_roe,
+            summary=summary,
+            raw_metrics=raw_metrics,
+            framework='STEPS',
+            dimension_scores=dimension_scores,
+            dimension_weights=dimension_weights
+        )
+
+        logger.info(f"STEPS analysis complete for {ticker}: {tier.value} tier, score {composite_score:.1f}")
+        return result
+
+    def _calculate_gross_profitability_score_steps(self, financial_data: Dict[str, Any]) -> float:
+        """
+        Calculate Gross Profitability score for STEPS framework (different thresholds).
+
+        Scoring (1-10 scale):
+        - <20% = 1-3
+        - 20-40% = 4-6
+        - 40-60% = 7-9
+        - >60% = 10
+
+        Args:
+            financial_data: Financial data dictionary
+
+        Returns:
+            Score from 1-10
+        """
+        revenue = financial_data.get('revenue', 0)
+        cogs = financial_data.get('cogs', 0)
+        total_assets = financial_data.get('total_assets', 1)
+
+        if total_assets == 0:
+            return 0.0
+
+        gp_ratio = (revenue - cogs) / total_assets
+
+        if gp_ratio > 0.60:
+            return 10.0
+        elif gp_ratio > 0.40:
+            # Linear interpolation 7-9
+            return 7.0 + (gp_ratio - 0.40) / 0.20 * 2.0
+        elif gp_ratio > 0.20:
+            # Linear interpolation 4-6
+            return 4.0 + (gp_ratio - 0.20) / 0.20 * 2.0
+        elif gp_ratio > 0.0:
+            # Linear interpolation 1-3
+            return 1.0 + (gp_ratio / 0.20) * 2.0
+        else:
+            return 1.0
+
+    def _calculate_roe_persistence_score(self, financial_data: Dict[str, Any]) -> float:
+        """
+        Calculate ROE Persistence score for STEPS framework.
+
+        Components:
+        - Base ROE score (1-10 scale)
+        - Consistency bonus: +1 if 3-year std dev < 5 percentage points
+        - Persistence bonus: +1 if 3-year average within 20% of current year
+
+        Scoring (1-10 scale):
+        - <5% = 0-2
+        - 5-10% = 3-4
+        - 10-15% = 5-6
+        - 15-20% = 7-8
+        - >20% = 9-10
+
+        Args:
+            financial_data: Financial data dictionary
+
+        Returns:
+            Score from 1-10
+        """
+        net_income = financial_data.get('net_income', 0)
+        shareholder_equity = financial_data.get('shareholder_equity', 1)
+
+        if shareholder_equity == 0:
+            return 0.0
+
+        current_roe = net_income / shareholder_equity
+
+        # Base score
+        if current_roe > 0.20:
+            base_score = 9.0 + min(1.0, (current_roe - 0.20) / 0.10)
+        elif current_roe > 0.15:
+            base_score = 7.0 + (current_roe - 0.15) / 0.05 * 2.0
+        elif current_roe > 0.10:
+            base_score = 5.0 + (current_roe - 0.10) / 0.05 * 2.0
+        elif current_roe > 0.05:
+            base_score = 3.0 + (current_roe - 0.05) / 0.05 * 2.0
+        elif current_roe > 0.0:
+            base_score = (current_roe / 0.05) * 2.0
+        else:
+            base_score = 0.0
+
+        # Check for ROE history (3-year consistency)
+        roe_history = financial_data.get('roe_history', [])
+        if len(roe_history) >= 3:
+            import statistics
+            avg_roe = statistics.mean(roe_history)
+            std_dev = statistics.stdev(roe_history)
+
+            # Consistency bonus
+            if std_dev < 0.05:  # < 5 percentage points std dev
+                base_score = min(10.0, base_score + 0.5)
+
+            # Persistence bonus
+            if abs(current_roe - avg_roe) / current_roe < 0.20:  # Within 20%
+                base_score = min(10.0, base_score + 0.5)
+
+        return base_score
+
+    def _calculate_earnings_quality_score(self, financial_data: Dict[str, Any]) -> float:
+        """
+        Calculate Earnings Quality score for STEPS framework.
+
+        Components:
+        a) Accruals ratio: (Net Income - Operating Cash Flow) / Total Assets
+           - Lower is better, <0.05 = good, >0.10 = bad
+        b) OCF/Net Income ratio
+           - >1.2 = excellent (9-10), 1.0-1.2 = good (7-8), 0.8-1.0 = acceptable (5-6), <0.8 = poor (1-4)
+        c) Asset growth rate
+           - <10% = conservative (9-10), 10-20% = moderate (7-8), >20% = aggressive (1-6)
+
+        Returns average of 3 components (1-10 scale)
+
+        Args:
+            financial_data: Financial data dictionary
+
+        Returns:
+            Score from 1-10
+        """
+        net_income = financial_data.get('net_income', 0)
+        operating_cash_flow = financial_data.get('operating_cash_flow', net_income)  # Fallback to NI
+        total_assets = financial_data.get('total_assets', 1)
+        asset_growth = financial_data.get('asset_growth', 0)
+
+        scores = []
+
+        # Component a) Accruals ratio
+        if total_assets > 0:
+            accruals_ratio = abs((net_income - operating_cash_flow) / total_assets)
+            if accruals_ratio < 0.02:
+                accruals_score = 10.0
+            elif accruals_ratio < 0.05:
+                accruals_score = 7.0 + (0.05 - accruals_ratio) / 0.03 * 3.0
+            elif accruals_ratio < 0.10:
+                accruals_score = 4.0 + (0.10 - accruals_ratio) / 0.05 * 3.0
+            else:
+                accruals_score = max(1.0, 4.0 - (accruals_ratio - 0.10) * 10)
+            scores.append(accruals_score)
+
+        # Component b) OCF/Net Income ratio
+        if net_income > 0:
+            ocf_ni_ratio = operating_cash_flow / net_income
+            if ocf_ni_ratio > 1.2:
+                ocf_score = 9.0 + min(1.0, (ocf_ni_ratio - 1.2) / 0.3)
+            elif ocf_ni_ratio > 1.0:
+                ocf_score = 7.0 + (ocf_ni_ratio - 1.0) / 0.2 * 2.0
+            elif ocf_ni_ratio > 0.8:
+                ocf_score = 5.0 + (ocf_ni_ratio - 0.8) / 0.2 * 2.0
+            else:
+                ocf_score = max(1.0, 5.0 * ocf_ni_ratio / 0.8)
+            scores.append(ocf_score)
+
+        # Component c) Asset growth rate
+        if asset_growth < 0.10:
+            asset_score = 9.0 + min(1.0, (0.10 - asset_growth) / 0.05)
+        elif asset_growth < 0.20:
+            asset_score = 7.0 + (0.20 - asset_growth) / 0.10 * 2.0
+        else:
+            asset_score = max(1.0, 7.0 - (asset_growth - 0.20) * 10)
+        scores.append(asset_score)
+
+        # Return average
+        return sum(scores) / len(scores) if scores else 5.0
+
+    def _calculate_conservative_growth_score(self, financial_data: Dict[str, Any]) -> float:
+        """
+        Calculate Conservative Growth score for STEPS framework.
+
+        Components:
+        a) Asset growth: <10% = 10, 10-15% = 8, 15-20% = 6, >20% = 2
+        b) Debt/EBITDA: <1x = 10, 1-2x = 8, 2-3x = 6, >3x = 3
+        c) Capital allocation quality:
+           - If acquisitions > 50% of total CAPEX: -2 points
+           - If organic CAPEX dominates: +2 points
+
+        Returns weighted average of components (1-10 scale)
+
+        Args:
+            financial_data: Financial data dictionary
+
+        Returns:
+            Score from 1-10
+        """
+        asset_growth = financial_data.get('asset_growth', 0)
+        total_debt = financial_data.get('total_debt', 0)
+        ebitda = financial_data.get('ebitda', financial_data.get('net_income', 0) * 1.5)  # Rough estimate if missing
+
+        scores = []
+        weights = []
+
+        # Component a) Asset growth
+        if asset_growth < 0.10:
+            asset_growth_score = 10.0
+        elif asset_growth < 0.15:
+            asset_growth_score = 8.0 + (0.15 - asset_growth) / 0.05 * 2.0
+        elif asset_growth < 0.20:
+            asset_growth_score = 6.0 + (0.20 - asset_growth) / 0.05 * 2.0
+        else:
+            asset_growth_score = max(2.0, 6.0 - (asset_growth - 0.20) * 10)
+        scores.append(asset_growth_score)
+        weights.append(0.4)
+
+        # Component b) Debt/EBITDA
+        if ebitda > 0:
+            debt_ebitda = total_debt / ebitda
+            if debt_ebitda < 1.0:
+                debt_score = 10.0
+            elif debt_ebitda < 2.0:
+                debt_score = 8.0 + (2.0 - debt_ebitda) * 2.0
+            elif debt_ebitda < 3.0:
+                debt_score = 6.0 + (3.0 - debt_ebitda) * 2.0
+            else:
+                debt_score = max(3.0, 6.0 - (debt_ebitda - 3.0))
+            scores.append(debt_score)
+            weights.append(0.4)
+
+        # Component c) Capital allocation (simplified - would need CAPEX breakdown data)
+        # For now, use a neutral score if data not available
+        capex_quality_score = 7.0  # Neutral default
+        scores.append(capex_quality_score)
+        weights.append(0.2)
+
+        # Calculate weighted average
+        total_weight = sum(weights)
+        if total_weight > 0:
+            weighted_score = sum(s * w for s, w in zip(scores, weights)) / total_weight
+        else:
+            weighted_score = 5.0
+
+        return weighted_score
 
 
 def format_quality_report(result: QualityAnalysisResult, include_raw_data: bool = False) -> str:
