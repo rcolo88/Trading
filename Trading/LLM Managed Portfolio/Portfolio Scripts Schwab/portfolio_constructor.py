@@ -221,11 +221,13 @@ class PortfolioConstructor:
         total_quality_pct = sum(quality_normalized.values())
         total_thematic_pct = sum(thematic_normalized.values())
 
+        # Calculate cash reserve
         # If no holdings passed threshold, all cash
         if total_quality_pct == 0 and total_thematic_pct == 0:
             cash_reserve = 100.0
         else:
-            cash_reserve = self.TARGET_CASH_PCT
+            # Cash fills the gap to 100%
+            cash_reserve = max(self.TARGET_CASH_PCT, 100.0 - total_quality_pct - total_thematic_pct)
 
         # Create PortfolioAllocation
         allocation = PortfolioAllocation(
@@ -330,27 +332,27 @@ class PortfolioConstructor:
         violations = []
 
         if current_quality_pct < self.QUALITY_MIN:
-            violations.append(f"Quality allocation {current_quality_pct:.1f}% below minimum {self.QUALITY_MIN}%")
+            violations.append(f"Quality allocation {current_quality_pct:.1f}% below {self.QUALITY_MIN:.0f}%")
         elif current_quality_pct > self.QUALITY_MAX:
-            violations.append(f"Quality allocation {current_quality_pct:.1f}% above maximum {self.QUALITY_MAX}%")
+            violations.append(f"Quality allocation {current_quality_pct:.1f}% above {self.QUALITY_MAX:.0f}%")
 
         if current_thematic_pct < self.THEMATIC_MIN:
-            violations.append(f"Thematic allocation {current_thematic_pct:.1f}% below minimum {self.THEMATIC_MIN}%")
+            violations.append(f"Thematic allocation {current_thematic_pct:.1f}% below {self.THEMATIC_MIN:.0f}%")
         elif current_thematic_pct > self.THEMATIC_MAX:
-            violations.append(f"Thematic allocation {current_thematic_pct:.1f}% above maximum {self.THEMATIC_MAX}%")
+            violations.append(f"Thematic allocation {current_thematic_pct:.1f}% above {self.THEMATIC_MAX:.0f}%")
 
         if current_cash_pct < self.CASH_MIN:
-            violations.append(f"Cash reserve {current_cash_pct:.1f}% below minimum {self.CASH_MIN}%")
+            violations.append(f"Cash reserve {current_cash_pct:.1f}% below {self.CASH_MIN:.0f}%")
 
         # Check individual position limits
         all_positions = {**quality_holdings_pct, **thematic_holdings_pct}
         for ticker, pct in all_positions.items():
             if pct > self.MAX_SINGLE_POSITION:
-                violations.append(f"{ticker} position {pct:.1f}% exceeds maximum {self.MAX_SINGLE_POSITION}%")
+                violations.append(f"{ticker} position {pct:.1f}% exceeds {self.MAX_SINGLE_POSITION:.0f}%")
 
         for ticker, pct in thematic_holdings_pct.items():
             if pct > self.MAX_THEMATIC_POSITION:
-                violations.append(f"{ticker} thematic position {pct:.1f}% exceeds maximum {self.MAX_THEMATIC_POSITION}%")
+                violations.append(f"{ticker} thematic position {pct:.1f}% exceeds {self.MAX_THEMATIC_POSITION:.0f}%")
 
         # Determine if rebalancing needed
         rebalancing_needed = len(violations) > 0
@@ -421,7 +423,7 @@ class PortfolioConstructor:
                     'action': 'SELL',
                     'ticker': ticker,
                     'shares': int(shares),
-                    'reason': f'Exit position - fails quality/thematic threshold',
+                    'reasoning': f'Exit position - fails quality/thematic threshold',
                     'priority': 'HIGH'
                 })
 
@@ -445,7 +447,7 @@ class PortfolioConstructor:
                         'action': 'BUY',
                         'ticker': ticker,
                         'shares': share_diff,
-                        'reason': f'Scale to {target_pct:.1f}% target allocation',
+                        'reasoning': f'Scale to {target_pct:.1f}% target allocation',
                         'priority': 'MEDIUM'
                     })
                 elif share_diff < 0:
@@ -454,7 +456,7 @@ class PortfolioConstructor:
                         'action': 'SELL',
                         'ticker': ticker,
                         'shares': abs(share_diff),
-                        'reason': f'Reduce to {target_pct:.1f}% target allocation',
+                        'reasoning': f'Reduce to {target_pct:.1f}% target allocation',
                         'priority': 'MEDIUM'
                     })
 
