@@ -143,6 +143,57 @@ python steps_orchestrator.py --verbose
 - Calls existing `recommendation_generator_script.py` for STEP 8
 - Generates trading_template.md format output
 
+### 📊 STEP 1: Market Environment Analyzer
+
+**Implements market environment assessment for STEPS methodology.**
+
+The Market Environment Analyzer fetches and analyzes real-time market data (S&P 500, VIX, sector rotation) to provide context for portfolio decisions. It classifies market conditions and generates actionable summaries.
+
+Execute standalone market analysis:
+
+```bash
+# Basic usage (with 4-hour caching)
+cd "Portfolio Scripts Schwab"
+python market_environment_analyzer.py
+
+# Export to JSON
+python market_environment_analyzer.py --json outputs/market_test.json
+
+# Export to markdown report
+python market_environment_analyzer.py --markdown outputs/market_test.md
+
+# Disable caching (always fetch fresh data)
+python market_environment_analyzer.py --no-cache
+
+# Verbose logging
+python market_environment_analyzer.py --verbose
+```
+
+**Key Features:**
+- **S&P 500 Analysis** - Price, 50-day MA, 200-day MA, 1-month and YTD returns
+- **Trend Classification** - STRONG_BULL, BULL, NEUTRAL, BEAR, STRONG_BEAR (golden/death cross logic)
+- **VIX Analysis** - Current level, 20-day average
+- **Volatility Regime** - LOW (<15), MODERATE (15-20), ELEVATED (20-30), HIGH (>30)
+- **Sector Rotation** - 11 sector ETFs (XLK, XLC, XLV, XLF, XLE, XLI, XLP, XLY, XLU, XLRE, XLB)
+- **Market Breadth** - NARROW (tech/comm dominance), MODERATE, BROAD (diverse leadership)
+- **Risk Appetite** - RISK_ON (low vol + bull), NEUTRAL, RISK_OFF (high vol + bear)
+- **4-Hour Caching** - Reduces API calls for efficiency
+
+**Outputs:**
+- `outputs/market_environment_YYYYMMDD.json` - Structured JSON data
+- `outputs/market_environment_YYYYMMDD.md` - Human-readable markdown report
+- `market_environment_cache.pkl` - 4-hour cache file
+
+**Integration:**
+- Called automatically by `steps_orchestrator.py` in STEP 1
+- Exports data for use in trade synthesis and reasoning
+- Graceful fallback to default assessment if API fails
+
+**Performance:**
+- Runtime: <30 seconds for complete analysis
+- Fetches data from yfinance (S&P 500, VIX, 11 sector ETFs)
+- 4-hour cache prevents redundant API calls
+
 ### ❌ Legacy Scripts (DO NOT USE)
 ```bash
 # DEPRECATED - Only kept for reference
@@ -155,18 +206,19 @@ conda run -n options python Daily_Portfolio_Script_new_parse.py --test-parser
 ### Core Modules in `Portfolio Scripts Schwab/`
 1. **`main.py`** - System orchestrator and entry point
 2. **`steps_orchestrator.py`** - STEPS 10-step portfolio analysis orchestrator (NEW)
-3. **`portfolio_manager.py`** - Holdings, cash, and state management
-4. **`schwab_data_fetcher.py`** - Schwab API market data retrieval
-5. **`schwab_account_manager.py`** - Account synchronization with Schwab
-6. **`schwab_trade_executor.py`** - Live trade execution via Schwab API
-7. **`schwab_safety_validator.py`** - Pre-trade safety validation
-8. **`trade_executor.py`** - Document parsing and order execution
-9. **`report_generator.py`** - Analysis, reporting, and chart generation
-10. **`market_hours.py`** - Market hours validation
-11. **`trading_models.py`** - Data structures and enums
-12. **`hf_recommendation_generator.py`** - HuggingFace AI recommendation orchestrator
-13. **`hf_config.py`** - HuggingFace model configurations
-14. **`agents/`** - HuggingFace agent modules (news, market, risk, tone)
+3. **`market_environment_analyzer.py`** - Market environment assessment (STEP 1) (NEW)
+4. **`portfolio_manager.py`** - Holdings, cash, and state management
+5. **`schwab_data_fetcher.py`** - Schwab API market data retrieval
+6. **`schwab_account_manager.py`** - Account synchronization with Schwab
+7. **`schwab_trade_executor.py`** - Live trade execution via Schwab API
+8. **`schwab_safety_validator.py`** - Pre-trade safety validation
+9. **`trade_executor.py`** - Document parsing and order execution
+10. **`report_generator.py`** - Analysis, reporting, and chart generation
+11. **`market_hours.py`** - Market hours validation
+12. **`trading_models.py`** - Data structures and enums
+13. **`hf_recommendation_generator.py`** - HuggingFace AI recommendation orchestrator
+14. **`hf_config.py`** - HuggingFace model configurations
+15. **`agents/`** - HuggingFace agent modules (news, market, risk, tone)
 
 ### Key Benefits of Modular System
 - **Smaller, manageable code chunks** for easier Claude interaction

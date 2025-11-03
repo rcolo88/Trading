@@ -308,13 +308,34 @@ class STEPSOrchestrator:
 
         Fetches S&P 500, VIX, sector rotation data
         Classifies market trend and volatility regime
+        Uses market_environment_analyzer.py
         """
         logger.info("🌍 Running STEP 1: Market Environment Assessment...")
 
         try:
-            # TODO: Implement actual market environment analyzer
-            # For now, return default assessment
-            logger.warning("⚠️  Market environment analyzer not yet implemented - using default assessment")
+            # Import and run market environment analyzer
+            from market_environment_analyzer import MarketEnvironmentAnalyzer
+
+            analyzer = MarketEnvironmentAnalyzer(enable_cache=True)
+            env = analyzer.analyze_market_environment()
+
+            # Save output files
+            if not self.dry_run:
+                # JSON output
+                json_file = self.outputs_dir / f"market_environment_{datetime.now().strftime('%Y%m%d')}.json"
+                analyzer.export_to_json(env, str(json_file))
+
+                # Markdown report
+                md_file = self.outputs_dir / f"market_environment_{datetime.now().strftime('%Y%m%d')}.md"
+                analyzer.export_to_markdown(env, str(md_file))
+
+            logger.info(f"✅ STEP 1 Complete: {env.summary}")
+            return env
+
+        except Exception as e:
+            logger.error(f"❌ STEP 1 Failed: {e}")
+            # Return default on failure (not critical)
+            logger.warning("⚠️  Using default market assessment due to error")
 
             default_env = MarketEnvironment(
                 sp500_price=6840.0,
@@ -322,44 +343,20 @@ class STEPSOrchestrator:
                 sp500_200ma=6400.0,
                 sp500_1m_return=0.26,
                 sp500_ytd_return=28.0,
-                trend="BULL",
-                vix_level=15.2,
-                vix_20ma=16.5,
-                volatility_regime="LOW",
-                leading_sectors=["Technology", "Communication Services", "Financials"],
-                lagging_sectors=["Energy", "Utilities", "Real Estate"],
-                sector_performance={
-                    "Technology": 35.0,
-                    "Communication Services": 28.0,
-                    "Financials": 22.0,
-                    "Healthcare": 18.0,
-                    "Consumer Discretionary": 15.0,
-                    "Industrials": 12.0,
-                    "Materials": 8.0,
-                    "Consumer Staples": 5.0,
-                    "Energy": -2.0,
-                    "Utilities": -5.0,
-                    "Real Estate": -8.0
-                },
-                market_breadth="NARROW",
-                risk_appetite="RISK_ON",
-                summary="S&P 500 at 6,840 (+0.26%), low volatility (VIX 15.2), tech leadership continues. Bullish environment with narrow breadth.",
+                trend="NEUTRAL",
+                vix_level=20.0,
+                vix_20ma=20.0,
+                volatility_regime="MODERATE",
+                leading_sectors=["Technology"],
+                lagging_sectors=["Energy"],
+                sector_performance={},
+                market_breadth="MODERATE",
+                risk_appetite="NEUTRAL",
+                summary="Market data unavailable - using neutral assessment.",
                 analysis_date=datetime.now().strftime("%Y-%m-%d"),
-                data_quality="PARTIAL"
+                data_quality="INSUFFICIENT"
             )
 
-            # Save output
-            output_file = self.outputs_dir / f"market_environment_{datetime.now().strftime('%Y%m%d')}.json"
-            if not self.dry_run:
-                with open(output_file, 'w') as f:
-                    json.dump(asdict(default_env), f, indent=2)
-
-            logger.info(f"✅ STEP 1 Complete: {default_env.summary}")
-            return default_env
-
-        except Exception as e:
-            logger.error(f"❌ STEP 1 Failed: {e}")
-            # Return default on failure (not critical)
             return default_env
 
     def _step_2_holdings_quality(self) -> Dict[str, QualityScore]:
