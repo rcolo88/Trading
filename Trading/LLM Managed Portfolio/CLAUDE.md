@@ -194,6 +194,88 @@ python market_environment_analyzer.py --verbose
 - Fetches data from yfinance (S&P 500, VIX, 11 sector ETFs)
 - 4-hour cache prevents redundant API calls
 
+### 🏗️ STEP 6: Portfolio Constructor
+
+**Implements systematic 80/20 allocation enforcement and score-based position sizing.**
+
+The Portfolio Constructor module calculates optimal portfolio allocations based on quality and thematic scores, generates rebalancing trades, and enforces the 80/20 framework constraints.
+
+Execute standalone portfolio construction:
+
+```bash
+# Basic test (no arguments needed)
+cd "Portfolio Scripts Schwab"
+python portfolio_constructor.py --test
+
+# Run full test suite
+python test_portfolio_constructor.py
+```
+
+**Key Features:**
+- **Score-Based Position Sizing** - Automatic position sizes based on quality (7-10) and thematic (28-40) scores
+- **80/20 Framework Enforcement** - Quality 75-85%, Thematic 15-25%, Cash ≥3%
+- **Rebalancing Trade Generation** - Specific buy/sell orders to reach target allocation
+- **Risk Parameter Calculation** - Stop-losses and profit targets by position type
+- **Violation Detection** - Identifies constraint violations for human review
+- **$50 Minimum Trade Size** - Prevents uneconomical micro-trades
+
+**Position Sizing Rules:**
+
+*Quality Holdings (0-10 scale):*
+- **Elite (9-10)**: 10-20% per position, -15% stop, +40% target
+- **Strong (8-8.99)**: 7-12% per position, -15% stop, +40% target
+- **Moderate (7-7.99)**: 5-8% per position, -20% stop, +40% target
+- **Weak (<7)**: EXIT position (0%)
+
+*Thematic Holdings (0-40 scale):*
+- **Leader (35-40)**: 5-7% per position, -27.5% stop, +50% target
+- **Strong Contender (30-34.9)**: 3-5% per position, -27.5% stop, +50% target
+- **Contender (28-29.9)**: 2-3% per position, -27.5% stop, +50% target
+- **Laggard (<28)**: EXIT position (0%)
+
+**Outputs:**
+- `outputs/portfolio_allocation_YYYYMMDD.json` - Target allocation with violations
+- `outputs/rebalancing_trades_YYYYMMDD.json` - Specific trades needed
+- `outputs/portfolio_allocation_summary.md` - Human-readable summary
+
+**Integration:**
+- Called automatically by `steps_orchestrator.py` in STEP 6
+- Uses quality scores from `quality_analysis_script.py` (STEP 2)
+- Uses thematic scores from prompt builder analysis (STEP 3B)
+- Generates trades for trade synthesis (STEP 7)
+
+**Core Dataclasses:**
+```python
+@dataclass
+class PortfolioAllocation:
+    quality_holdings: Dict[str, float]  # ticker → target %
+    thematic_holdings: Dict[str, float]  # ticker → target %
+    cash_reserve: float
+    total_quality_pct: float
+    total_thematic_pct: float
+    violations: List[str]
+
+@dataclass
+class RiskParameters:
+    ticker: str
+    stop_loss_pct: float  # e.g., -15.0
+    profit_target_pct: float  # e.g., +50.0
+    position_type: str  # QUALITY or THEMATIC
+```
+
+**Algorithm:**
+1. Calculate raw position sizes based on quality/thematic scores
+2. Normalize quality holdings to 80% total allocation
+3. Normalize thematic holdings to 20% total allocation
+4. Reserve 5% cash
+5. Detect and report violations (oversized positions, wrong ratios, etc.)
+6. Generate specific trades to move from current to target allocation
+
+**Performance:**
+- Runtime: <1 second for typical portfolio (5-15 positions)
+- No external API calls (offline calculation)
+- Generates actionable trades with reasoning
+
 ### ❌ Legacy Scripts (DO NOT USE)
 ```bash
 # DEPRECATED - Only kept for reference
@@ -207,18 +289,19 @@ conda run -n options python Daily_Portfolio_Script_new_parse.py --test-parser
 1. **`main.py`** - System orchestrator and entry point
 2. **`steps_orchestrator.py`** - STEPS 10-step portfolio analysis orchestrator (NEW)
 3. **`market_environment_analyzer.py`** - Market environment assessment (STEP 1) (NEW)
-4. **`portfolio_manager.py`** - Holdings, cash, and state management
-5. **`schwab_data_fetcher.py`** - Schwab API market data retrieval
-6. **`schwab_account_manager.py`** - Account synchronization with Schwab
-7. **`schwab_trade_executor.py`** - Live trade execution via Schwab API
-8. **`schwab_safety_validator.py`** - Pre-trade safety validation
-9. **`trade_executor.py`** - Document parsing and order execution
-10. **`report_generator.py`** - Analysis, reporting, and chart generation
-11. **`market_hours.py`** - Market hours validation
-12. **`trading_models.py`** - Data structures and enums
-13. **`hf_recommendation_generator.py`** - HuggingFace AI recommendation orchestrator
-14. **`hf_config.py`** - HuggingFace model configurations
-15. **`agents/`** - HuggingFace agent modules (news, market, risk, tone)
+4. **`portfolio_constructor.py`** - 80/20 portfolio construction and rebalancing (STEP 6) (NEW)
+5. **`portfolio_manager.py`** - Holdings, cash, and state management
+6. **`schwab_data_fetcher.py`** - Schwab API market data retrieval
+7. **`schwab_account_manager.py`** - Account synchronization with Schwab
+8. **`schwab_trade_executor.py`** - Live trade execution via Schwab API
+9. **`schwab_safety_validator.py`** - Pre-trade safety validation
+10. **`trade_executor.py`** - Document parsing and order execution
+11. **`report_generator.py`** - Analysis, reporting, and chart generation
+12. **`market_hours.py`** - Market hours validation
+13. **`trading_models.py`** - Data structures and enums
+14. **`hf_recommendation_generator.py`** - HuggingFace AI recommendation orchestrator
+15. **`hf_config.py`** - HuggingFace model configurations
+16. **`agents/`** - HuggingFace agent modules (news, market, risk, tone)
 
 ### Key Benefits of Modular System
 - **Smaller, manageable code chunks** for easier Claude interaction
