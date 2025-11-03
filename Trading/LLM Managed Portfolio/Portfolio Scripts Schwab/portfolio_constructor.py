@@ -220,7 +220,12 @@ class PortfolioConstructor:
         # Calculate totals
         total_quality_pct = sum(quality_normalized.values())
         total_thematic_pct = sum(thematic_normalized.values())
-        cash_reserve = self.TARGET_CASH_PCT
+
+        # If no holdings passed threshold, all cash
+        if total_quality_pct == 0 and total_thematic_pct == 0:
+            cash_reserve = 100.0
+        else:
+            cash_reserve = self.TARGET_CASH_PCT
 
         # Create PortfolioAllocation
         allocation = PortfolioAllocation(
@@ -246,7 +251,8 @@ class PortfolioConstructor:
         self,
         portfolio_state: Dict,  # from portfolio_state.json
         quality_scores: Dict[str, float],
-        thematic_scores: Dict[str, float]
+        thematic_scores: Dict[str, float],
+        current_prices: Dict[str, float]
     ) -> AllocationReport:
         """
         Analyze current portfolio allocation vs 80/20 framework.
@@ -267,6 +273,7 @@ class PortfolioConstructor:
             portfolio_state: Portfolio state dict with holdings and cash
             quality_scores: Dict of ticker → quality_score
             thematic_scores: Dict of ticker → thematic_score
+            current_prices: Dict of ticker → current_price
 
         Returns:
             AllocationReport with current allocation and violations
@@ -278,18 +285,31 @@ class PortfolioConstructor:
 
         # Calculate total portfolio value
         total_value = cash
-        for ticker, shares in holdings.items():
-            # Would need current prices - for now use placeholder
-            # In real implementation, fetch from market data
-            estimated_price = 100.0  # Placeholder
-            total_value += shares * estimated_price
+        for ticker, holding_data in holdings.items():
+            shares = holding_data.get('shares', holding_data) if isinstance(holding_data, dict) else holding_data
+            price = current_prices.get(ticker, 100.0)
+            total_value += shares * price
+
+        # Handle empty portfolio
+        if total_value == 0:
+            return AllocationReport(
+                current_quality_pct=0.0,
+                current_thematic_pct=0.0,
+                current_cash_pct=0.0,
+                violations=[],
+                rebalancing_needed=False,
+                quality_holdings={},
+                thematic_holdings={}
+            )
 
         # Classify holdings as quality or thematic
         quality_holdings_pct = {}
         thematic_holdings_pct = {}
 
-        for ticker, shares in holdings.items():
-            position_value = shares * 100.0  # Placeholder price
+        for ticker, holding_data in holdings.items():
+            shares = holding_data.get('shares', holding_data) if isinstance(holding_data, dict) else holding_data
+            price = current_prices.get(ticker, 100.0)
+            position_value = shares * price
             position_pct = (position_value / total_value) * 100.0
 
             # Determine if quality or thematic based on scores
@@ -384,7 +404,8 @@ class PortfolioConstructor:
 
         # Calculate total portfolio value
         total_value = cash
-        for ticker, shares in holdings.items():
+        for ticker, holding_data in holdings.items():
+            shares = holding_data.get('shares', holding_data) if isinstance(holding_data, dict) else holding_data
             price = current_prices.get(ticker, 100.0)
             total_value += shares * price
 
@@ -392,13 +413,14 @@ class PortfolioConstructor:
 
         # Step 1: Identify exits (holdings not in target)
         all_target_tickers = set(target_allocation.quality_holdings.keys()) | set(target_allocation.thematic_holdings.keys())
-        for ticker, shares in holdings.items():
+        for ticker, holding_data in holdings.items():
+            shares = holding_data.get('shares', holding_data) if isinstance(holding_data, dict) else holding_data
             if ticker not in all_target_tickers:
                 # Position should be exited
                 trades.append({
                     'action': 'SELL',
                     'ticker': ticker,
-                    'shares': shares,
+                    'shares': int(shares),
                     'reason': f'Exit position - fails quality/thematic threshold',
                     'priority': 'HIGH'
                 })
@@ -411,7 +433,9 @@ class PortfolioConstructor:
             price = current_prices.get(ticker, 100.0)
             target_shares = int(target_value / price)
 
-            current_shares = holdings.get(ticker, 0)
+            holding_data = holdings.get(ticker, 0)
+            current_shares = holding_data.get('shares', holding_data) if isinstance(holding_data, dict) else holding_data
+            current_shares = int(current_shares) if current_shares else 0
             share_diff = target_shares - current_shares
 
             if abs(share_diff * price) >= 50.0:  # Minimum trade size $50
@@ -510,26 +534,26 @@ class PortfolioConstructor:
         # Check 80/20 framework (allow 5% tolerance)
         if allocation.total_quality_pct < self.QUALITY_MIN:
             violations.append(
-                f"Quality allocation {allocation.total_quality_pct:.1f}% below minimum {self.QUALITY_MIN}%"
+                f"Quality allocation {allocation.total_quality_pct:.1f}% below {self.QUALITY_MIN:.0f}%"
             )
         elif allocation.total_quality_pct > self.QUALITY_MAX:
             violations.append(
-                f"Quality allocation {allocation.total_quality_pct:.1f}% above maximum {self.QUALITY_MAX}%"
+                f"Quality allocation {allocation.total_quality_pct:.1f}% above {self.QUALITY_MAX:.0f}%"
             )
 
         if allocation.total_thematic_pct < self.THEMATIC_MIN:
             violations.append(
-                f"Thematic allocation {allocation.total_thematic_pct:.1f}% below minimum {self.THEMATIC_MIN}%"
+                f"Thematic allocation {allocation.total_thematic_pct:.1f}% below {self.THEMATIC_MIN:.0f}%"
             )
         elif allocation.total_thematic_pct > self.THEMATIC_MAX:
             violations.append(
-                f"Thematic allocation {allocation.total_thematic_pct:.1f}% above maximum {self.THEMATIC_MAX}%"
+                f"Thematic allocation {allocation.total_thematic_pct:.1f}% above {self.THEMATIC_MAX:.0f}%"
             )
 
         # Check cash reserve
         if allocation.cash_reserve < self.CASH_MIN:
             violations.append(
-                f"Cash reserve {allocation.cash_reserve:.1f}% below minimum {self.CASH_MIN}%"
+                f"Cash reserve {allocation.cash_reserve:.1f}% below {self.CASH_MIN:.0f}%"
             )
 
         # Check individual position limits
@@ -537,28 +561,34 @@ class PortfolioConstructor:
         for ticker, pct in all_positions.items():
             if pct > self.MAX_SINGLE_POSITION:
                 violations.append(
-                    f"{ticker} position {pct:.1f}% exceeds maximum {self.MAX_SINGLE_POSITION}%"
+                    f"{ticker} position {pct:.1f}% exceeds {self.MAX_SINGLE_POSITION:.0f}%"
                 )
 
         # Check thematic position limits
         for ticker, pct in allocation.thematic_holdings.items():
             if pct > self.MAX_THEMATIC_POSITION:
                 violations.append(
-                    f"{ticker} thematic position {pct:.1f}% exceeds maximum {self.MAX_THEMATIC_POSITION}%"
+                    f"{ticker} thematic position {pct:.1f}% exceeds {self.MAX_THEMATIC_POSITION:.0f}%"
                 )
 
         return violations
 
     # ==================== EXPORT METHODS ====================
 
-    def export_allocation_report(self, allocation: PortfolioAllocation, filename: str) -> None:
+    def export_allocation_report(self, allocation: PortfolioAllocation, filename: Optional[str] = None) -> str:
         """
         Export allocation to JSON file.
 
         Args:
             allocation: PortfolioAllocation to export
-            filename: Output filename
+            filename: Output filename (auto-generated if not provided)
+
+        Returns:
+            Path to exported file
         """
+        if filename is None:
+            filename = f"outputs/portfolio_allocation_{datetime.now().strftime('%Y%m%d')}.json"
+
         try:
             output_path = Path(filename)
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -567,43 +597,58 @@ class PortfolioConstructor:
                 json.dump(asdict(allocation), f, indent=2)
 
             logger.info(f"Exported allocation report to {filename}")
+            return str(output_path)
 
         except Exception as e:
             logger.error(f"Failed to export allocation report: {e}")
+            return ""
 
-    def export_rebalancing_trades(self, trades: List[Dict], filename: str) -> None:
+    def export_rebalancing_trades(self, trades: List[Dict], filename: Optional[str] = None) -> str:
         """
         Export rebalancing trades to JSON file.
 
         Args:
             trades: List of trade dicts
-            filename: Output filename
+            filename: Output filename (auto-generated if not provided)
+
+        Returns:
+            Path to exported file
         """
+        if filename is None:
+            filename = f"outputs/rebalancing_trades_{datetime.now().strftime('%Y%m%d')}.json"
+
         try:
             output_path = Path(filename)
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
             with open(output_path, 'w') as f:
-                json.dump(trades, f, indent=2)
+                json.dump({'trades': trades}, f, indent=2)
 
             logger.info(f"Exported {len(trades)} rebalancing trades to {filename}")
+            return str(output_path)
 
         except Exception as e:
             logger.error(f"Failed to export rebalancing trades: {e}")
+            return ""
 
-    def generate_allocation_summary(self, allocation: PortfolioAllocation) -> str:
+    def generate_allocation_summary(self, allocation: PortfolioAllocation, total_portfolio_value: Optional[float] = None) -> str:
         """
         Generate markdown summary of allocation.
 
         Args:
             allocation: PortfolioAllocation to summarize
+            total_portfolio_value: Optional total portfolio value in dollars
 
         Returns:
             Markdown formatted summary string
         """
         lines = []
         lines.append("# Portfolio Allocation Summary\n")
-        lines.append(f"**Date**: {datetime.now().strftime('%Y-%m-%d')}\n")
+        lines.append(f"**Date**: {datetime.now().strftime('%Y-%m-%d')}")
+        if total_portfolio_value is not None:
+            lines.append(f"**Portfolio Value**: ${total_portfolio_value:,.2f}\n")
+        else:
+            lines.append("")
         lines.append(f"**Total Quality**: {allocation.total_quality_pct:.1f}%")
         lines.append(f"**Total Thematic**: {allocation.total_thematic_pct:.1f}%")
         lines.append(f"**Cash Reserve**: {allocation.cash_reserve:.1f}%\n")

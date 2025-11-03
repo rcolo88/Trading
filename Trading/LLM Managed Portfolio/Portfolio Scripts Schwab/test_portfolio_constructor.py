@@ -22,12 +22,7 @@ from portfolio_constructor import (
     PortfolioConstructor,
     PortfolioAllocation,
     AllocationReport,
-    RiskParameters,
-    QUALITY_POSITION_SIZING,
-    THEMATIC_POSITION_SIZING,
-    TARGET_QUALITY_PCT,
-    TARGET_THEMATIC_PCT,
-    TARGET_CASH_PCT
+    RiskParameters
 )
 
 
