@@ -5,6 +5,7 @@ Configuration for financial sentiment analysis models and trading parameters
 
 from dataclasses import dataclass
 from typing import Optional
+import json
 import os
 
 
@@ -132,7 +133,8 @@ class HFConfig:
     ACTIVE_THEMES = [
         "AI Infrastructure",
         "Nuclear Renaissance",
-        "Defense Modernization"
+        "Defense Modernization", 
+        "Biotech"
     ]
 
     # Request Headers

@@ -4,15 +4,13 @@ Quality Metrics Calculator for Stock Analysis
 This module implements academically-validated quality metrics for evaluating company quality.
 Metrics are based on research by Novy-Marx, Piotroski, and other academic studies on quality investing.
 
-Metrics Calculated:
+Ranked Metrics Calculated:
 1. Gross Profitability = (Revenue - COGS) / Total Assets
 2. Return on Equity (ROE) = Net Income / Shareholder Equity
 3. Operating Profitability = (Revenue - COGS - SG&A) / Total Assets
 4. Free Cash Flow Yield = Free Cash Flow / Market Cap
 5. ROIC = NOPAT / (Total Debt + Total Equity)
 
-Author: Trading System
-Date: 2025-10-30
 """
 
 from typing import Dict, List, Tuple, Optional, Any

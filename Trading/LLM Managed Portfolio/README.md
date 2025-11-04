@@ -865,22 +865,22 @@ The agent system directly implements the **80% Quality Core / 20% Opportunistic*
 | **FCF Yield** | Free Cash Flow / Market Cap | 20% | ≥8% | Cash generation |
 | **ROIC** | NOPAT / (Debt + Equity) | 15% | ≥20% | Invested capital returns |
 
-**Quality Score Thresholds & Position Sizing:**
+**Quality Score Thresholds & Position Sizing (STEPS Framework):**
 
-| Tier | Score Range | Position Size | Hold Strategy | Stop-Loss | Profit Target |
-|------|-------------|---------------|---------------|-----------|---------------|
-| **Elite** | 85-100 | 10-20% | Long-term compounder | -8% | +15% |
-| **Strong** | 70-84 | 7-12% | Core holding | -8% | +15% |
-| **Moderate** | 50-69 | 5-8% | Selective holding | -10% | +12% |
-| **Weak** | 0-49 | **Exit or avoid** | N/A | N/A | N/A |
+| Tier | Score Range (0-100) | Score Range (0-10) | Position Size | Stop-Loss | Profit Target |
+|------|---------------------|--------------------|--------------|-----------|--------------|
+| **Elite** | 90-100 | 9.0-10.0 | 10-20% | -15% | +40% |
+| **Strong** | 80-89 | 8.0-8.9 | 7-12% | -15% | +40% |
+| **Moderate** | 70-79 | 7.0-7.9 | 5-8% | -20% | +40% |
+| **Below Threshold** | 0-69 | <7.0 | **EXIT** | N/A | N/A |
 
 **Investment Rules for Core (80%):**
-- ✅ **DO**: Buy companies with quality score ≥ 7
+- ✅ **DO**: Buy companies with quality score ≥ 70 (7.0 on 10-point scale)
 - ✅ **DO**: Size positions based on quality score (higher quality = larger position)
 - ✅ **DO**: Hold through normal market volatility (long-term compounders)
 - ✅ **DO**: Require positive free cash flow and ROE > 15% for 3+ years
 - ❌ **DON'T**: Exceed 20% in any single core position
-- ❌ **DON'T**: Exit unless quality score drops below 7
+- ❌ **DON'T**: Exit unless quality score drops below 70 (STEPS threshold)
 - ❌ **DON'T**: Prioritize cheap valuations over quality (avoid value traps)
 
 **Red Flag Detection:**
@@ -919,15 +919,14 @@ The agent system directly implements the **80% Quality Core / 20% Opportunistic*
 | **Climate Technology** | Tech maturity, unit economics, policy support, demand, carbon impact | IRA subsidies, carbon credits, grid modernization |
 | **Longevity/Biotech** | Science quality, clinical progress, commercial potential, IP, management | FDA approvals, GLP-1 adoption, clinical trial results |
 
-**Thematic Score Thresholds & Position Sizing:**
+**Thematic Score Thresholds & Position Sizing (STEPS Framework):**
 
-| Classification | Score Range | Position Size | Hold Strategy | Stop-Loss | Profit Target |
-|----------------|-------------|---------------|---------------|-----------|---------------|
-| **Leader** | 40-50 | 5-7% | Event-driven | -25% to -30% | +40-60% |
-| **Strong Contender** | 35-39 | 3-5% | Event-driven | -25% to -30% | +40-60% |
-| **Contender** | 30-34 | 3-5% | Event-driven | -25% to -30% | +40-60% |
-| **Weak Contender** | 28-29 | 2-3% | Event-driven | -30% | +40% |
-| **Laggard** | 0-27 | **Do not invest** | N/A | N/A | N/A |
+| Classification | Score Range (0-40) | Position Size | Stop-Loss | Profit Target |
+|----------------|-------------------|---------------|-----------|---------------|
+| **Leader** | 35-40 | 5-7% | -27.5% | +50% |
+| **Strong Contender** | 30-34 | 3-5% | -27.5% | +50% |
+| **Contender** | 28-29 | 2-3% | -25% | +45% |
+| **Below Threshold** | 0-27 | **EXIT** | N/A | N/A |
 
 **Catalyst Integration for Timing:**
 - Use Catalyst Analyzer to identify near-term (0-6mo) positive catalysts
@@ -937,14 +936,14 @@ The agent system directly implements the **80% Quality Core / 20% Opportunistic*
 - Avoid entering <2 weeks before catalyst (premium priced in)
 
 **Investment Rules for Opportunistic (20%):**
-- ✅ **DO**: Score minimum 28/50 on thematic dimensions
+- ✅ **DO**: Score minimum 28/40 on thematic dimensions (STEPS threshold)
 - ✅ **DO**: Position 2-4 months before high-probability positive catalysts
 - ✅ **DO**: Set tighter stop-losses (-25% to -30%) due to higher volatility
 - ✅ **DO**: Take profits aggressively (+40-60% gains)
 - ✅ **DO**: Accept negative FCF IF runway >12mo AND revenue growing >50%
 - ❌ **DON'T**: Exceed 7% in any single opportunistic position
 - ❌ **DON'T**: Exceed 20% total allocation to opportunistic holdings
-- ❌ **DON'T**: Hold through -30% stop-loss (cut losers quickly)
+- ❌ **DON'T**: Hold through stop-loss levels (cut losers quickly)
 - ❌ **DON'T**: Average down on thesis breaks (acknowledge mistakes)
 
 **Opportunistic Holdings Philosophy:**

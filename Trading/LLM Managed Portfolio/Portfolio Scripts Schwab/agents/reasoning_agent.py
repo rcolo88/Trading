@@ -22,6 +22,12 @@ class ReasoningDecision:
     recommended_shares: Optional[int] = None
     price_target: Optional[float] = None
 
+    # Position sizing (from portfolio_constructor.py logic)
+    target_position_pct: Optional[float] = None  # e.g., 15.0 for 15%
+    position_type: Optional[str] = None  # QUALITY or THEMATIC
+    stop_loss_pct: Optional[float] = None  # e.g., -15.0
+    profit_target_pct: Optional[float] = None  # e.g., +40.0
+
 
 class ReasoningAgent(BaseAgent):
     """
@@ -29,10 +35,10 @@ class ReasoningAgent(BaseAgent):
 
     Uses DeepSeek-R1-Distill-Qwen-14B for reasoning and decision synthesis.
 
-    Decision Logic:
-    - HOLD: Default when quality >70, no major red flags, neutral/positive news
-    - SELL: Quality <60 OR >3 red flags OR major negative catalyst
-    - BUY: Alternative quality >85 OR >15 points better than current holding
+    Decision Logic (STEPS Framework - PM_README_V3.md):
+    - HOLD: Default when quality ≥70, no major red flags, neutral/positive news
+    - SELL: Quality <70 (STEPS threshold) OR thematic <28 OR >3 red flags OR major negative catalyst
+    - BUY: Alternative quality ≥85 (Elite) OR quality ≥70 and 15+ points better than current holding
     """
 
     def __init__(self):
@@ -144,23 +150,24 @@ AGENT ANALYSIS:
 - Red Flags: {quality_analysis.get('red_flags_count', 0)}
 - Investment Rating: {quality_analysis.get('investment_rating', 'N/A')}
 
-DECISION FRAMEWORK:
+DECISION FRAMEWORK (STEPS Methodology):
 
 HOLD if:
-- Quality score >70
+- Quality score ≥70 (STEPS threshold for core holdings)
 - No major red flags (<3)
 - News neutral or positive
 - No better alternative identified
 
 SELL if:
-- Quality score <60, OR
+- Quality score <70 (STEPS: exit from core holdings), OR
+- Thematic score <28 (STEPS: exit opportunistic positions), OR
 - Red flags >3, OR
 - Major negative catalyst in news, OR
 - Better alternative exists (>15 quality points higher)
 
 BUY if (for alternatives):
-- Quality score >85 (Elite), OR
-- Quality score >70 AND 15+ points better than current holdings
+- Quality score ≥85 (Elite tier - STEPS: 10-20% position), OR
+- Quality score ≥70 AND 15+ points better than current holdings
 
 Think step-by-step:
 1. What is the overall quality of this company?
@@ -250,9 +257,17 @@ KEY_FACTOR: [Single most important factor]
             if "KEY_FACTOR:" in generated_text:
                 key_factor = generated_text.split("KEY_FACTOR:")[1].split("\n")[0].strip()
 
+            # Calculate position sizing
+            quality_score = agent_outputs.get('quality_analysis', {}).get('composite_score')
+            thematic_score = agent_outputs.get('thematic_score')
+            position_type, target_pct, stop_loss, profit_target = self._calculate_position_params(
+                quality_score, thematic_score
+            )
+
             # Build key factors dict
             key_factors = {
-                'quality_score': agent_outputs.get('quality_analysis', {}).get('composite_score'),
+                'quality_score': quality_score,
+                'thematic_score': thematic_score,
                 'news_sentiment': agent_outputs.get('news_sentiment', {}).get('sentiment'),
                 'market_sentiment': agent_outputs.get('market_sentiment', {}).get('sentiment'),
                 'risk_level': agent_outputs.get('risk_assessment', {}).get('label'),
@@ -264,12 +279,97 @@ KEY_FACTOR: [Single most important factor]
                 action=action,
                 confidence=confidence,
                 reasoning_steps=reasoning_steps if reasoning_steps else ["Automated decision based on agent consensus"],
-                key_factors=key_factors
+                key_factors=key_factors,
+                target_position_pct=target_pct,
+                position_type=position_type,
+                stop_loss_pct=stop_loss,
+                profit_target_pct=profit_target
             )
 
         except Exception as e:
             self.logger.error(f"Failed to parse reasoning output: {e}")
             return self._create_fallback_decision(ticker, agent_outputs)
+
+    def _calculate_position_params(
+        self,
+        quality_score: Optional[float],
+        thematic_score: Optional[float]
+    ) -> tuple:
+        """
+        Calculate position type, target %, stop-loss, profit target
+
+        Position sizing follows PM_README_V3.md (80/20 Framework):
+
+        Quality Holdings (Core 80%):
+        - Score ≥9.0: 10-20% position, -15% stop, +40% target (Elite)
+        - Score 8.0-8.99: 7-12% position, -15% stop, +40% target (Strong)
+        - Score 7.0-7.99: 5-8% position, -20% stop, +40% target (Moderate)
+        - Score <7.0: 0% - EXIT
+
+        Thematic Holdings (Opportunistic 20%):
+        - Score 35-40: 5-7% position, -27.5% stop, +50% target (Leader)
+        - Score 30-34: 3-5% position, -27.5% stop, +50% target (Strong Contender)
+        - Score 28-29: 2-3% position, -25% stop, +45% target (Contender)
+        - Score <28: 0% - EXIT
+
+        Args:
+            quality_score: Quality score (0-100 scale)
+            thematic_score: Thematic score (0-40 scale)
+
+        Returns:
+            Tuple of (position_type, target_pct, stop_loss_pct, profit_target_pct)
+        """
+        # Convert quality score from 0-100 scale to 0-10 scale
+        quality_score_10 = quality_score / 10.0 if quality_score is not None else None
+
+        # Quality holdings (score ≥ 7)
+        if quality_score_10 is not None and quality_score_10 >= 7.0:
+            position_type = "QUALITY"
+
+            if quality_score_10 >= 9.0:
+                # Elite: 10-20%
+                target_pct = 15.0  # Midpoint
+                stop_loss = -15.0
+                profit_target = 40.0
+            elif quality_score_10 >= 8.0:
+                # Strong: 7-12%
+                target_pct = 9.5  # Midpoint
+                stop_loss = -15.0
+                profit_target = 40.0
+            else:  # 7.0-7.99
+                # Moderate: 5-8%
+                target_pct = 6.5  # Midpoint
+                stop_loss = -20.0
+                profit_target = 40.0
+
+        # Thematic holdings (score ≥ 28)
+        elif thematic_score is not None and thematic_score >= 28:
+            position_type = "THEMATIC"
+
+            if thematic_score >= 35:
+                # Leader: 5-7%
+                target_pct = 6.0  # Midpoint
+                stop_loss = -27.5
+                profit_target = 50.0
+            elif thematic_score >= 30:
+                # Strong Contender: 3-5%
+                target_pct = 4.0  # Midpoint
+                stop_loss = -27.5
+                profit_target = 50.0
+            else:  # 28-29
+                # Contender: 2-3%
+                target_pct = 2.5  # Midpoint
+                stop_loss = -25.0
+                profit_target = 45.0
+
+        else:
+            # No score or below thresholds → EXIT
+            position_type = "NONE"
+            target_pct = 0.0
+            stop_loss = 0.0
+            profit_target = 0.0
+
+        return position_type, target_pct, stop_loss, profit_target
 
     def _create_fallback_decision(
         self,
@@ -277,7 +377,26 @@ KEY_FACTOR: [Single most important factor]
         agent_outputs: Dict[str, Any]
     ) -> ReasoningDecision:
         """
-        Create fallback decision using simple rule-based logic
+        Create fallback decision using simple rule-based logic when LLM reasoning fails
+
+        Decision thresholds from PM_README_V3.md (80/20 Framework):
+
+        Quality Holdings (Core 80%):
+        - Score <7.0 (70 on 0-100 scale): EXIT - below minimum threshold (line 594)
+        - Score 7.0-7.9 (70-79): HOLD with 5-8% position (line 66)
+        - Score 8.0-8.9 (80-89): BUY/SCALE with 7-12% position (line 65)
+        - Score ≥9.0 (90-100): STRONG BUY with 10-20% position (line 64)
+
+        Thematic Holdings (Opportunistic 20%):
+        - Score <28: EXIT - below minimum threshold (line 117)
+        - Score 28-29: HOLD with 2-3% position (line 122)
+        - Score 30-34: BUY with 3-5% position (line 121)
+        - Score 35-40: STRONG BUY with 5-7% position (line 120)
+
+        Additional Exit Rules:
+        - Red flags >3: EXIT regardless of score
+        - Negative news + quality <70: EXIT
+        - Better alternative exists (>15 points quality): SWAP/EXIT
 
         Args:
             ticker: Stock ticker
@@ -287,29 +406,80 @@ KEY_FACTOR: [Single most important factor]
             ReasoningDecision with rule-based decision
         """
         quality_score = agent_outputs.get('quality_analysis', {}).get('composite_score', 50)
+        thematic_score = agent_outputs.get('thematic_score')
         red_flags = agent_outputs.get('quality_analysis', {}).get('red_flags_count', 0)
         news_sentiment = agent_outputs.get('news_sentiment', {}).get('sentiment', 'neutral')
         current_holding = agent_outputs.get('current_holding', False)
 
-        # Simple rule-based logic
+        # Calculate position sizing
+        position_type, target_pct, stop_loss, profit_target = self._calculate_position_params(
+            quality_score, thematic_score
+        )
+
+        # Simple rule-based logic following STEPS methodology
         action = "HOLD"
         reasoning = []
 
-        if quality_score < 60:
+        # Check thematic score first (if applicable)
+        if thematic_score is not None and thematic_score < 28:
             action = "SELL"
-            reasoning.append(f"Quality score {quality_score:.1f} below threshold (60)")
+            reasoning.append(f"Thematic score {thematic_score:.1f}/40 below STEPS threshold (28)")
+            reasoning.append("EXIT opportunistic position (STEPS requirement)")
+            reasoning.append("Free capital for higher-conviction thematic opportunities")
+            # Override position params for SELL
+            target_pct = 0.0
+            position_type = "NONE"
+            stop_loss = 0.0
+            profit_target = 0.0
+        # Check quality score
+        elif quality_score < 70:  # STEPS threshold (7.0 on 10-point scale)
+            action = "SELL"
+            quality_10 = quality_score / 10.0
+            reasoning.append(f"Quality score {quality_10:.1f}/10 below STEPS threshold (7.0)")
+            reasoning.append("EXIT from core holdings (STEPS requirement)")
+            reasoning.append("Free capital for higher quality opportunities")
+            # Override position params for SELL
+            target_pct = 0.0
+            position_type = "NONE"
+            stop_loss = 0.0
+            profit_target = 0.0
+        # Check red flags
         elif red_flags > 3:
             action = "SELL"
-            reasoning.append(f"Too many red flags ({red_flags})")
+            reasoning.append(f"Too many red flags ({red_flags}) - quality concerns")
+            reasoning.append("EXIT regardless of score (STEPS risk management)")
+            # Override position params for SELL
+            target_pct = 0.0
+            position_type = "NONE"
+            stop_loss = 0.0
+            profit_target = 0.0
+        # Elite quality opportunity
         elif quality_score >= 85 and not current_holding:
             action = "BUY"
-            reasoning.append(f"Elite quality score {quality_score:.1f}")
-        elif news_sentiment == 'negative' and quality_score < 70:
+            quality_10 = quality_score / 10.0
+            reasoning.append(f"Quality score {quality_10:.1f}/10 (STEPS: Elite tier)")
+            reasoning.append(f"Target position: {target_pct:.1f}% ({position_type})")
+            reasoning.append(f"STEPS framework: 10-20% range for Elite quality")
+        # Negative news with borderline quality
+        elif news_sentiment == 'negative' and quality_score < 75:
             action = "SELL"
-            reasoning.append("Negative news with moderate quality")
+            reasoning.append("Negative news with marginal quality (STEPS: risk reduction)")
+            # Override position params for SELL
+            target_pct = 0.0
+            position_type = "NONE"
+            stop_loss = 0.0
+            profit_target = 0.0
+        # Default HOLD
         else:
             action = "HOLD"
-            reasoning.append(f"Quality {quality_score:.1f}, news {news_sentiment}, maintaining position")
+            quality_10 = quality_score / 10.0
+            reasoning.append(f"Quality {quality_10:.1f}/10 (STEPS: threshold met), news {news_sentiment}")
+            if target_pct > 0:
+                reasoning.append(f"Maintain position at {target_pct:.1f}% ({position_type})")
+
+        # Add position sizing to reasoning for BUY/HOLD
+        if action in ["BUY", "HOLD"] and target_pct > 0:
+            reasoning.append(f"Stop-loss: {stop_loss}%, Profit target: {profit_target}%")
 
         return ReasoningDecision(
             ticker=ticker,
@@ -318,10 +488,52 @@ KEY_FACTOR: [Single most important factor]
             reasoning_steps=reasoning,
             key_factors={
                 'quality_score': quality_score,
+                'thematic_score': thematic_score,
                 'red_flags': red_flags,
                 'news_sentiment': news_sentiment,
                 'key_factor': 'Fallback rule-based decision'
-            }
+            },
+            target_position_pct=target_pct,
+            position_type=position_type,
+            stop_loss_pct=stop_loss,
+            profit_target_pct=profit_target
+        )
+
+    def _interpret_results(self, response: Dict[str, Any], text: str, context: Optional[Dict[str, Any]]) -> AgentResult:
+        """
+        Interpret reasoning model response into AgentResult
+
+        This method satisfies the BaseAgent abstract method requirement.
+        For ReasoningAgent, we parse the response and convert to AgentResult.
+
+        Args:
+            response: Raw API response from reasoning model
+            text: Original prompt text (not used)
+            context: Must contain 'ticker' and 'agent_outputs'
+
+        Returns:
+            AgentResult with decision
+        """
+        if not context or 'ticker' not in context or 'agent_outputs' not in context:
+            raise ValueError("ReasoningAgent requires context with 'ticker' and 'agent_outputs'")
+
+        ticker = context['ticker']
+        agent_outputs = context['agent_outputs']
+
+        # Parse the response into a decision
+        decision = self._parse_reasoning_output(ticker, response, agent_outputs)
+
+        # Convert to AgentResult
+        return AgentResult(
+            agent_name="ReasoningAgent",
+            sentiment=decision.action.lower(),
+            confidence=decision.confidence,
+            score=decision.confidence * 100,
+            label=decision.action,
+            reasoning="\n".join(decision.reasoning_steps),
+            timestamp=datetime.now(),
+            model_used=self.model_config.model_id,
+            raw_response={'decision': decision.__dict__}
         )
 
     def analyze(self, text: str, context: Optional[Dict[str, Any]] = None) -> AgentResult:

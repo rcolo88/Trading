@@ -473,20 +473,62 @@ class STEPSOrchestrator:
         """
         STEP 3B: Thematic Opportunity Discovery
 
-        Identifies and scores opportunistic thematic investments
+        Identifies and scores opportunistic thematic investments (20% allocation)
+        Uses thematic_analysis_script.py to score holdings on theme fit
         """
         logger.info("🎯 Running STEP 3B: Thematic Discovery...")
 
         try:
-            # TODO: Implement thematic analysis integration
-            logger.warning("⚠️  Thematic analysis not yet fully implemented")
+            from thematic_analysis_script import ThematicAnalysisScript
 
-            # Placeholder: Return empty dict for now
+            # Initialize thematic analyzer
+            thematic_script = ThematicAnalysisScript(model_type='7B')
+
+            # Identify opportunistic candidates
+            # Option 1: All current holdings (check if any are thematic)
+            # Option 2: Specific tickers flagged as opportunistic
+            # For now, analyze all holdings and filter by thematic score threshold
+
+            holdings = list(self.portfolio_state.get('holdings', {}).keys())
+            logger.info(f"Analyzing {len(holdings)} holdings for thematic fit...")
+
+            # Run thematic analysis (heuristic mode - fast)
+            results = thematic_script.analyze_opportunistic_holdings(
+                tickers=holdings,
+                use_llm=False  # Use heuristic for speed
+            )
+
+            # Filter by minimum threshold (28/50)
+            qualified_thematic = {
+                ticker: data
+                for ticker, data in results.items()
+                if data['score'] >= 28
+            }
+
+            # Convert to ThematicScore objects
             thematic_scores = {}
+            for ticker, data in qualified_thematic.items():
+                thematic_scores[ticker] = ThematicScore(
+                    dimension_scores=data['dimensions'],
+                    dimension_rationales={k: f"Score: {v}/10" for k, v in data['dimensions'].items()},
+                    overall_score=data['score'],
+                    classification=data['classification'],
+                    key_strength=f"{data['theme']} exposure",
+                    key_risk="Thematic volatility",
+                    investment_stance=data['investment_stance'],
+                    confidence=data['confidence']
+                )
 
-            logger.info(f"✅ STEP 3B Complete: {len(thematic_scores)} thematic candidates identified")
+            # Export results
+            if results:
+                thematic_script.export_results(results)
+
+            logger.info(f"✅ STEP 3B Complete: {len(qualified_thematic)}/{len(results)} meet thematic threshold (≥28)")
             return thematic_scores
 
+        except ImportError as e:
+            logger.error(f"❌ STEP 3B Failed: Missing thematic_analysis_script.py - {e}")
+            return {}
         except Exception as e:
             logger.error(f"❌ STEP 3B Warning: {e}")
             return {}
@@ -496,18 +538,45 @@ class STEPSOrchestrator:
         STEP 4: Competitive Landscape Analysis
 
         Compares holdings against direct competitors
+        Identifies KEEP/SWAP/EXIT opportunities based on competitive position
         """
         logger.info("🏆 Running STEP 4: Competitive Analysis...")
 
         try:
-            # TODO: Implement competitive analyzer
-            logger.warning("⚠️  Competitive analyzer not yet implemented")
+            from competitive_analyzer import CompetitiveAnalyzer
 
-            competitive_rankings = {}
+            # Initialize analyzer
+            analyzer = CompetitiveAnalyzer()
+
+            # Get holdings to analyze
+            holdings = list(self.portfolio_state.get('holdings', {}).keys())
+            logger.info(f"Analyzing competitive position for {len(holdings)} holdings...")
+
+            # Run competitive analysis
+            results = analyzer.batch_analyze_portfolio(holdings)
+
+            # Export results
+            if results:
+                analyzer.export_to_json(results)
+                analyzer.generate_markdown_report(results)
+
+            # Convert to CompetitiveRanking format (if needed for typing)
+            # For now, just use the results dict
+            competitive_rankings = results
 
             logger.info(f"✅ STEP 4 Complete: {len(competitive_rankings)} competitive analyses")
+
+            # Log summary
+            keep_count = sum(1 for r in results.values() if r.recommendation == "KEEP")
+            swap_count = sum(1 for r in results.values() if r.recommendation == "SWAP")
+            exit_count = sum(1 for r in results.values() if r.recommendation == "EXIT")
+            logger.info(f"  KEEP: {keep_count}, SWAP: {swap_count}, EXIT: {exit_count}")
+
             return competitive_rankings
 
+        except ImportError as e:
+            logger.error(f"❌ STEP 4 Failed: Missing competitive_analyzer.py - {e}")
+            return {}
         except Exception as e:
             logger.error(f"❌ STEP 4 Warning: {e}")
             return {}
@@ -516,19 +585,54 @@ class STEPSOrchestrator:
         """
         STEP 5: Valuation Analysis
 
-        Assesses whether stocks are reasonably valued
+        Assesses whether stocks are reasonably valued using quality-adjusted P/E thresholds
+        Prevents overpaying even for high-quality companies
         """
         logger.info("💰 Running STEP 5: Valuation Analysis...")
 
         try:
-            # TODO: Implement valuation analyzer
-            logger.warning("⚠️  Valuation analyzer not yet implemented")
+            from valuation_analyzer import ValuationAnalyzer
 
-            valuation_ratings = {}
+            # Initialize analyzer
+            analyzer = ValuationAnalyzer()
+
+            # Get holdings to analyze
+            holdings = list(self.portfolio_state.get('holdings', {}).keys())
+            logger.info(f"Analyzing valuation for {len(holdings)} holdings...")
+
+            # Get quality scores from quality analysis (from previous step)
+            # For now, use default scores - in production would load from quality_scores dict
+            quality_scores = {}
+            if hasattr(self, 'quality_scores') and self.quality_scores:
+                quality_scores = self.quality_scores
+            else:
+                # Default to 75 if quality scores not available
+                quality_scores = {ticker: 75.0 for ticker in holdings}
+                logger.warning("Quality scores not available, using default 75.0")
+
+            # Run valuation analysis
+            results = analyzer.batch_analyze_portfolio(holdings, quality_scores)
+
+            # Export results
+            if results:
+                analyzer.export_to_json(results)
+                analyzer.generate_markdown_report(results)
+
+            valuation_ratings = results
 
             logger.info(f"✅ STEP 5 Complete: {len(valuation_ratings)} valuations analyzed")
+
+            # Log summary
+            buy_count = sum(1 for r in results.values() if r.recommendation == "BUY")
+            hold_count = sum(1 for r in results.values() if r.recommendation == "HOLD")
+            avoid_count = sum(1 for r in results.values() if r.recommendation == "AVOID")
+            logger.info(f"  BUY: {buy_count}, HOLD: {hold_count}, AVOID: {avoid_count}")
+
             return valuation_ratings
 
+        except ImportError as e:
+            logger.error(f"❌ STEP 5 Failed: Missing valuation_analyzer.py - {e}")
+            return {}
         except Exception as e:
             logger.error(f"❌ STEP 5 Warning: {e}")
             return {}
@@ -638,30 +742,87 @@ class STEPSOrchestrator:
         """
         STEP 9: Data Quality Validation
 
-        Validates data completeness and freshness
+        Validates data completeness and freshness for all holdings
         """
         logger.info("🔬 Running STEP 9: Data Validation...")
 
         try:
-            # TODO: Implement data validator
-            logger.warning("⚠️  Data validator not yet implemented")
+            from data_validator import DataValidator
 
-            report = DataQualityReport(
-                overall_quality="PARTIAL",
-                missing_metrics=[],
-                stale_metrics=[],
-                warnings=[],
-                quality_score=7.0
+            validator = DataValidator()
+            holdings = list(self.portfolio_state.get('holdings', {}).keys())
+
+            if not holdings:
+                logger.warning("No holdings to validate")
+                return DataQualityReport(
+                    overall_quality="INSUFFICIENT",
+                    missing_metrics=[],
+                    stale_metrics=[],
+                    warnings=["No holdings in portfolio"],
+                    quality_score=0.0
+                )
+
+            # Batch validate all holdings
+            detailed_reports = validator.batch_validate_portfolio(holdings)
+
+            # Aggregate results for orchestrator summary
+            all_missing = []
+            all_stale = []
+            all_warnings = []
+            total_score = 0.0
+
+            for ticker, detail_report in detailed_reports.items():
+                all_missing.extend([f"{ticker}:{m}" for m in detail_report.missing_metrics])
+                all_stale.extend([f"{ticker}:{s}" for s in detail_report.stale_metrics])
+                all_warnings.extend([f"{ticker}: {w}" for w in detail_report.warnings])
+                total_score += detail_report.quality_score
+
+            # Calculate average quality score
+            avg_score = total_score / len(detailed_reports)
+
+            # Determine overall quality
+            if avg_score >= 8.0:
+                overall = "COMPLETE"
+            elif avg_score >= 5.0:
+                overall = "PARTIAL"
+            else:
+                overall = "INSUFFICIENT"
+
+            # Export detailed reports
+            output_date = datetime.now().strftime('%Y%m%d')
+            validator.export_to_json(
+                detailed_reports,
+                f"outputs/data_validation_{output_date}.json"
+            )
+            validator.export_summary(
+                detailed_reports,
+                f"outputs/data_validation_{output_date}_summary.md"
             )
 
-            logger.info(f"✅ STEP 9 Complete: Data quality score {report.quality_score}/10")
+            report = DataQualityReport(
+                overall_quality=overall,
+                missing_metrics=all_missing,
+                stale_metrics=all_stale,
+                warnings=all_warnings,
+                quality_score=avg_score
+            )
+
+            logger.info(f"✅ STEP 9 Complete: Portfolio data quality {overall} (score: {avg_score:.1f}/10)")
+            logger.info(f"   - Holdings validated: {len(holdings)}")
+            logger.info(f"   - Total missing metrics: {len(all_missing)}")
+            logger.info(f"   - Total warnings: {len(all_warnings)}")
+
             return report
 
         except Exception as e:
-            logger.error(f"❌ STEP 9 Warning: {e}")
+            logger.error(f"❌ STEP 9 Error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return DataQualityReport(
                 overall_quality="INSUFFICIENT",
-                missing_metrics=[], stale_metrics=[], warnings=[],
+                missing_metrics=[],
+                stale_metrics=[],
+                warnings=[f"Error during validation: {str(e)}"],
                 quality_score=0.0
             )
 
@@ -669,33 +830,105 @@ class STEPSOrchestrator:
         """
         STEP 10: Framework Compliance Validation
 
-        Ensures all recommendations comply with 80/20 framework
+        Validates portfolio compliance with 80/20 framework rules
         """
         logger.info("✅ Running STEP 10: Framework Validation...")
 
         try:
-            # TODO: Implement framework validator
-            logger.warning("⚠️  Framework validator not yet implemented")
+            from framework_validator import FrameworkValidator
 
-            report = ComplianceReport(
-                portfolio_value=1000.0,
-                compliance_score=100.0,
-                violations=[],
-                allocation_quality_pct=80.0,
-                allocation_thematic_pct=20.0,
-                allocation_cash_pct=5.0,
-                framework_compliant=True
+            validator = FrameworkValidator()
+
+            # Get quality scores from STEP 2 results
+            quality_results = self.results.get('quality_scores', {})
+            quality_scores = {}
+            for ticker, score_data in quality_results.items():
+                if isinstance(score_data, dict):
+                    # Extract composite score from dict
+                    quality_scores[ticker] = score_data.get('composite_score', 0.0)
+                else:
+                    # Assume it's already a number
+                    quality_scores[ticker] = score_data
+
+            # Get thematic scores from STEP 3B results
+            thematic_results = self.results.get('thematic_scores', {})
+            thematic_scores = {}
+            for ticker, score_data in thematic_results.items():
+                if isinstance(score_data, dict):
+                    # Extract total score from dict
+                    thematic_scores[ticker] = score_data.get('total_score', 0.0)
+                else:
+                    # Assume it's already a number
+                    thematic_scores[ticker] = score_data
+
+            # Classify holdings as QUALITY or THEMATIC
+            holdings_types = {}
+            for ticker in self.portfolio_state.get('holdings', {}).keys():
+                quality_score = quality_scores.get(ticker, 0)
+                thematic_score = thematic_scores.get(ticker, 0)
+
+                # Quality holdings have score ≥70
+                if quality_score >= 70:
+                    holdings_types[ticker] = "QUALITY"
+                # Thematic holdings have score ≥28
+                elif thematic_score >= 28:
+                    holdings_types[ticker] = "THEMATIC"
+                else:
+                    # Below both thresholds - classify as quality for validation
+                    holdings_types[ticker] = "QUALITY"
+
+            # Run validation
+            report = validator.validate_portfolio(
+                self.portfolio_state,
+                quality_scores,
+                thematic_scores,
+                holdings_types
             )
 
-            logger.info(f"✅ STEP 10 Complete: Compliance score {report.compliance_score}/100")
+            # Export compliance report
+            output_date = datetime.now().strftime('%Y%m%d')
+            validator.export_to_json(
+                report,
+                f"outputs/compliance_{output_date}.json"
+            )
+
+            # Generate markdown report
+            markdown = validator.generate_compliance_report_markdown(report)
+            with open(f"outputs/compliance_{output_date}.md", 'w') as f:
+                f.write(markdown)
+
+            # Log summary
+            if report.framework_compliant:
+                logger.info(f"✅ STEP 10 Complete: Framework COMPLIANT (score: {report.compliance_score:.0f}/100)")
+            else:
+                logger.warning(f"⚠️  STEP 10 Complete: Framework NON-COMPLIANT (score: {report.compliance_score:.0f}/100)")
+
+            critical_count = len([v for v in report.violations if v.severity == "CRITICAL"])
+            warning_count = len([v for v in report.violations if v.severity == "WARNING"])
+            info_count = len([v for v in report.violations if v.severity == "INFO"])
+
+            logger.info(f"   - CRITICAL violations: {critical_count}")
+            logger.info(f"   - WARNING violations: {warning_count}")
+            logger.info(f"   - INFO violations: {info_count}")
+
+            if critical_count > 0:
+                logger.warning(f"   ⚠️  {critical_count} critical violations must be resolved!")
+
             return report
 
         except Exception as e:
-            logger.error(f"❌ STEP 10 Warning: {e}")
+            logger.error(f"❌ STEP 10 Error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return ComplianceReport(
-                portfolio_value=0.0, compliance_score=0.0, violations=[],
-                allocation_quality_pct=0.0, allocation_thematic_pct=0.0,
-                allocation_cash_pct=0.0, framework_compliant=False
+                portfolio_value=0.0,
+                compliance_score=0.0,
+                violations=[],
+                allocation_quality_pct=0.0,
+                allocation_thematic_pct=0.0,
+                allocation_cash_pct=0.0,
+                framework_compliant=False,
+                validation_date=datetime.now().strftime('%Y-%m-%d')
             )
 
     # ==================== OUTPUT GENERATION ====================

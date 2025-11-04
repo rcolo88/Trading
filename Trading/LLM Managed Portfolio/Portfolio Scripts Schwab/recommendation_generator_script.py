@@ -63,6 +63,7 @@ class RecommendationGenerator:
         self.portfolio_state = None
         self.news_analysis = None
         self.quality_analysis = None
+        self.thematic_analysis = None  # NEW: thematic scoring for opportunistic holdings
         self.recommendations = []
 
     def load_portfolio_state(self) -> Dict:
@@ -191,12 +192,17 @@ class RecommendationGenerator:
             # Get quality analysis for this ticker
             quality = self.quality_analysis.get('holdings_quality', {}).get(ticker, {})
 
+            # Get thematic analysis for this ticker (if available)
+            thematic = self.thematic_analysis.get(ticker, {}) if self.thematic_analysis else {}
+            thematic_score = thematic.get('score')  # None if not a thematic holding
+
             # Build agent outputs
             agent_outputs = {
                 'news_sentiment': news,
                 'market_sentiment': market_analysis['market'],
                 'risk_assessment': market_analysis['risk'],
                 'quality_analysis': quality,
+                'thematic_score': thematic_score,  # NEW: thematic score for position sizing
                 'current_holding': True,
                 'current_shares': self.portfolio_state['holdings'][ticker]['shares']
             }
@@ -222,6 +228,10 @@ class RecommendationGenerator:
             # Get news analysis if available
             news = self.news_analysis.get('results', {}).get(ticker, {})
 
+            # Get thematic analysis if available
+            thematic = self.thematic_analysis.get(ticker, {}) if self.thematic_analysis else {}
+            thematic_score = thematic.get('score')
+
             # Build agent outputs
             agent_outputs = {
                 'news_sentiment': news,
@@ -233,6 +243,7 @@ class RecommendationGenerator:
                     'red_flags_count': alt['red_flags'],
                     'investment_rating': 'BUY'
                 },
+                'thematic_score': thematic_score,  # NEW: thematic score for opportunistic alternatives
                 'current_holding': False,
                 'current_shares': 0
             }
@@ -812,9 +823,12 @@ class RecommendationGenerator:
         print(f"  LOW priority: {len(low_priority)}")
         print(f"{'='*60}\n")
 
-    def run(self):
+    def run(self, skip_thematic: bool = False):
         """
         Run complete recommendation generation pipeline
+
+        Args:
+            skip_thematic: If True, skip thematic analysis (faster execution)
         """
         logger.info("Starting recommendation generation pipeline")
 
@@ -834,6 +848,18 @@ class RecommendationGenerator:
             logger.error("No quality analysis found. Exiting.")
             return
 
+        # NEW: Load thematic analysis (optional)
+        if not skip_thematic:
+            self.thematic_analysis = self.load_latest_analysis('thematic')
+            if not self.thematic_analysis:
+                logger.warning("No thematic analysis found. Continuing without thematic scores.")
+                self.thematic_analysis = {}
+            else:
+                logger.info(f"Loaded thematic analysis for {len(self.thematic_analysis)} tickers")
+        else:
+            logger.info("Skipping thematic analysis (--skip-thematic flag)")
+            self.thematic_analysis = {}
+
         # Run market analysis
         market_analysis = self.run_market_analysis()
 
@@ -848,8 +874,19 @@ class RecommendationGenerator:
 
 def main():
     """Main entry point"""
+    import argparse
+
+    parser = argparse.ArgumentParser(description='Generate Trading Recommendations')
+    parser.add_argument(
+        '--skip-thematic',
+        action='store_true',
+        help='Skip thematic analysis (faster execution, quality-only mode)'
+    )
+
+    args = parser.parse_args()
+
     generator = RecommendationGenerator()
-    generator.run()
+    generator.run(skip_thematic=args.skip_thematic)
 
 
 if __name__ == "__main__":
