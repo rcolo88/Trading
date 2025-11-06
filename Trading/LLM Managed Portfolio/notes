@@ -1,7 +1,11 @@
 ## 11/4/24 
-
+### TASK
+---
 - ROE history appears to be yearly. Research doc suggested looking at past 4 quarter. 
     - Double check research and make sure to solidify number of months. Will need to convert ROE calculations from yearly to monthly.
 
 - I want to change the portfolio structure form 80% quality with market cap > 100 billion and 20% high risk thematic to 70% quality with market cap > 100 billion 15% quality with market cap > 1 billion and 15% thematic high risk
     - Will need some sort of aggregation technique if same company is returned in both the > 100b and > 1b scanner
+---
+### SOLUTION
+----
