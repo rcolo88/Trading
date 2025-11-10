@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """
-Portfolio Constructor - 80/20 Framework Implementation
+Portfolio Constructor - 4-Tier Market Cap Framework Implementation
 
-Implements systematic portfolio construction following PM_README_V3.md:
-- 80% Quality Compounders (core holdings, quality score ≥7)
-- 20% Opportunistic/Thematic (tactical positions, thematic score ≥28)
-- 5% Cash Reserve
-- Score-based position sizing
-- Automated rebalancing trade generation
-- Risk parameter calculation (stop-loss, profit targets)
+Implements systematic portfolio construction following quality_investing_thresholds_research.md:
+- Core Holdings (65-70%): Large cap ($50B+) with 5+ years ROE >15%
+- Growth Quality (15-20%): Mid cap ($2B-$50B) with 2-3 years ROE >15%
+- Opportunistic Quality (10-15%): Small cap ($500M-$2B) with strict quality filters
+- High Risk/Thematic (5-10%): Momentum plays and thematic investments
+- Cash Reserve: 5% target, 3% minimum
 
 Author: LLM Portfolio Management System
-Date: November 3, 2025
+Date: November 6, 2025
 """
 
 import json
@@ -20,6 +19,9 @@ from dataclasses import dataclass, asdict
 from typing import Dict, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
+
+# Import market cap classifier and tier eligibility
+from market_cap_classifier import MarketCapTier, MarketCapClassifier
 
 # Configure logging
 logging.basicConfig(
@@ -32,26 +34,38 @@ logger = logging.getLogger(__name__)
 # ==================== DATACLASSES ====================
 
 @dataclass
-class PortfolioAllocation:
-    """Target portfolio allocation following 80/20 framework"""
-    quality_holdings: Dict[str, float]  # ticker → target % allocation
-    thematic_holdings: Dict[str, float]  # ticker → target % allocation
-    cash_reserve: float  # target % for cash
-    total_quality_pct: float  # should be ~80%
-    total_thematic_pct: float  # should be ~20%
-    violations: List[str]  # any constraint violations
+class TieredAllocation:
+    """Target portfolio allocation following 4-tier market cap framework"""
+    large_cap_holdings: Dict[str, float]  # ticker → target % allocation
+    mid_cap_holdings: Dict[str, float]    # ticker → target % allocation
+    small_cap_holdings: Dict[str, float]  # ticker → target % allocation
+    thematic_holdings: Dict[str, float]   # ticker → target % allocation
+    cash_reserve: float                   # target % for cash
+    total_large_cap_pct: float           # should be 65-70%
+    total_mid_cap_pct: float             # should be 15-20%
+    total_small_cap_pct: float           # should be 10-15%
+    total_thematic_pct: float            # should be 5-10%
+    violations: List[str]                # any constraint violations
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return asdict(self)
 
 
 @dataclass
 class AllocationReport:
     """Current portfolio allocation analysis"""
-    current_quality_pct: float
+    current_large_cap_pct: float
+    current_mid_cap_pct: float
+    current_small_cap_pct: float
     current_thematic_pct: float
     current_cash_pct: float
     violations: List[str]
     rebalancing_needed: bool
-    quality_holdings: Dict[str, float]  # ticker → current %
-    thematic_holdings: Dict[str, float]  # ticker → current %
+    large_cap_holdings: Dict[str, float]  # ticker → current %
+    mid_cap_holdings: Dict[str, float]    # ticker → current %
+    small_cap_holdings: Dict[str, float]  # ticker → current %
+    thematic_holdings: Dict[str, float]   # ticker → current %
 
 
 @dataclass
@@ -59,182 +73,349 @@ class RiskParameters:
     """Risk management parameters for a position"""
     ticker: str
     stop_loss_pct: float  # e.g., -15.0
-    profit_target_pct: float  # e.g., +50.0
-    position_type: str  # QUALITY or THEMATIC
+    profit_target_pct: float  # e.g., +30.0
+    position_type: str  # LARGE_CAP, MID_CAP, SMALL_CAP, or THEMATIC
+    tier: Optional[MarketCapTier] = None
 
 
 # ==================== PORTFOLIO CONSTRUCTOR CLASS ====================
 
 class PortfolioConstructor:
     """
-    Portfolio construction engine following 80/20 quality/opportunistic framework.
+    Portfolio construction engine following 4-tier market cap framework.
 
-    Implements systematic allocation rules from PM_README_V3.md:
-    - Quality holdings (80%): Score-based sizing (7-10 scale)
-    - Thematic holdings (20%): Score-based sizing (28-40 scale)
+    Implements systematic allocation rules from quality_investing_thresholds_research.md:
+    - Large Cap (Core): 65-70%, ROE-based sizing
+    - Mid Cap (Growth): 15-20%, ROE + incremental ROCE-based sizing
+    - Small Cap (Opportunistic): 10-15%, strict quality filters
+    - Thematic: 5-10%, uniform sizing
     - Cash reserve: 5% target, 3% minimum
-    - Position limits: 20% max, thematic max 7%
     """
 
-    # Quality position sizing rules (score → min%, max%)
-    QUALITY_POSITION_SIZING = {
-        (9.0, 10.0): (10.0, 20.0),   # Elite: 10-20%
-        (8.0, 8.99): (7.0, 12.0),    # Strong: 7-12%
-        (7.0, 7.99): (5.0, 8.0),     # Moderate: 5-8%
-        (0.0, 6.99): (0.0, 0.0)      # Weak: EXIT
-    }
-
-    # Thematic position sizing rules (score → min%, max%)
-    THEMATIC_POSITION_SIZING = {
-        (35.0, 40.0): (5.0, 7.0),    # Leader: 5-7%
-        (30.0, 34.9): (3.0, 5.0),    # Strong Contender: 3-5%
-        (28.0, 29.9): (2.0, 3.0),    # Contender: 2-3%
-        (0.0, 27.9): (0.0, 0.0)      # Laggard: EXIT
-    }
-
-    # 80/20 allocation targets
-    TARGET_QUALITY_PCT = 80.0
-    TARGET_THEMATIC_PCT = 20.0
+    # 4-Tier allocation targets
+    TARGET_LARGE_CAP_PCT = 67.5   # Midpoint of 65-70%
+    TARGET_MID_CAP_PCT = 17.5     # Midpoint of 15-20%
+    TARGET_SMALL_CAP_PCT = 12.5   # Midpoint of 10-15%
+    TARGET_THEMATIC_PCT = 7.5     # Midpoint of 5-10%
     TARGET_CASH_PCT = 5.0
 
-    # Tolerance bands
-    QUALITY_MIN = 75.0
-    QUALITY_MAX = 85.0
-    THEMATIC_MIN = 15.0
-    THEMATIC_MAX = 25.0
+    # Tolerance bands (±2.5%)
+    LARGE_CAP_MIN = 62.5
+    LARGE_CAP_MAX = 72.5
+    MID_CAP_MIN = 12.5
+    MID_CAP_MAX = 22.5
+    SMALL_CAP_MIN = 7.5
+    SMALL_CAP_MAX = 17.5
+    THEMATIC_MIN = 2.5
+    THEMATIC_MAX = 12.5
     CASH_MIN = 3.0
 
-    # Position limits
-    MAX_SINGLE_POSITION = 20.0  # 20% max for any position
-    MAX_THEMATIC_POSITION = 7.0  # 7% max for thematic positions
+    # Position limits by tier
+    MAX_LARGE_CAP_POSITION = 15.0   # 15% max for large cap
+    MAX_MID_CAP_POSITION = 10.0     # 10% max for mid cap
+    MAX_SMALL_CAP_POSITION = 4.0    # 4% max for small cap (research: 2% typical, 4% absolute max)
+    MAX_THEMATIC_POSITION = 2.5     # 2.5% max for thematic
+
+    # Small cap strict quality filters
+    SMALL_CAP_MIN_FCF = 0.0  # Positive FCF required
+    SMALL_CAP_MAX_DEBT_EQUITY = 1.0  # D/E <1.0
+    SMALL_CAP_MIN_GROSS_PROFIT_MARGIN = 0.30  # GP >30%
+
+    # Minimum trade size
+    MIN_TRADE_VALUE = 50.0
 
     def __init__(self):
         """Initialize Portfolio Constructor"""
-        logger.info("PortfolioConstructor initialized")
+        self.market_cap_classifier = MarketCapClassifier(enable_cache=True)
+        logger.info("PortfolioConstructor initialized (4-Tier Framework)")
 
-    def calculate_quality_position_size(self, quality_score: float) -> Tuple[float, float]:
+    def calculate_large_cap_position_size(self, roe: float) -> float:
         """
-        Calculate position size range for quality holding based on score.
+        Calculate position size for large cap holding based on ROE.
 
-        Scoring rules:
-        - Score 9-10: (10%, 20%) - Elite quality
-        - Score 8-8.9: (7%, 12%) - Strong quality
-        - Score 7-7.9: (5%, 8%) - Moderate quality
-        - Score <7: (0%, 0%) - EXIT (fails quality threshold)
+        Research guidelines:
+        - ROE 15-20%: 8-12% position (use midpoint 10%)
+        - ROE 20%+: 10-15% position (use midpoint 12.5%)
 
         Args:
-            quality_score: Quality score from 0-10
+            roe: Return on Equity (0.15 = 15%)
 
         Returns:
-            Tuple of (min_pct, max_pct) for position sizing
+            Target position size as percentage
         """
-        for (score_min, score_max), (min_pct, max_pct) in self.QUALITY_POSITION_SIZING.items():
-            if score_min <= quality_score <= score_max:
-                return (min_pct, max_pct)
+        if roe >= 0.20:
+            return 12.5  # Midpoint of 10-15%
+        elif roe >= 0.15:
+            return 10.0  # Midpoint of 8-12%
+        else:
+            return 0.0  # Below threshold, exit
 
-        # Default to EXIT if score not in range
-        return (0.0, 0.0)
-
-    def calculate_thematic_position_size(self, thematic_score: float) -> Tuple[float, float]:
+    def calculate_mid_cap_position_size(
+        self,
+        roe: float,
+        incremental_roce_advantage: float = 0.0
+    ) -> float:
         """
-        Calculate position size range for thematic holding based on score.
+        Calculate position size for mid cap holding based on ROE and incremental ROCE.
 
-        Scoring rules:
-        - Score 35-40: (5%, 7%) - Leader
-        - Score 30-34: (3%, 5%) - Strong Contender
-        - Score 28-29: (2%, 3%) - Contender
-        - Score <28: (0%, 0%) - EXIT (fails thematic threshold)
+        Research guidelines:
+        - ROE 15-20%, incremental ROCE +5%: 5-8% position (use midpoint 6.5%)
+        - ROE 20%+, incremental ROCE +5%: 7-10% position (use midpoint 8.5%)
 
         Args:
-            thematic_score: Thematic score from 0-40
+            roe: Return on Equity (0.15 = 15%)
+            incremental_roce_advantage: Incremental ROCE advantage in percentage points
 
         Returns:
-            Tuple of (min_pct, max_pct) for position sizing
+            Target position size as percentage
         """
-        for (score_min, score_max), (min_pct, max_pct) in self.THEMATIC_POSITION_SIZING.items():
-            if score_min <= thematic_score <= score_max:
-                return (min_pct, max_pct)
+        # Require incremental ROCE advantage for mid-cap quality
+        if incremental_roce_advantage < 5.0:
+            logger.warning(f"Mid-cap missing incremental ROCE advantage (+{incremental_roce_advantage:.1f}%, need +5%)")
+            # Still allow if ROE is good, but use smaller position
+            if roe >= 0.20:
+                return 6.5  # Conservative sizing
+            elif roe >= 0.15:
+                return 5.0  # Minimum position
+            else:
+                return 0.0
 
-        # Default to EXIT if score not in range
-        return (0.0, 0.0)
+        # Has incremental ROCE advantage
+        if roe >= 0.20:
+            return 8.5  # Midpoint of 7-10%
+        elif roe >= 0.15:
+            return 6.5  # Midpoint of 5-8%
+        else:
+            return 0.0  # Below threshold, exit
+
+    def calculate_small_cap_position_size(
+        self,
+        passes_strict_filters: bool,
+        quality_score: float
+    ) -> float:
+        """
+        Calculate position size for small cap holding.
+
+        Research guidelines:
+        - Positive ROE trend, strict quality filters: 2-4% position
+        - Use 2% for marginal quality, 4% for exceptional
+        - Strict filters: FCF+, D/E<1.0, GP>30%, top 80% quality
+
+        Args:
+            passes_strict_filters: Whether holding meets all strict quality filters
+            quality_score: Quality score (0-100 scale)
+
+        Returns:
+            Target position size as percentage
+        """
+        if not passes_strict_filters:
+            return 0.0  # Exit if fails strict filters
+
+        # Position size based on quality score
+        if quality_score >= 80.0:  # Top 20%
+            return 4.0  # Maximum for small cap
+        elif quality_score >= 70.0:
+            return 3.0  # Mid-range
+        elif quality_score >= 60.0:  # Top 80% (bottom 20% excluded)
+            return 2.0  # Minimum position
+        else:
+            return 0.0  # Bottom quintile, exit
+
+    def calculate_thematic_position_size(self, thematic_score: float) -> float:
+        """
+        Calculate position size for thematic holding.
+
+        Research guidelines:
+        - Uniform sizing: 1.5-2.5% per position
+        - Use 2% as standard position size
+
+        Args:
+            thematic_score: Thematic score (0-40 scale)
+
+        Returns:
+            Target position size as percentage
+        """
+        if thematic_score >= 28.0:  # Meets threshold
+            return 2.0  # Standard thematic position
+        else:
+            return 0.0  # Exit
+
+    def validate_small_cap_filters(
+        self,
+        ticker: str,
+        financial_data: Dict[str, float]
+    ) -> Tuple[bool, List[str]]:
+        """
+        Validate strict quality filters for small cap holdings.
+
+        Strict filters from research:
+        1. Positive free cash flow
+        2. Debt/Equity <1.0
+        3. Gross profitability >30%
+        4. Quality score top 80% (checked in position sizing)
+
+        Args:
+            ticker: Stock ticker
+            financial_data: Dict with fcf, total_debt, shareholder_equity, gross_margin
+
+        Returns:
+            Tuple of (passes: bool, failed_filters: List[str])
+        """
+        failed_filters = []
+
+        # Check FCF
+        fcf = financial_data.get('free_cash_flow', 0.0)
+        if fcf <= self.SMALL_CAP_MIN_FCF:
+            failed_filters.append(f"FCF {fcf/1e9:.1f}B not positive (need >0)")
+
+        # Check Debt/Equity
+        total_debt = financial_data.get('total_debt', 0.0)
+        shareholder_equity = financial_data.get('shareholder_equity', 1.0)
+        if shareholder_equity > 0:
+            debt_equity = total_debt / shareholder_equity
+            if debt_equity > self.SMALL_CAP_MAX_DEBT_EQUITY:
+                failed_filters.append(f"D/E {debt_equity:.2f} exceeds 1.0")
+        else:
+            failed_filters.append("Shareholder equity ≤0 (cannot calculate D/E)")
+
+        # Check Gross Profit Margin
+        gross_margin = financial_data.get('gross_margin', 0.0)
+        if gross_margin < self.SMALL_CAP_MIN_GROSS_PROFIT_MARGIN:
+            failed_filters.append(f"Gross margin {gross_margin*100:.1f}% below 30%")
+
+        passes = len(failed_filters) == 0
+
+        if not passes:
+            logger.warning(f"{ticker} fails small cap strict filters: {', '.join(failed_filters)}")
+
+        return passes, failed_filters
 
     def calculate_target_allocation(
         self,
-        quality_holdings: Dict[str, float],  # ticker → quality_score
-        thematic_holdings: Dict[str, float],  # ticker → thematic_score
+        holdings_by_tier: Dict[MarketCapTier, Dict[str, float]],  # tier → {ticker → score/data}
+        financial_data: Dict[str, Dict[str, float]],  # ticker → financial metrics
         total_portfolio_value: float
-    ) -> PortfolioAllocation:
+    ) -> TieredAllocation:
         """
-        Calculate target % allocation for each ticker based on scores.
+        Calculate target % allocation for each ticker based on tier and scores.
 
         Algorithm:
-        1. Separate quality (score ≥7) from thematic (score ≥28)
-        2. Calculate raw position sizes based on score ranges
-        3. Normalize quality holdings to 80% total
-        4. Normalize thematic holdings to 20% total
-        5. Reserve 5% for cash
-        6. Detect any constraint violations
+        1. Classify holdings by market cap tier
+        2. Apply tier-specific position sizing
+        3. Validate small cap strict filters
+        4. Normalize each tier to target allocation
+        5. Reserve cash
+        6. Detect violations
 
         Args:
-            quality_holdings: Dict of ticker → quality_score
-            thematic_holdings: Dict of ticker → thematic_score
+            holdings_by_tier: Dict of tier → {ticker → roe/score data}
+            financial_data: Dict of ticker → financial metrics for validation
             total_portfolio_value: Total portfolio value in dollars
 
         Returns:
-            PortfolioAllocation with target percentages and violations
+            TieredAllocation with target percentages and violations
         """
-        logger.info(f"Calculating target allocation for {len(quality_holdings)} quality + {len(thematic_holdings)} thematic holdings")
+        logger.info(f"Calculating target allocation for 4-tier framework")
 
-        # Calculate raw position sizes
-        quality_raw = {}
-        for ticker, score in quality_holdings.items():
-            min_pct, max_pct = self.calculate_quality_position_size(score)
-            if max_pct > 0:  # Only include if not EXIT
-                # Use midpoint of range
-                target_pct = (min_pct + max_pct) / 2.0
-                quality_raw[ticker] = target_pct
-
+        # Calculate raw position sizes by tier
+        large_cap_raw = {}
+        mid_cap_raw = {}
+        small_cap_raw = {}
         thematic_raw = {}
-        for ticker, score in thematic_holdings.items():
-            min_pct, max_pct = self.calculate_thematic_position_size(score)
-            if max_pct > 0:  # Only include if not EXIT
-                # Use midpoint of range
-                target_pct = (min_pct + max_pct) / 2.0
+
+        # Large Cap positions
+        for ticker, roe in holdings_by_tier.get(MarketCapTier.LARGE_CAP, {}).items():
+            target_pct = self.calculate_large_cap_position_size(roe)
+            if target_pct > 0:
+                large_cap_raw[ticker] = target_pct
+
+        # Mid Cap positions
+        for ticker, data in holdings_by_tier.get(MarketCapTier.MID_CAP, {}).items():
+            if isinstance(data, dict):
+                roe = data.get('roe', 0.0)
+                incremental_roce_adv = data.get('incremental_roce_advantage', 0.0)
+            else:
+                roe = data
+                incremental_roce_adv = 0.0
+
+            target_pct = self.calculate_mid_cap_position_size(roe, incremental_roce_adv)
+            if target_pct > 0:
+                mid_cap_raw[ticker] = target_pct
+
+        # Small Cap positions (with strict filters)
+        for ticker, data in holdings_by_tier.get(MarketCapTier.SMALL_CAP, {}).items():
+            # Validate strict filters
+            ticker_financials = financial_data.get(ticker, {})
+            passes_filters, failed = self.validate_small_cap_filters(ticker, ticker_financials)
+
+            if isinstance(data, dict):
+                quality_score = data.get('quality_score', 0.0)
+            else:
+                quality_score = data if data > 10 else data * 10  # Convert 0-10 to 0-100 if needed
+
+            target_pct = self.calculate_small_cap_position_size(passes_filters, quality_score)
+            if target_pct > 0:
+                small_cap_raw[ticker] = target_pct
+
+        # Thematic positions (tier-agnostic)
+        for ticker, thematic_score in holdings_by_tier.get('THEMATIC', {}).items():
+            target_pct = self.calculate_thematic_position_size(thematic_score)
+            if target_pct > 0:
                 thematic_raw[ticker] = target_pct
 
         # Calculate raw totals
-        raw_quality_total = sum(quality_raw.values())
+        raw_large_cap_total = sum(large_cap_raw.values())
+        raw_mid_cap_total = sum(mid_cap_raw.values())
+        raw_small_cap_total = sum(small_cap_raw.values())
         raw_thematic_total = sum(thematic_raw.values())
 
-        # Normalize to targets (80% quality, 20% thematic)
-        quality_normalized = {}
-        if raw_quality_total > 0:
-            for ticker, pct in quality_raw.items():
-                quality_normalized[ticker] = (pct / raw_quality_total) * self.TARGET_QUALITY_PCT
+        # Normalize each tier INDEPENDENTLY to its target percentage
+        # Only tiers with holdings get their target allocation
+        # Position limits are checked during validation, not enforced here
+        large_cap_normalized = {}
+        if raw_large_cap_total > 0:
+            for ticker, pct in large_cap_raw.items():
+                large_cap_normalized[ticker] = (pct / raw_large_cap_total) * self.TARGET_LARGE_CAP_PCT
+
+        mid_cap_normalized = {}
+        if raw_mid_cap_total > 0:
+            for ticker, pct in mid_cap_raw.items():
+                mid_cap_normalized[ticker] = (pct / raw_mid_cap_total) * self.TARGET_MID_CAP_PCT
+
+        small_cap_normalized = {}
+        if raw_small_cap_total > 0:
+            for ticker, pct in small_cap_raw.items():
+                small_cap_normalized[ticker] = (pct / raw_small_cap_total) * self.TARGET_SMALL_CAP_PCT
 
         thematic_normalized = {}
         if raw_thematic_total > 0:
             for ticker, pct in thematic_raw.items():
                 thematic_normalized[ticker] = (pct / raw_thematic_total) * self.TARGET_THEMATIC_PCT
 
-        # Calculate totals
-        total_quality_pct = sum(quality_normalized.values())
+        # Calculate totals after normalization
+        total_large_cap_pct = sum(large_cap_normalized.values())
+        total_mid_cap_pct = sum(mid_cap_normalized.values())
+        total_small_cap_pct = sum(small_cap_normalized.values())
         total_thematic_pct = sum(thematic_normalized.values())
 
-        # Calculate cash reserve
-        # If no holdings passed threshold, all cash
-        if total_quality_pct == 0 and total_thematic_pct == 0:
+        # Calculate cash reserve (may be negative if all tiers are at target)
+        allocated_pct = total_large_cap_pct + total_mid_cap_pct + total_small_cap_pct + total_thematic_pct
+
+        if allocated_pct == 0:
             cash_reserve = 100.0
         else:
-            # Cash fills the gap to 100%
-            cash_reserve = max(self.TARGET_CASH_PCT, 100.0 - total_quality_pct - total_thematic_pct)
+            cash_reserve = 100.0 - allocated_pct
 
-        # Create PortfolioAllocation
-        allocation = PortfolioAllocation(
-            quality_holdings=quality_normalized,
+        # Create TieredAllocation
+        allocation = TieredAllocation(
+            large_cap_holdings=large_cap_normalized,
+            mid_cap_holdings=mid_cap_normalized,
+            small_cap_holdings=small_cap_normalized,
             thematic_holdings=thematic_normalized,
             cash_reserve=cash_reserve,
-            total_quality_pct=total_quality_pct,
+            total_large_cap_pct=total_large_cap_pct,
+            total_mid_cap_pct=total_mid_cap_pct,
+            total_small_cap_pct=total_small_cap_pct,
             total_thematic_pct=total_thematic_pct,
             violations=[]
         )
@@ -243,163 +424,94 @@ class PortfolioConstructor:
         violations = self.validate_allocation(allocation)
         allocation.violations = violations
 
-        logger.info(f"Target allocation: Quality {total_quality_pct:.1f}%, Thematic {total_thematic_pct:.1f}%, Cash {cash_reserve:.1f}%")
+        logger.info(f"Target allocation: Large {total_large_cap_pct:.1f}%, Mid {total_mid_cap_pct:.1f}%, Small {total_small_cap_pct:.1f}%, Thematic {total_thematic_pct:.1f}%, Cash {cash_reserve:.1f}%")
         if violations:
             logger.warning(f"Allocation violations detected: {len(violations)}")
 
         return allocation
 
-    def analyze_current_allocation(
-        self,
-        portfolio_state: Dict,  # from portfolio_state.json
-        quality_scores: Dict[str, float],
-        thematic_scores: Dict[str, float],
-        current_prices: Dict[str, float]
-    ) -> AllocationReport:
+    def validate_allocation(self, allocation: TieredAllocation) -> List[str]:
         """
-        Analyze current portfolio allocation vs 80/20 framework.
+        Check for constraint violations in 4-tier allocation.
 
-        Calculates:
-        - % in quality holdings (should be ~80%)
-        - % in thematic holdings (should be ~20%)
-        - % in cash (should be ≥5%)
-
-        Identifies violations:
-        - Quality <75% or >85%
-        - Thematic <15% or >25%
-        - Cash <3%
-        - Individual positions >20% (concentration risk)
-        - Thematic positions >7%
+        Checks:
+        - Large cap: 62.5-72.5% (±2.5% from 67.5%)
+        - Mid cap: 12.5-22.5% (±2.5% from 17.5%)
+        - Small cap: 7.5-17.5% (±2.5% from 12.5%)
+        - Thematic: 2.5-12.5% (±2.5% from 7.5%)
+        - Individual position limits by tier
+        - Cash reserve ≥3%
 
         Args:
-            portfolio_state: Portfolio state dict with holdings and cash
-            quality_scores: Dict of ticker → quality_score
-            thematic_scores: Dict of ticker → thematic_score
-            current_prices: Dict of ticker → current_price
+            allocation: TieredAllocation to validate
 
         Returns:
-            AllocationReport with current allocation and violations
+            List of violation messages (empty if valid)
         """
-        logger.info("Analyzing current portfolio allocation")
-
-        holdings = portfolio_state.get('holdings', {})
-        cash = portfolio_state.get('cash', 0.0)
-
-        # Calculate total portfolio value
-        total_value = cash
-        for ticker, holding_data in holdings.items():
-            shares = holding_data.get('shares', holding_data) if isinstance(holding_data, dict) else holding_data
-            price = current_prices.get(ticker, 100.0)
-            total_value += shares * price
-
-        # Handle empty portfolio
-        if total_value == 0:
-            return AllocationReport(
-                current_quality_pct=0.0,
-                current_thematic_pct=0.0,
-                current_cash_pct=0.0,
-                violations=[],
-                rebalancing_needed=False,
-                quality_holdings={},
-                thematic_holdings={}
-            )
-
-        # Classify holdings as quality or thematic
-        quality_holdings_pct = {}
-        thematic_holdings_pct = {}
-
-        for ticker, holding_data in holdings.items():
-            shares = holding_data.get('shares', holding_data) if isinstance(holding_data, dict) else holding_data
-            price = current_prices.get(ticker, 100.0)
-            position_value = shares * price
-            position_pct = (position_value / total_value) * 100.0
-
-            # Determine if quality or thematic based on scores
-            if ticker in quality_scores and quality_scores[ticker] >= 7.0:
-                quality_holdings_pct[ticker] = position_pct
-            elif ticker in thematic_scores and thematic_scores[ticker] >= 28.0:
-                thematic_holdings_pct[ticker] = position_pct
-            else:
-                # Below threshold - should be exited
-                pass
-
-        # Calculate percentages
-        current_quality_pct = sum(quality_holdings_pct.values())
-        current_thematic_pct = sum(thematic_holdings_pct.values())
-        current_cash_pct = (cash / total_value) * 100.0
-
-        # Detect violations
         violations = []
 
-        if current_quality_pct < self.QUALITY_MIN:
-            violations.append(f"Quality allocation {current_quality_pct:.1f}% below {self.QUALITY_MIN:.0f}%")
-        elif current_quality_pct > self.QUALITY_MAX:
-            violations.append(f"Quality allocation {current_quality_pct:.1f}% above {self.QUALITY_MAX:.0f}%")
+        # Check tier allocations
+        if allocation.total_large_cap_pct < self.LARGE_CAP_MIN:
+            violations.append(f"Large cap allocation {allocation.total_large_cap_pct:.1f}% below {self.LARGE_CAP_MIN:.1f}%")
+        elif allocation.total_large_cap_pct > self.LARGE_CAP_MAX:
+            violations.append(f"Large cap allocation {allocation.total_large_cap_pct:.1f}% above {self.LARGE_CAP_MAX:.1f}%")
 
-        if current_thematic_pct < self.THEMATIC_MIN:
-            violations.append(f"Thematic allocation {current_thematic_pct:.1f}% below {self.THEMATIC_MIN:.0f}%")
-        elif current_thematic_pct > self.THEMATIC_MAX:
-            violations.append(f"Thematic allocation {current_thematic_pct:.1f}% above {self.THEMATIC_MAX:.0f}%")
+        if allocation.total_mid_cap_pct < self.MID_CAP_MIN:
+            violations.append(f"Mid cap allocation {allocation.total_mid_cap_pct:.1f}% below {self.MID_CAP_MIN:.1f}%")
+        elif allocation.total_mid_cap_pct > self.MID_CAP_MAX:
+            violations.append(f"Mid cap allocation {allocation.total_mid_cap_pct:.1f}% above {self.MID_CAP_MAX:.1f}%")
 
-        if current_cash_pct < self.CASH_MIN:
-            violations.append(f"Cash reserve {current_cash_pct:.1f}% below {self.CASH_MIN:.0f}%")
+        if allocation.total_small_cap_pct < self.SMALL_CAP_MIN:
+            violations.append(f"Small cap allocation {allocation.total_small_cap_pct:.1f}% below {self.SMALL_CAP_MIN:.1f}%")
+        elif allocation.total_small_cap_pct > self.SMALL_CAP_MAX:
+            violations.append(f"Small cap allocation {allocation.total_small_cap_pct:.1f}% above {self.SMALL_CAP_MAX:.1f}%")
 
-        # Check individual position limits
-        all_positions = {**quality_holdings_pct, **thematic_holdings_pct}
-        for ticker, pct in all_positions.items():
-            if pct > self.MAX_SINGLE_POSITION:
-                violations.append(f"{ticker} position {pct:.1f}% exceeds {self.MAX_SINGLE_POSITION:.0f}%")
+        if allocation.total_thematic_pct < self.THEMATIC_MIN:
+            violations.append(f"Thematic allocation {allocation.total_thematic_pct:.1f}% below {self.THEMATIC_MIN:.1f}%")
+        elif allocation.total_thematic_pct > self.THEMATIC_MAX:
+            violations.append(f"Thematic allocation {allocation.total_thematic_pct:.1f}% above {self.THEMATIC_MAX:.1f}%")
 
-        for ticker, pct in thematic_holdings_pct.items():
+        # Check cash reserve
+        if allocation.cash_reserve < self.CASH_MIN:
+            violations.append(f"Cash reserve {allocation.cash_reserve:.1f}% below {self.CASH_MIN:.0f}%")
+
+        # Check individual position limits by tier
+        for ticker, pct in allocation.large_cap_holdings.items():
+            if pct > self.MAX_LARGE_CAP_POSITION:
+                violations.append(f"Large cap {ticker} position {pct:.1f}% exceeds {self.MAX_LARGE_CAP_POSITION:.0f}% limit")
+
+        for ticker, pct in allocation.mid_cap_holdings.items():
+            if pct > self.MAX_MID_CAP_POSITION:
+                violations.append(f"Mid cap {ticker} position {pct:.1f}% exceeds {self.MAX_MID_CAP_POSITION:.0f}% limit")
+
+        for ticker, pct in allocation.small_cap_holdings.items():
+            if pct > self.MAX_SMALL_CAP_POSITION:
+                violations.append(f"Small cap {ticker} position {pct:.1f}% exceeds {self.MAX_SMALL_CAP_POSITION:.0f}% limit")
+
+        for ticker, pct in allocation.thematic_holdings.items():
             if pct > self.MAX_THEMATIC_POSITION:
-                violations.append(f"{ticker} thematic position {pct:.1f}% exceeds {self.MAX_THEMATIC_POSITION:.0f}%")
+                violations.append(f"Thematic {ticker} position {pct:.1f}% exceeds {self.MAX_THEMATIC_POSITION:.0f}% limit")
 
-        # Determine if rebalancing needed
-        rebalancing_needed = len(violations) > 0
-
-        report = AllocationReport(
-            current_quality_pct=current_quality_pct,
-            current_thematic_pct=current_thematic_pct,
-            current_cash_pct=current_cash_pct,
-            violations=violations,
-            rebalancing_needed=rebalancing_needed,
-            quality_holdings=quality_holdings_pct,
-            thematic_holdings=thematic_holdings_pct
-        )
-
-        logger.info(f"Current allocation: Quality {current_quality_pct:.1f}%, Thematic {current_thematic_pct:.1f}%, Cash {current_cash_pct:.1f}%")
-        if rebalancing_needed:
-            logger.warning(f"Rebalancing needed - {len(violations)} violations detected")
-
-        return report
+        return violations
 
     def generate_rebalancing_trades(
         self,
-        current_allocation: AllocationReport,
-        target_allocation: PortfolioAllocation,
         portfolio_state: Dict,
+        target_allocation: TieredAllocation,
         current_prices: Dict[str, float]
     ) -> List[Dict]:
         """
-        Generate exact trades needed to rebalance portfolio.
-
-        Logic:
-        1. Identify exits (quality <7, thematic <28)
-        2. Identify position size adjustments (over/under allocated)
-        3. Calculate exact share quantities
-        4. Prioritize: sells first (generate cash), then buys
-        5. Respect minimum trade size ($50)
+        Generate specific trades to move from current to target allocation.
 
         Args:
-            current_allocation: Current allocation analysis
-            target_allocation: Target allocation
-            portfolio_state: Current portfolio state
+            portfolio_state: Portfolio state dict with holdings and cash
+            target_allocation: Target TieredAllocation
             current_prices: Dict of ticker → current_price
 
         Returns:
-            List of trade dicts with action, ticker, shares, reason, priority
+            List of trade dicts with action, ticker, shares, reasoning, priority
         """
-        logger.info("Generating rebalancing trades")
+        logger.info("Generating rebalancing trades for 4-tier framework")
 
         holdings = portfolio_state.get('holdings', {})
         cash = portfolio_state.get('cash', 0.0)
@@ -413,22 +525,33 @@ class PortfolioConstructor:
 
         trades = []
 
+        # Get all target tickers
+        all_target_tickers = (
+            set(target_allocation.large_cap_holdings.keys()) |
+            set(target_allocation.mid_cap_holdings.keys()) |
+            set(target_allocation.small_cap_holdings.keys()) |
+            set(target_allocation.thematic_holdings.keys())
+        )
+
         # Step 1: Identify exits (holdings not in target)
-        all_target_tickers = set(target_allocation.quality_holdings.keys()) | set(target_allocation.thematic_holdings.keys())
         for ticker, holding_data in holdings.items():
             shares = holding_data.get('shares', holding_data) if isinstance(holding_data, dict) else holding_data
             if ticker not in all_target_tickers:
-                # Position should be exited
                 trades.append({
                     'action': 'SELL',
                     'ticker': ticker,
                     'shares': int(shares),
-                    'reasoning': f'Exit position - fails quality/thematic threshold',
+                    'reasoning': 'Exit position - fails tier requirements',
                     'priority': 'HIGH'
                 })
 
         # Step 2: Calculate position adjustments
-        all_target_positions = {**target_allocation.quality_holdings, **target_allocation.thematic_holdings}
+        all_target_positions = {
+            **target_allocation.large_cap_holdings,
+            **target_allocation.mid_cap_holdings,
+            **target_allocation.small_cap_holdings,
+            **target_allocation.thematic_holdings
+        }
 
         for ticker, target_pct in all_target_positions.items():
             target_value = (target_pct / 100.0) * total_value
@@ -440,9 +563,8 @@ class PortfolioConstructor:
             current_shares = int(current_shares) if current_shares else 0
             share_diff = target_shares - current_shares
 
-            if abs(share_diff * price) >= 50.0:  # Minimum trade size $50
+            if abs(share_diff * price) >= self.MIN_TRADE_VALUE:
                 if share_diff > 0:
-                    # Need to buy
                     trades.append({
                         'action': 'BUY',
                         'ticker': ticker,
@@ -451,7 +573,6 @@ class PortfolioConstructor:
                         'priority': 'MEDIUM'
                     })
                 elif share_diff < 0:
-                    # Need to sell
                     trades.append({
                         'action': 'SELL',
                         'ticker': ticker,
@@ -465,244 +586,170 @@ class PortfolioConstructor:
 
     def calculate_risk_parameters(
         self,
-        holdings: Dict[str, str],  # ticker → type (QUALITY or THEMATIC)
-        quality_scores: Dict[str, float]
+        holdings_by_tier: Dict[str, str]  # ticker → tier_name
     ) -> Dict[str, RiskParameters]:
         """
-        Calculate stop-loss and profit targets for each holding.
+        Calculate stop-loss and profit targets for each holding by tier.
 
-        Rules:
-        Quality holdings:
-        - Score >8: -15% stop, +30-50% profit target
-        - Score 7-8: -20% stop, +30-50% profit target
-
-        Thematic holdings:
-        - All: -25% to -30% stop, +40-60% profit target
+        Rules from research:
+        Large Cap: -15% stop, +30% profit target (lower risk/reward)
+        Mid Cap: -20% stop, +40% profit target (balanced)
+        Small Cap: -25% stop, +50% profit target (higher risk/reward)
+        Thematic: -30% stop, +60% profit target (highest risk/reward)
 
         Args:
-            holdings: Dict of ticker → position_type (QUALITY or THEMATIC)
-            quality_scores: Dict of ticker → quality_score
+            holdings_by_tier: Dict of ticker → tier_name
 
         Returns:
             Dict of ticker → RiskParameters
         """
-        logger.info(f"Calculating risk parameters for {len(holdings)} holdings")
+        logger.info(f"Calculating risk parameters for {len(holdings_by_tier)} holdings")
 
         risk_params = {}
 
-        for ticker, position_type in holdings.items():
-            if position_type == 'QUALITY':
-                quality_score = quality_scores.get(ticker, 0.0)
-
-                if quality_score > 8.0:
-                    stop_loss = -15.0
-                    profit_target = 40.0  # Midpoint of 30-50%
-                else:  # 7-8
-                    stop_loss = -20.0
-                    profit_target = 40.0  # Midpoint of 30-50%
-
+        for ticker, tier_name in holdings_by_tier.items():
+            if tier_name == 'LARGE_CAP':
+                stop_loss = -15.0
+                profit_target = 30.0
+                tier = MarketCapTier.LARGE_CAP
+            elif tier_name == 'MID_CAP':
+                stop_loss = -20.0
+                profit_target = 40.0
+                tier = MarketCapTier.MID_CAP
+            elif tier_name == 'SMALL_CAP':
+                stop_loss = -25.0
+                profit_target = 50.0
+                tier = MarketCapTier.SMALL_CAP
             else:  # THEMATIC
-                stop_loss = -27.5  # Midpoint of -25 to -30%
-                profit_target = 50.0  # Midpoint of 40-60%
+                stop_loss = -30.0
+                profit_target = 60.0
+                tier = None
 
             risk_params[ticker] = RiskParameters(
                 ticker=ticker,
                 stop_loss_pct=stop_loss,
                 profit_target_pct=profit_target,
-                position_type=position_type
+                position_type=tier_name,
+                tier=tier
             )
 
         logger.info(f"Calculated risk parameters for {len(risk_params)} holdings")
         return risk_params
 
-    def validate_allocation(self, allocation: PortfolioAllocation) -> List[str]:
-        """
-        Check for constraint violations in allocation.
-
-        Checks:
-        - 80/20 framework (75-85% quality, 15-25% thematic)
-        - Individual position limits (20% max)
-        - Thematic position limits (7% max)
-        - Cash reserve (≥3%)
-
-        Args:
-            allocation: PortfolioAllocation to validate
-
-        Returns:
-            List of violation messages (empty if valid)
-        """
-        violations = []
-
-        # Check 80/20 framework (allow 5% tolerance)
-        if allocation.total_quality_pct < self.QUALITY_MIN:
-            violations.append(
-                f"Quality allocation {allocation.total_quality_pct:.1f}% below {self.QUALITY_MIN:.0f}%"
-            )
-        elif allocation.total_quality_pct > self.QUALITY_MAX:
-            violations.append(
-                f"Quality allocation {allocation.total_quality_pct:.1f}% above {self.QUALITY_MAX:.0f}%"
-            )
-
-        if allocation.total_thematic_pct < self.THEMATIC_MIN:
-            violations.append(
-                f"Thematic allocation {allocation.total_thematic_pct:.1f}% below {self.THEMATIC_MIN:.0f}%"
-            )
-        elif allocation.total_thematic_pct > self.THEMATIC_MAX:
-            violations.append(
-                f"Thematic allocation {allocation.total_thematic_pct:.1f}% above {self.THEMATIC_MAX:.0f}%"
-            )
-
-        # Check cash reserve
-        if allocation.cash_reserve < self.CASH_MIN:
-            violations.append(
-                f"Cash reserve {allocation.cash_reserve:.1f}% below {self.CASH_MIN:.0f}%"
-            )
-
-        # Check individual position limits
-        all_positions = {**allocation.quality_holdings, **allocation.thematic_holdings}
-        for ticker, pct in all_positions.items():
-            if pct > self.MAX_SINGLE_POSITION:
-                violations.append(
-                    f"{ticker} position {pct:.1f}% exceeds {self.MAX_SINGLE_POSITION:.0f}%"
-                )
-
-        # Check thematic position limits
-        for ticker, pct in allocation.thematic_holdings.items():
-            if pct > self.MAX_THEMATIC_POSITION:
-                violations.append(
-                    f"{ticker} thematic position {pct:.1f}% exceeds {self.MAX_THEMATIC_POSITION:.0f}%"
-                )
-
-        return violations
-
-    # ==================== EXPORT METHODS ====================
-
-    def export_allocation_report(self, allocation: PortfolioAllocation, filename: Optional[str] = None) -> str:
-        """
-        Export allocation to JSON file.
-
-        Args:
-            allocation: PortfolioAllocation to export
-            filename: Output filename (auto-generated if not provided)
-
-        Returns:
-            Path to exported file
-        """
-        if filename is None:
-            filename = f"outputs/portfolio_allocation_{datetime.now().strftime('%Y%m%d')}.json"
-
+    def export_allocation_to_json(
+        self,
+        allocation: TieredAllocation,
+        filepath: str
+    ):
+        """Export allocation to JSON file."""
         try:
-            output_path = Path(filename)
+            output_path = Path(filepath)
             output_path.parent.mkdir(parents=True, exist_ok=True)
 
             with open(output_path, 'w') as f:
-                json.dump(asdict(allocation), f, indent=2)
+                json.dump(allocation.to_dict(), f, indent=2)
 
-            logger.info(f"Exported allocation report to {filename}")
-            return str(output_path)
-
+            logger.info(f"Exported allocation to {output_path}")
         except Exception as e:
-            logger.error(f"Failed to export allocation report: {e}")
-            return ""
+            logger.error(f"Failed to export allocation: {e}")
+            raise
 
-    def export_rebalancing_trades(self, trades: List[Dict], filename: Optional[str] = None) -> str:
-        """
-        Export rebalancing trades to JSON file.
-
-        Args:
-            trades: List of trade dicts
-            filename: Output filename (auto-generated if not provided)
-
-        Returns:
-            Path to exported file
-        """
-        if filename is None:
-            filename = f"outputs/rebalancing_trades_{datetime.now().strftime('%Y%m%d')}.json"
-
-        try:
-            output_path = Path(filename)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            with open(output_path, 'w') as f:
-                json.dump({'trades': trades}, f, indent=2)
-
-            logger.info(f"Exported {len(trades)} rebalancing trades to {filename}")
-            return str(output_path)
-
-        except Exception as e:
-            logger.error(f"Failed to export rebalancing trades: {e}")
-            return ""
-
-    def generate_allocation_summary(self, allocation: PortfolioAllocation, total_portfolio_value: Optional[float] = None) -> str:
-        """
-        Generate markdown summary of allocation.
-
-        Args:
-            allocation: PortfolioAllocation to summarize
-            total_portfolio_value: Optional total portfolio value in dollars
-
-        Returns:
-            Markdown formatted summary string
-        """
-        lines = []
-        lines.append("# Portfolio Allocation Summary\n")
-        lines.append(f"**Date**: {datetime.now().strftime('%Y-%m-%d')}")
-        if total_portfolio_value is not None:
-            lines.append(f"**Portfolio Value**: ${total_portfolio_value:,.2f}\n")
-        else:
-            lines.append("")
-        lines.append(f"**Total Quality**: {allocation.total_quality_pct:.1f}%")
-        lines.append(f"**Total Thematic**: {allocation.total_thematic_pct:.1f}%")
-        lines.append(f"**Cash Reserve**: {allocation.cash_reserve:.1f}%\n")
-
-        lines.append("## Quality Holdings (80% Target)\n")
-        for ticker, pct in sorted(allocation.quality_holdings.items(), key=lambda x: x[1], reverse=True):
-            lines.append(f"- **{ticker}**: {pct:.1f}%")
-
-        lines.append("\n## Thematic Holdings (20% Target)\n")
-        for ticker, pct in sorted(allocation.thematic_holdings.items(), key=lambda x: x[1], reverse=True):
-            lines.append(f"- **{ticker}**: {pct:.1f}%")
+    def generate_allocation_summary(
+        self,
+        allocation: TieredAllocation
+    ) -> str:
+        """Generate human-readable allocation summary."""
+        lines = [
+            "# 4-Tier Portfolio Allocation Summary",
+            f"**Date:** {datetime.now().strftime('%Y-%m-%d')}",
+            "",
+            "## Tier Allocation",
+            f"- **Large Cap (Core)**: {allocation.total_large_cap_pct:.1f}% (target 67.5%, range 62.5-72.5%)",
+            f"- **Mid Cap (Growth)**: {allocation.total_mid_cap_pct:.1f}% (target 17.5%, range 12.5-22.5%)",
+            f"- **Small Cap (Opportunistic)**: {allocation.total_small_cap_pct:.1f}% (target 12.5%, range 7.5-17.5%)",
+            f"- **Thematic**: {allocation.total_thematic_pct:.1f}% (target 7.5%, range 2.5-12.5%)",
+            f"- **Cash**: {allocation.cash_reserve:.1f}% (target 5.0%, min 3.0%)",
+            ""
+        ]
 
         if allocation.violations:
-            lines.append("\n## ⚠️ Violations\n")
+            lines.append("## Violations")
             for violation in allocation.violations:
-                lines.append(f"- {violation}")
+                lines.append(f"- ⚠️ {violation}")
+            lines.append("")
+
+        lines.append("## Large Cap Holdings (Core)")
+        if allocation.large_cap_holdings:
+            for ticker, pct in sorted(allocation.large_cap_holdings.items(), key=lambda x: x[1], reverse=True):
+                lines.append(f"- {ticker}: {pct:.1f}%")
         else:
-            lines.append("\n## ✅ No Violations\n")
-            lines.append("Allocation complies with all 80/20 framework constraints.")
+            lines.append("- None")
+        lines.append("")
+
+        lines.append("## Mid Cap Holdings (Growth Quality)")
+        if allocation.mid_cap_holdings:
+            for ticker, pct in sorted(allocation.mid_cap_holdings.items(), key=lambda x: x[1], reverse=True):
+                lines.append(f"- {ticker}: {pct:.1f}%")
+        else:
+            lines.append("- None")
+        lines.append("")
+
+        lines.append("## Small Cap Holdings (Opportunistic)")
+        if allocation.small_cap_holdings:
+            for ticker, pct in sorted(allocation.small_cap_holdings.items(), key=lambda x: x[1], reverse=True):
+                lines.append(f"- {ticker}: {pct:.1f}%")
+        else:
+            lines.append("- None")
+        lines.append("")
+
+        lines.append("## Thematic Holdings")
+        if allocation.thematic_holdings:
+            for ticker, pct in sorted(allocation.thematic_holdings.items(), key=lambda x: x[1], reverse=True):
+                lines.append(f"- {ticker}: {pct:.1f}%")
+        else:
+            lines.append("- None")
 
         return "\n".join(lines)
 
 
-def main():
-    """CLI interface for testing"""
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Portfolio Constructor (80/20 Framework)")
-    parser.add_argument('--test', action='store_true', help='Run test example')
-    args = parser.parse_args()
-
-    if args.test:
-        constructor = PortfolioConstructor()
-
-        # Test quality position sizing
-        print("\n" + "=" * 60)
-        print("QUALITY POSITION SIZING TEST")
-        print("=" * 60)
-        for score in [9.5, 8.5, 7.5, 6.5]:
-            min_pct, max_pct = constructor.calculate_quality_position_size(score)
-            print(f"Score {score:.1f}: {min_pct:.1f}% - {max_pct:.1f}%")
-
-        # Test thematic position sizing
-        print("\n" + "=" * 60)
-        print("THEMATIC POSITION SIZING TEST")
-        print("=" * 60)
-        for score in [37.0, 32.0, 28.5, 25.0]:
-            min_pct, max_pct = constructor.calculate_thematic_position_size(score)
-            print(f"Score {score:.1f}: {min_pct:.1f}% - {max_pct:.1f}%")
-
-        print("\n" + "=" * 60)
-
-
+# Example usage and testing
 if __name__ == "__main__":
-    main()
+    import logging
+    logging.basicConfig(level=logging.INFO)
+
+    constructor = PortfolioConstructor()
+
+    # Example: Calculate target allocation
+    holdings_by_tier = {
+        MarketCapTier.LARGE_CAP: {
+            'AAPL': 0.25,  # 25% ROE
+            'MSFT': 0.18,  # 18% ROE
+            'GOOGL': 0.22  # 22% ROE
+        },
+        MarketCapTier.MID_CAP: {
+            'NVDA': {'roe': 0.18, 'incremental_roce_advantage': 8.0}
+        },
+        MarketCapTier.SMALL_CAP: {
+            'QS': {'quality_score': 65.0}
+        },
+        'THEMATIC': {
+            'IONQ': 32.0  # Thematic score
+        }
+    }
+
+    financial_data = {
+        'QS': {
+            'free_cash_flow': 100e6,
+            'total_debt': 200e6,
+            'shareholder_equity': 500e6,
+            'gross_margin': 0.35
+        }
+    }
+
+    allocation = constructor.calculate_target_allocation(
+        holdings_by_tier,
+        financial_data,
+        100000.0
+    )
+
+    print("\n" + constructor.generate_allocation_summary(allocation))

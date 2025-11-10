@@ -21,6 +21,8 @@ sys.path.append(str(Path(__file__).parent))
 
 from financial_data_fetcher import FinancialDataFetcher, FinancialData, get_sp500_tickers
 from quality_metrics_calculator import QualityMetricsCalculator, QualityAnalysisResult
+from market_cap_classifier import MarketCapClassifier
+from quality_persistence_analyzer import ROEPersistenceAnalyzer
 from hf_config import HFConfig
 
 # Setup logging
@@ -48,6 +50,8 @@ class QualityAnalysisScript:
     def __init__(self):
         """Initialize quality analysis script"""
         self.financial_fetcher = FinancialDataFetcher(enable_cache=True)
+        self.market_cap_classifier = MarketCapClassifier()
+        self.roe_analyzer = ROEPersistenceAnalyzer()
         self.quality_calculator = QualityMetricsCalculator()
         self.results = {}
 
@@ -256,15 +260,21 @@ class QualityAnalysisScript:
         self,
         holdings_quality: Dict[str, QualityAnalysisResult],
         watchlist_quality: Dict[str, QualityAnalysisResult],
-        recommendations: Dict[str, List[Dict]]
+        recommendations: Dict[str, List[Dict]],
+        market_cap_tiers: Dict[str, str],
+        roe_persistence: Dict[str, Dict],
+        strict_filters: Dict[str, Dict]
     ):
         """
-        Export analysis results to JSON and summary text
+        Export analysis results to JSON and summary text (4-tier framework)
 
         Args:
             holdings_quality: Quality results for holdings
             watchlist_quality: Quality results for watchlist
             recommendations: SELL and BUY recommendations
+            market_cap_tiers: Market cap tier classification (4-tier framework)
+            roe_persistence: ROE persistence analysis results
+            strict_filters: Small cap strict quality filters results
         """
         # Create outputs directory if it doesn't exist
         output_dir = Path(__file__).parent / "outputs"
@@ -273,7 +283,7 @@ class QualityAnalysisScript:
         # Generate timestamp for filenames
         timestamp = datetime.now().strftime("%Y%m%d")
 
-        # Prepare JSON output
+        # Prepare JSON output (4-tier framework)
         output_data = {
             'timestamp': datetime.now().isoformat(),
             'holdings_count': len(holdings_quality),
@@ -310,7 +320,10 @@ class QualityAnalysisScript:
                 }
                 for ticker, result in watchlist_quality.items()
             },
-            'recommendations': recommendations
+            'recommendations': recommendations,
+            'market_cap_tiers': market_cap_tiers,  # NEW: 4-tier framework
+            'roe_persistence': roe_persistence,    # NEW: 4-tier framework
+            'strict_filters': strict_filters        # NEW: 4-tier framework
         }
 
         # Export JSON
@@ -434,11 +447,83 @@ class QualityAnalysisScript:
         holdings_quality = {ticker: result for ticker, result in quality_results.items() if ticker in holdings}
         watchlist_quality = {ticker: result for ticker, result in quality_results.items() if ticker in watchlist}
 
+        # Classify market cap tiers (4-tier framework integration)
+        logger.info("Classifying market cap tiers...")
+        market_cap_results = self.market_cap_classifier.batch_classify_tickers(list(quality_results.keys()))
+        market_cap_tiers = {
+            ticker: tier_data.tier.value
+            for ticker, tier_data in market_cap_results.classifications.items()
+        }
+        logger.info(f"Classified {len(market_cap_tiers)} tickers into market cap tiers")
+
+        # Analyze ROE persistence (4-tier framework integration)
+        logger.info("Analyzing ROE persistence...")
+        roe_persistence = {}
+        for ticker in quality_results.keys():
+            try:
+                persistence_result = self.roe_analyzer.analyze_ticker(ticker)
+                if persistence_result:
+                    roe_persistence[ticker] = {
+                        'persistence_years': persistence_result.persistence_years,
+                        'trend_quarters': persistence_result.trend_quarters,
+                        'incremental_roce': persistence_result.incremental_roce,
+                        'classification': persistence_result.classification.value
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to analyze ROE persistence for {ticker}: {e}")
+                continue
+        logger.info(f"Analyzed ROE persistence for {len(roe_persistence)} tickers")
+
+        # Analyze small cap strict filters (4-tier framework integration)
+        logger.info("Analyzing small cap strict filters...")
+        strict_filters = {}
+        for ticker, tier in market_cap_tiers.items():
+            if tier == "Small Cap":  # Only check small caps
+                data = financial_data.get(ticker)
+                if data:
+                    try:
+                        # FCF+ check
+                        fcf_positive = data.free_cash_flow and data.free_cash_flow > 0
+
+                        # D/E < 1.0 check
+                        if data.total_debt and data.shareholder_equity and data.shareholder_equity > 0:
+                            debt_to_equity = data.total_debt / data.shareholder_equity
+                            de_pass = debt_to_equity < 1.0
+                        else:
+                            de_pass = False
+
+                        # GP > 30% check
+                        if data.revenue and data.cogs and data.revenue > 0:
+                            gross_margin = (data.revenue - data.cogs) / data.revenue
+                            gm_pass = gross_margin > 0.30
+                        else:
+                            gm_pass = False
+
+                        passed = fcf_positive and de_pass and gm_pass
+
+                        strict_filters[ticker] = {
+                            'passed': passed,
+                            'fcf_positive': fcf_positive,
+                            'debt_to_equity_ok': de_pass,
+                            'gross_margin_ok': gm_pass
+                        }
+                    except Exception as e:
+                        logger.warning(f"Failed to check strict filters for {ticker}: {e}")
+                        continue
+        logger.info(f"Analyzed strict filters for {len(strict_filters)} small cap tickers")
+
         # Generate recommendations
         recommendations = self.identify_recommendations(holdings, holdings_quality, watchlist_quality)
 
-        # Export results
-        self.export_results(holdings_quality, watchlist_quality, recommendations)
+        # Export results (including market cap tiers, ROE persistence, and strict filters)
+        self.export_results(
+            holdings_quality,
+            watchlist_quality,
+            recommendations,
+            market_cap_tiers,
+            roe_persistence,
+            strict_filters
+        )
 
         logger.info("Quality analysis pipeline complete")
 

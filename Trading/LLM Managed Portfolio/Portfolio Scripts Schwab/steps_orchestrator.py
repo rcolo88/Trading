@@ -5,11 +5,11 @@ Implements complete 10-step STEPS research methodology for portfolio management
 
 References:
 - STEPS_Research_Methodology_November_1_2025.md for methodology
-- PM_README_V3.md for 80/20 quality/opportunistic framework
+- quality_investing_thresholds_research.md for 4-tier market cap framework
 - trading_template.md for output format
 
 Author: LLM Portfolio Management System
-Date: November 3, 2025
+Date: November 6, 2025 (Updated for 4-Tier Framework)
 """
 
 import json
@@ -108,12 +108,16 @@ class ValuationRating:
 
 
 @dataclass
-class PortfolioAllocation:
-    """Target portfolio allocation"""
-    quality_holdings: Dict[str, float]  # ticker -> target %
+class TieredAllocation:
+    """Target portfolio allocation for 4-tier market cap framework"""
+    large_cap_holdings: Dict[str, float]  # ticker -> target %
+    mid_cap_holdings: Dict[str, float]  # ticker -> target %
+    small_cap_holdings: Dict[str, float]  # ticker -> target %
     thematic_holdings: Dict[str, float]  # ticker -> target %
     cash_reserve: float
-    total_quality_pct: float
+    total_large_cap_pct: float
+    total_mid_cap_pct: float
+    total_small_cap_pct: float
     total_thematic_pct: float
     violations: List[str]
 
@@ -361,12 +365,12 @@ class STEPSOrchestrator:
 
     def _step_2_holdings_quality(self) -> Dict[str, QualityScore]:
         """
-        STEP 2: Current Holdings Quality Analysis
+        STEP 2: Current Holdings Quality Analysis + Market Cap Classification
 
-        CRITICAL STEP: Calculates quality scores for all holdings
-        Uses existing quality_analysis_script.py
+        CRITICAL STEP: Calculates quality scores and classifies by market cap tier
+        Uses existing quality_analysis_script.py + market_cap_classifier.py
         """
-        logger.info("📊 Running STEP 2: Holdings Quality Analysis...")
+        logger.info("📊 Running STEP 2: Holdings Quality Analysis & Market Cap Classification...")
 
         try:
             # Run quality analysis script
@@ -408,10 +412,27 @@ class STEPSOrchestrator:
                     meets_core_criteria=data.get('composite_score', 0) >= 7.0
                 )
 
+            # NEW: Market cap classification for 4-tier framework
+            logger.info("Classifying holdings by market cap tier...")
+            from market_cap_classifier import MarketCapClassifier
+
+            classifier = MarketCapClassifier()
+            tickers = list(quality_scores.keys())
+            market_cap_results = classifier.batch_classify_tickers(tickers)
+
+            # Store market cap tier results for later use
+            self.results['market_cap_tiers'] = {}
+            for ticker in tickers:
+                tier_data = market_cap_results.classifications.get(ticker)
+                if tier_data:
+                    self.results['market_cap_tiers'][ticker] = tier_data.tier.value
+                    logger.info(f"  📈 {ticker}: {tier_data.tier.value} (${tier_data.market_cap/1e9:.1f}B)")
+
             logger.info(f"✅ STEP 2 Complete: Analyzed {len(quality_scores)} holdings")
             for ticker, score in quality_scores.items():
                 status = "✅" if score.meets_core_criteria else "❌"
-                logger.info(f"  {status} {ticker}: {score.composite_score:.1f}/10 ({score.tier})")
+                tier = self.results['market_cap_tiers'].get(ticker, 'UNKNOWN')
+                logger.info(f"  {status} {ticker}: {score.composite_score:.1f}/10 ({score.tier}) - {tier}")
 
             return quality_scores
 
@@ -637,44 +658,112 @@ class STEPSOrchestrator:
             logger.error(f"❌ STEP 5 Warning: {e}")
             return {}
 
-    def _step_6_portfolio_construction(self) -> PortfolioAllocation:
+    def _step_6_portfolio_construction(self) -> TieredAllocation:
         """
         STEP 6: Portfolio Construction
 
-        Determines optimal 80/20 allocation based on scores
+        Determines optimal 4-tier allocation (Large/Mid/Small/Thematic)
+        Uses portfolio_constructor.py with 4-tier framework
         """
-        logger.info("🏗️  Running STEP 6: Portfolio Construction...")
+        logger.info("🏗️  Running STEP 6: Portfolio Construction (4-Tier Framework)...")
 
         try:
-            # TODO: Implement portfolio constructor
-            logger.warning("⚠️  Portfolio constructor not yet implemented")
+            from portfolio_constructor import PortfolioConstructor
+            from market_cap_classifier import MarketCapTier
 
-            # Load current portfolio state
+            # Get quality scores and market cap tiers from STEP 2
+            quality_results = self.results.get('quality_scores', {})
+            market_cap_tiers = self.results.get('market_cap_tiers', {})
+
+            if not quality_results or not market_cap_tiers:
+                logger.error("Missing quality scores or market cap tiers from STEP 2")
+                return self._default_tiered_allocation()
+
+            # Organize holdings by market cap tier
+            holdings_by_tier = {
+                MarketCapTier.LARGE_CAP: {},
+                MarketCapTier.MID_CAP: {},
+                MarketCapTier.SMALL_CAP: {},
+                'THEMATIC': {}
+            }
+
+            for ticker, tier_str in market_cap_tiers.items():
+                quality_data = quality_results.get(ticker)
+                if not quality_data:
+                    continue
+
+                roe = quality_data.roe if hasattr(quality_data, 'roe') else 0.15
+
+                if tier_str == 'Large Cap':
+                    holdings_by_tier[MarketCapTier.LARGE_CAP][ticker] = roe
+                elif tier_str == 'Mid Cap':
+                    # For mid cap, need ROE and incremental ROCE advantage
+                    holdings_by_tier[MarketCapTier.MID_CAP][ticker] = {
+                        'roe': roe,
+                        'incremental_roce_advantage': 5.0  # Placeholder
+                    }
+                elif tier_str == 'Small Cap':
+                    # For small cap, need quality score
+                    quality_score = quality_data.composite_score * 10 if hasattr(quality_data, 'composite_score') else 70
+                    holdings_by_tier[MarketCapTier.SMALL_CAP][ticker] = {
+                        'quality_score': quality_score
+                    }
+
+            # Get thematic holdings from STEP 3B (if available)
+            thematic_results = self.results.get('thematic_scores', {})
+            for ticker, thematic_data in thematic_results.items():
+                if isinstance(thematic_data, dict):
+                    thematic_score = thematic_data.get('total_score', 0)
+                else:
+                    thematic_score = thematic_data
+
+                if thematic_score >= 28:
+                    holdings_by_tier['THEMATIC'][ticker] = thematic_score
+
+            # Prepare financial data for small cap filters
+            financial_data = {}  # TODO: Load actual financial data if needed
+
+            # Load portfolio value
             portfolio_file = Path("../portfolio_state.json")
+            portfolio_value = 100000.0  # Default
             if portfolio_file.exists():
                 with open(portfolio_file, 'r') as f:
                     portfolio_data = json.load(f)
-                logger.info(f"Loaded portfolio: {len(portfolio_data.get('holdings', {}))} positions")
+                    holdings = portfolio_data.get('holdings', {})
+                    cash = portfolio_data.get('cash', 0)
+                    portfolio_value = sum(holdings.values()) + cash
+                    logger.info(f"Loaded portfolio: ${portfolio_value:,.2f}")
 
-            # Default allocation
-            allocation = PortfolioAllocation(
-                quality_holdings={},
-                thematic_holdings={},
-                cash_reserve=5.0,
-                total_quality_pct=0.0,
-                total_thematic_pct=0.0,
-                violations=[]
+            # Calculate target allocation
+            constructor = PortfolioConstructor()
+            allocation = constructor.calculate_target_allocation(
+                holdings_by_tier, financial_data, portfolio_value
             )
 
-            logger.info("✅ STEP 6 Complete: Portfolio allocation determined")
+            logger.info(f"✅ STEP 6 Complete: 4-Tier allocation calculated")
+            logger.info(f"  Large Cap: {allocation.total_large_cap_pct:.1f}%")
+            logger.info(f"  Mid Cap: {allocation.total_mid_cap_pct:.1f}%")
+            logger.info(f"  Small Cap: {allocation.total_small_cap_pct:.1f}%")
+            logger.info(f"  Thematic: {allocation.total_thematic_pct:.1f}%")
+            logger.info(f"  Cash: {allocation.cash_reserve:.1f}%")
+
+            if allocation.violations:
+                logger.warning(f"  ⚠️  {len(allocation.violations)} allocation violations")
+
             return allocation
 
         except Exception as e:
-            logger.error(f"❌ STEP 6 Warning: {e}")
-            return PortfolioAllocation(
-                quality_holdings={}, thematic_holdings={}, cash_reserve=5.0,
-                total_quality_pct=0.0, total_thematic_pct=0.0, violations=[]
-            )
+            logger.error(f"❌ STEP 6 Failed: {e}", exc_info=True)
+            return self._default_tiered_allocation()
+
+    def _default_tiered_allocation(self) -> TieredAllocation:
+        """Return default empty allocation for error cases"""
+        return TieredAllocation(
+            large_cap_holdings={}, mid_cap_holdings={}, small_cap_holdings={},
+            thematic_holdings={}, cash_reserve=5.0,
+            total_large_cap_pct=0.0, total_mid_cap_pct=0.0,
+            total_small_cap_pct=0.0, total_thematic_pct=0.0, violations=[]
+        )
 
     def _step_7_rebalancing_trades(self) -> List[Trade]:
         """
@@ -826,63 +915,67 @@ class STEPSOrchestrator:
                 quality_score=0.0
             )
 
-    def _step_10_framework_validation(self) -> ComplianceReport:
+    def _step_10_framework_validation(self) -> 'TieredComplianceReport':
         """
         STEP 10: Framework Compliance Validation
 
-        Validates portfolio compliance with 80/20 framework rules
+        Validates portfolio compliance with 4-tier market cap framework rules
         """
-        logger.info("✅ Running STEP 10: Framework Validation...")
+        logger.info("✅ Running STEP 10: 4-Tier Framework Validation...")
 
         try:
             from framework_validator import FrameworkValidator
 
             validator = FrameworkValidator()
 
-            # Get quality scores from STEP 2 results
-            quality_results = self.results.get('quality_scores', {})
-            quality_scores = {}
-            for ticker, score_data in quality_results.items():
-                if isinstance(score_data, dict):
-                    # Extract composite score from dict
-                    quality_scores[ticker] = score_data.get('composite_score', 0.0)
-                else:
-                    # Assume it's already a number
-                    quality_scores[ticker] = score_data
+            # Get market cap tiers from STEP 2
+            market_cap_tiers = self.results.get('market_cap_tiers', {})
 
             # Get thematic scores from STEP 3B results
             thematic_results = self.results.get('thematic_scores', {})
-            thematic_scores = {}
-            for ticker, score_data in thematic_results.items():
-                if isinstance(score_data, dict):
-                    # Extract total score from dict
-                    thematic_scores[ticker] = score_data.get('total_score', 0.0)
-                else:
-                    # Assume it's already a number
-                    thematic_scores[ticker] = score_data
 
-            # Classify holdings as QUALITY or THEMATIC
-            holdings_types = {}
+            # Classify holdings by market cap tier
+            holdings_tiers = {}
             for ticker in self.portfolio_state.get('holdings', {}).keys():
-                quality_score = quality_scores.get(ticker, 0)
-                thematic_score = thematic_scores.get(ticker, 0)
+                # Check if thematic first
+                thematic_score = 0
+                if ticker in thematic_results:
+                    thematic_data = thematic_results[ticker]
+                    if isinstance(thematic_data, dict):
+                        thematic_score = thematic_data.get('total_score', 0)
+                    else:
+                        thematic_score = thematic_data
 
-                # Quality holdings have score ≥70
-                if quality_score >= 70:
-                    holdings_types[ticker] = "QUALITY"
-                # Thematic holdings have score ≥28
-                elif thematic_score >= 28:
-                    holdings_types[ticker] = "THEMATIC"
+                if thematic_score >= 28:
+                    # This is a thematic holding
+                    holdings_tiers[ticker] = 'THEMATIC'
                 else:
-                    # Below both thresholds - classify as quality for validation
-                    holdings_types[ticker] = "QUALITY"
+                    # Use market cap tier
+                    tier_str = market_cap_tiers.get(ticker, 'Large Cap')  # Default to large cap
+                    if tier_str == 'Large Cap':
+                        holdings_tiers[ticker] = 'LARGE_CAP'
+                    elif tier_str == 'Mid Cap':
+                        holdings_tiers[ticker] = 'MID_CAP'
+                    elif tier_str == 'Small Cap':
+                        holdings_tiers[ticker] = 'SMALL_CAP'
+                    else:
+                        # Micro cap or unknown - default to small cap
+                        holdings_tiers[ticker] = 'SMALL_CAP'
 
-            # Run validation
+            # Prepare ROE persistence data (optional - would come from quality_persistence_analyzer)
+            # For now, use placeholder data
+            roe_persistence = None  # TODO: Integrate with quality_persistence_analyzer
+
+            # Prepare small cap filters (optional - would come from portfolio_constructor)
+            # For now, use placeholder data
+            small_cap_filters = None  # TODO: Integrate with financial data
+
+            # Run 4-tier validation
             report = validator.validate_portfolio(
                 self.portfolio_state,
-                quality_scores,
-                thematic_scores,
-                holdings_types
+                holdings_tiers,
+                roe_persistence,
+                small_cap_filters
             )
 
             # Export compliance report
@@ -899,9 +992,15 @@ class STEPSOrchestrator:
 
             # Log summary
             if report.framework_compliant:
-                logger.info(f"✅ STEP 10 Complete: Framework COMPLIANT (score: {report.compliance_score:.0f}/100)")
+                logger.info(f"✅ STEP 10 Complete: 4-Tier Framework COMPLIANT (score: {report.compliance_score:.0f}/100)")
             else:
-                logger.warning(f"⚠️  STEP 10 Complete: Framework NON-COMPLIANT (score: {report.compliance_score:.0f}/100)")
+                logger.warning(f"⚠️  STEP 10 Complete: 4-Tier Framework NON-COMPLIANT (score: {report.compliance_score:.0f}/100)")
+
+            logger.info(f"  Large Cap: {report.allocation_large_cap_pct:.1f}%")
+            logger.info(f"  Mid Cap: {report.allocation_mid_cap_pct:.1f}%")
+            logger.info(f"  Small Cap: {report.allocation_small_cap_pct:.1f}%")
+            logger.info(f"  Thematic: {report.allocation_thematic_pct:.1f}%")
+            logger.info(f"  Cash: {report.allocation_cash_pct:.1f}%")
 
             critical_count = len([v for v in report.violations if v.severity == "CRITICAL"])
             warning_count = len([v for v in report.violations if v.severity == "WARNING"])

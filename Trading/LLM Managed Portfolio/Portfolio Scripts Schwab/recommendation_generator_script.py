@@ -196,13 +196,29 @@ class RecommendationGenerator:
             thematic = self.thematic_analysis.get(ticker, {}) if self.thematic_analysis else {}
             thematic_score = thematic.get('score')  # None if not a thematic holding
 
-            # Build agent outputs
+            # Get tier-specific data from quality_analysis (4-tier framework)
+            market_cap_tier = self.quality_analysis.get('market_cap_tiers', {}).get(ticker)
+            roe_persistence_data = self.quality_analysis.get('roe_persistence', {}).get(ticker, {})
+            roe_persistence_years = roe_persistence_data.get('persistence_years')
+            roe_trend_quarters = roe_persistence_data.get('trend_quarters')
+            incremental_roce = roe_persistence_data.get('incremental_roce')
+
+            # Get strict filter results for small caps
+            strict_filters = self.quality_analysis.get('strict_filters', {}).get(ticker, {})
+            strict_filters_passed = strict_filters.get('passed', None)
+
+            # Build agent outputs (4-tier framework)
             agent_outputs = {
                 'news_sentiment': news,
                 'market_sentiment': market_analysis['market'],
                 'risk_assessment': market_analysis['risk'],
                 'quality_analysis': quality,
-                'thematic_score': thematic_score,  # NEW: thematic score for position sizing
+                'thematic_score': thematic_score,  # Thematic score for position sizing
+                'market_cap_tier': market_cap_tier,  # NEW: Market cap tier (LARGE_CAP/MID_CAP/SMALL_CAP/THEMATIC)
+                'roe_persistence_years': roe_persistence_years,  # NEW: Years of ROE >15%
+                'roe_trend_quarters': roe_trend_quarters,  # NEW: Quarters of positive ROE trend (small cap)
+                'incremental_roce': incremental_roce,  # NEW: Incremental ROCE improvement (mid cap)
+                'strict_filters_passed': strict_filters_passed,  # NEW: Small cap strict filters
                 'current_holding': True,
                 'current_shares': self.portfolio_state['holdings'][ticker]['shares']
             }
@@ -232,7 +248,18 @@ class RecommendationGenerator:
             thematic = self.thematic_analysis.get(ticker, {}) if self.thematic_analysis else {}
             thematic_score = thematic.get('score')
 
-            # Build agent outputs
+            # Get tier-specific data for alternatives (4-tier framework)
+            market_cap_tier = self.quality_analysis.get('market_cap_tiers', {}).get(ticker)
+            roe_persistence_data = self.quality_analysis.get('roe_persistence', {}).get(ticker, {})
+            roe_persistence_years = roe_persistence_data.get('persistence_years')
+            roe_trend_quarters = roe_persistence_data.get('trend_quarters')
+            incremental_roce = roe_persistence_data.get('incremental_roce')
+
+            # Get strict filter results for small caps
+            strict_filters = self.quality_analysis.get('strict_filters', {}).get(ticker, {})
+            strict_filters_passed = strict_filters.get('passed', None)
+
+            # Build agent outputs (4-tier framework)
             agent_outputs = {
                 'news_sentiment': news,
                 'market_sentiment': market_analysis['market'],
@@ -243,7 +270,12 @@ class RecommendationGenerator:
                     'red_flags_count': alt['red_flags'],
                     'investment_rating': 'BUY'
                 },
-                'thematic_score': thematic_score,  # NEW: thematic score for opportunistic alternatives
+                'thematic_score': thematic_score,  # Thematic score for opportunistic alternatives
+                'market_cap_tier': market_cap_tier,  # NEW: Market cap tier
+                'roe_persistence_years': roe_persistence_years,  # NEW: Years of ROE >15%
+                'roe_trend_quarters': roe_trend_quarters,  # NEW: Quarters of positive ROE trend
+                'incremental_roce': incremental_roce,  # NEW: Incremental ROCE improvement
+                'strict_filters_passed': strict_filters_passed,  # NEW: Small cap strict filters
                 'current_holding': False,
                 'current_shares': 0
             }

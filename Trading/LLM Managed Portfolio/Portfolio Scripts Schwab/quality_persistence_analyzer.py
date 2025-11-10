@@ -32,6 +32,9 @@ from datetime import datetime
 from quality_metrics_calculator import QualityMetricsCalculator
 from quality_llm_prompts import QualityLLMPromptGenerator
 
+# Import market cap classifier for tier-based analysis
+from market_cap_classifier import MarketCapTier, MarketCapClassifier
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -147,6 +150,40 @@ class PersistenceAnalysisResult:
             'trend_analysis': self.trend_analysis,
             'key_insights': self.key_insights,
             'warnings': self.warnings
+        }
+
+
+@dataclass
+class TierEligibility:
+    """
+    Tier eligibility assessment combining market cap and ROE persistence.
+
+    Used to validate if a holding meets tier-specific requirements from
+    quality_investing_thresholds_research.md:
+    - Large Cap ($50B+): 5+ years ROE >15%
+    - Mid Cap ($2B-$50B): 2-3 years ROE >15% + incremental ROCE advantage
+    - Small Cap ($500M-$2B): 6-8 quarters positive ROE trend + strict quality filters
+    """
+    ticker: str
+    market_cap: Optional[float]
+    market_cap_tier: Optional[MarketCapTier]
+    meets_roe_persistence: bool
+    roe_persistence_years: float  # Actual years/quarters meeting threshold
+    incremental_roce_advantage: Optional[float]  # % advantage (for mid-cap)
+    reasoning: str
+    validation_date: str
+
+    def to_dict(self) -> dict:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            'ticker': self.ticker,
+            'market_cap': self.market_cap,
+            'market_cap_tier': self.market_cap_tier.value if self.market_cap_tier else None,
+            'meets_roe_persistence': self.meets_roe_persistence,
+            'roe_persistence_years': self.roe_persistence_years,
+            'incremental_roce_advantage': self.incremental_roce_advantage,
+            'reasoning': self.reasoning,
+            'validation_date': self.validation_date
         }
 
 
@@ -1074,6 +1111,364 @@ class QualityPersistenceAnalyzer:
             )
 
         return warnings
+
+    # ==================== TIER-SPECIFIC ROE PERSISTENCE METHODS ====================
+    #
+    # Added for 4-tier market cap framework implementation.
+    # These methods validate if holdings meet tier-specific ROE persistence requirements
+    # from quality_investing_thresholds_research.md
+
+    def validate_roe_persistence_for_tier(
+        self,
+        ticker: str,
+        tier: MarketCapTier,
+        historical_data: pd.DataFrame
+    ) -> Tuple[bool, str]:
+        """
+        Validate if a holding meets tier-specific ROE persistence requirements.
+
+        Requirements by tier (from quality_investing_thresholds_research.md):
+        - LARGE_CAP: 5+ consecutive years with ROE >15%
+        - MID_CAP: 2-3 consecutive years with ROE >15%
+        - SMALL_CAP: 6-8 consecutive quarters with positive ROE trend
+        - MICRO_CAP: Not eligible for portfolio
+
+        Args:
+            ticker: Stock ticker symbol
+            tier: Market capitalization tier
+            historical_data: DataFrame with annual/quarterly financial data
+
+        Returns:
+            Tuple of (passes_requirement: bool, reasoning: str)
+
+        Example:
+            >>> analyzer = QualityPersistenceAnalyzer()
+            >>> passes, reason = analyzer.validate_roe_persistence_for_tier(
+            ...     'AAPL',
+            ...     MarketCapTier.LARGE_CAP,
+            ...     historical_df
+            ... )
+            >>> print(f"Passes: {passes}, Reason: {reason}")
+        """
+        # Micro cap not eligible
+        if tier == MarketCapTier.MICRO_CAP:
+            return False, "MICRO_CAP tier not eligible for portfolio"
+
+        # Calculate ROE for each period
+        df = historical_data.sort_values('year').copy()
+
+        # Check if we have required columns
+        required_cols = ['net_income', 'shareholder_equity']
+        if not all(col in df.columns for col in required_cols):
+            return False, f"Missing required columns: {required_cols}"
+
+        # Calculate ROE
+        df['roe'] = df['net_income'] / df['shareholder_equity'].replace(0, np.nan)
+        df = df.dropna(subset=['roe'])
+
+        if len(df) == 0:
+            return False, "No valid ROE data available"
+
+        # LARGE CAP: Require 5+ consecutive years with ROE >15%
+        if tier == MarketCapTier.LARGE_CAP:
+            roe_above_threshold = (df['roe'] > 0.15).astype(int)
+
+            # Find longest consecutive streak
+            max_streak = 0
+            current_streak = 0
+
+            for value in roe_above_threshold:
+                if value == 1:
+                    current_streak += 1
+                    max_streak = max(max_streak, current_streak)
+                else:
+                    current_streak = 0
+
+            years_analyzed = len(df)
+            years_above_15 = (df['roe'] > 0.15).sum()
+
+            if max_streak >= 5:
+                return True, f"LARGE_CAP requirement met: {max_streak} consecutive years ROE >15% (analyzed {years_analyzed} years)"
+            else:
+                return False, f"LARGE_CAP requirement NOT met: Only {max_streak} consecutive years ROE >15% (need 5+). Total years >15%: {years_above_15}/{years_analyzed}"
+
+        # MID CAP: Require 2-3 consecutive years with ROE >15%
+        elif tier == MarketCapTier.MID_CAP:
+            roe_above_threshold = (df['roe'] > 0.15).astype(int)
+
+            # Find longest consecutive streak
+            max_streak = 0
+            current_streak = 0
+
+            for value in roe_above_threshold:
+                if value == 1:
+                    current_streak += 1
+                    max_streak = max(max_streak, current_streak)
+                else:
+                    current_streak = 0
+
+            years_analyzed = len(df)
+
+            if max_streak >= 2:
+                return True, f"MID_CAP requirement met: {max_streak} consecutive years ROE >15% (analyzed {years_analyzed} years)"
+            else:
+                return False, f"MID_CAP requirement NOT met: Only {max_streak} consecutive years ROE >15% (need 2+)"
+
+        # SMALL CAP: Require 6-8 consecutive quarters with positive ROE trend
+        elif tier == MarketCapTier.SMALL_CAP:
+            # For small cap, we need quarterly data, but if we only have annual,
+            # we'll use a simplified approach: check for improving trend in recent periods
+
+            years_analyzed = len(df)
+
+            # If we have <2 years of data, can't determine trend
+            if years_analyzed < 2:
+                return False, f"SMALL_CAP requirement NOT met: Need at least 2 years of data to determine trend (have {years_analyzed})"
+
+            # Calculate trend using linear regression
+            if len(df) >= 2:
+                years = np.arange(len(df))
+                roe_values = df['roe'].values
+
+                # Linear regression
+                slope, intercept, r_value, p_value, std_err = stats.linregress(years, roe_values)
+
+                # Check if trend is positive
+                if slope > 0:
+                    # Count consecutive periods with positive ROE
+                    consecutive_positive = 0
+                    current_consecutive = 0
+
+                    for roe in roe_values:
+                        if roe > 0:
+                            current_consecutive += 1
+                            consecutive_positive = max(consecutive_positive, current_consecutive)
+                        else:
+                            current_consecutive = 0
+
+                    # For annual data, we approximate quarters (1 year ≈ 4 quarters)
+                    # So 2 consecutive positive annual periods ≈ 8 quarters
+                    quarters_equivalent = consecutive_positive * 4
+
+                    if consecutive_positive >= 2 and slope > 0.01:  # Positive trend and at least 2 years
+                        return True, f"SMALL_CAP requirement met: Positive ROE trend ({slope*100:.1f}% per year) with {consecutive_positive} consecutive positive years (~{quarters_equivalent} quarters equivalent)"
+                    else:
+                        return False, f"SMALL_CAP requirement NOT met: Positive trend but only {consecutive_positive} consecutive positive years (need ~2 years / 8 quarters)"
+                else:
+                    return False, f"SMALL_CAP requirement NOT met: ROE trend is negative ({slope*100:.1f}% per year)"
+
+        # Should never reach here
+        return False, f"Unknown tier: {tier}"
+
+    def calculate_incremental_roce(
+        self,
+        historical_data: pd.DataFrame
+    ) -> float:
+        """
+        Calculate incremental ROCE to identify companies with improving returns.
+
+        Incremental ROCE = (Change in NOPAT) / (Change in Invested Capital)
+
+        For mid-cap quality detection, research suggests looking for companies where
+        incremental ROCE exceeds traditional ROCE by 5%+ (indicates improving capital
+        deployment efficiency).
+
+        Args:
+            historical_data: DataFrame with annual financial data including:
+                - nopat (Net Operating Profit After Tax)
+                - total_debt
+                - shareholder_equity
+                - year
+
+        Returns:
+            Incremental ROCE advantage (percentage points)
+            Returns 0.0 if insufficient data or calculation fails
+
+        Example:
+            >>> analyzer = QualityPersistenceAnalyzer()
+            >>> advantage = analyzer.calculate_incremental_roce(historical_df)
+            >>> if advantage > 5.0:
+            ...     print(f"Strong incremental ROCE advantage: +{advantage:.1f}%")
+        """
+        df = historical_data.sort_values('year').copy()
+
+        # Check for required columns
+        required_cols = ['nopat', 'total_debt', 'shareholder_equity']
+        if not all(col in df.columns for col in required_cols):
+            logger.warning(f"Missing columns for incremental ROCE calculation: {required_cols}")
+            return 0.0
+
+        # Need at least 2 years of data
+        if len(df) < 2:
+            logger.warning("Insufficient data for incremental ROCE (need 2+ years)")
+            return 0.0
+
+        # Calculate invested capital for each year
+        df['invested_capital'] = df['total_debt'] + df['shareholder_equity']
+
+        # Remove rows with zero or NaN invested capital
+        df = df[df['invested_capital'] > 0].copy()
+
+        if len(df) < 2:
+            return 0.0
+
+        # Calculate traditional ROCE for most recent year
+        latest_year = df.iloc[-1]
+        traditional_roce = latest_year['nopat'] / latest_year['invested_capital']
+
+        # Calculate incremental ROCE (most recent year vs prior year)
+        current = df.iloc[-1]
+        prior = df.iloc[-2]
+
+        delta_nopat = current['nopat'] - prior['nopat']
+        delta_invested_capital = current['invested_capital'] - prior['invested_capital']
+
+        # If invested capital didn't change or decreased, can't calculate incremental ROCE
+        if delta_invested_capital <= 0:
+            return 0.0
+
+        incremental_roce = delta_nopat / delta_invested_capital
+
+        # Calculate advantage (incremental - traditional) in percentage points
+        advantage = (incremental_roce - traditional_roce) * 100
+
+        logger.debug(f"Traditional ROCE: {traditional_roce*100:.1f}%, "
+                    f"Incremental ROCE: {incremental_roce*100:.1f}%, "
+                    f"Advantage: {advantage:.1f}%")
+
+        return advantage
+
+    def assess_tier_eligibility(
+        self,
+        ticker: str,
+        market_cap: Optional[float] = None
+    ) -> TierEligibility:
+        """
+        Assess if a ticker meets tier-specific eligibility requirements.
+
+        Combines market cap classification and ROE persistence validation to determine
+        if a holding qualifies for its tier under the 4-tier framework.
+
+        This is a convenience method that:
+        1. Classifies market cap tier (if not provided)
+        2. Fetches historical financial data
+        3. Validates tier-specific ROE persistence
+        4. Calculates incremental ROCE (for mid-cap)
+
+        Args:
+            ticker: Stock ticker symbol
+            market_cap: Optional market cap in dollars (fetched if not provided)
+
+        Returns:
+            TierEligibility object with full assessment
+
+        Example:
+            >>> analyzer = QualityPersistenceAnalyzer()
+            >>> eligibility = analyzer.assess_tier_eligibility('AAPL')
+            >>> if eligibility.meets_roe_persistence:
+            ...     print(f"{ticker} meets {eligibility.market_cap_tier.value} requirements")
+            ... else:
+            ...     print(f"Failed: {eligibility.reasoning}")
+
+        Note:
+            This method requires yfinance for data fetching. For batch processing,
+            consider caching historical data and calling validate_roe_persistence_for_tier
+            directly.
+        """
+        # Classify market cap tier
+        classifier = MarketCapClassifier(enable_cache=True)
+
+        if market_cap is None:
+            market_cap_result = classifier.classify_ticker(ticker)
+            market_cap = market_cap_result.market_cap
+            tier = market_cap_result.tier
+
+            if market_cap_result.error:
+                return TierEligibility(
+                    ticker=ticker,
+                    market_cap=None,
+                    market_cap_tier=None,
+                    meets_roe_persistence=False,
+                    roe_persistence_years=0.0,
+                    incremental_roce_advantage=None,
+                    reasoning=f"Failed to fetch market cap: {market_cap_result.error}",
+                    validation_date=datetime.now().strftime("%Y-%m-%d")
+                )
+        else:
+            tier = classifier.classify_by_market_cap(market_cap)
+
+        # Fetch historical financial data (this is a simplified version)
+        # In production, you'd use a proper data fetcher
+        try:
+            import yfinance as yf
+            stock = yf.Ticker(ticker)
+
+            # Get annual financials
+            financials = stock.financials.T  # Transpose to get years as rows
+            balance_sheet = stock.balance_sheet.T
+
+            # Build historical dataframe
+            df = pd.DataFrame()
+            df['year'] = financials.index.year
+
+            # Map common fields
+            field_mapping = {
+                'Net Income': 'net_income',
+                'Total Revenue': 'revenue',
+                'Cost Of Revenue': 'cogs',
+                'Operating Income': 'operating_income',
+                'Total Assets': 'total_assets',
+                'Stockholders Equity': 'shareholder_equity',
+                'Total Debt': 'total_debt',
+            }
+
+            for yf_field, our_field in field_mapping.items():
+                if yf_field in financials.columns:
+                    df[our_field] = financials[yf_field].values
+                elif yf_field in balance_sheet.columns:
+                    df[our_field] = balance_sheet[yf_field].values
+
+            # Calculate NOPAT (simplified: operating income * (1 - 0.21 tax rate))
+            if 'operating_income' in df.columns:
+                df['nopat'] = df['operating_income'] * 0.79
+
+            # Validate ROE persistence
+            passes, reasoning = self.validate_roe_persistence_for_tier(ticker, tier, df)
+
+            # Calculate incremental ROCE (for mid-cap)
+            incremental_roce_adv = None
+            if tier == MarketCapTier.MID_CAP:
+                incremental_roce_adv = self.calculate_incremental_roce(df)
+
+            # Determine years of ROE persistence
+            roe_years = 0.0
+            if 'net_income' in df.columns and 'shareholder_equity' in df.columns:
+                df['roe'] = df['net_income'] / df['shareholder_equity'].replace(0, np.nan)
+                roe_years = (df['roe'] > 0.15).sum()
+
+            return TierEligibility(
+                ticker=ticker,
+                market_cap=market_cap,
+                market_cap_tier=tier,
+                meets_roe_persistence=passes,
+                roe_persistence_years=float(roe_years),
+                incremental_roce_advantage=incremental_roce_adv,
+                reasoning=reasoning,
+                validation_date=datetime.now().strftime("%Y-%m-%d")
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to assess tier eligibility for {ticker}: {e}")
+            return TierEligibility(
+                ticker=ticker,
+                market_cap=market_cap,
+                market_cap_tier=tier,
+                meets_roe_persistence=False,
+                roe_persistence_years=0.0,
+                incremental_roce_advantage=None,
+                reasoning=f"Error fetching historical data: {str(e)}",
+                validation_date=datetime.now().strftime("%Y-%m-%d")
+            )
 
 
 # Example usage and testing

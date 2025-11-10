@@ -16,8 +16,10 @@ import numpy as np
 import sys
 from quality_persistence_analyzer import (
     QualityPersistenceAnalyzer,
-    PersistenceClassification
+    PersistenceClassification,
+    TierEligibility
 )
+from market_cap_classifier import MarketCapTier
 import logging
 
 # Configure logging
@@ -327,6 +329,353 @@ def test_visualization():
         print(f"\n⚠️  Visualization test SKIPPED (may require display): {e}")
 
 
+# ==================== TIER-SPECIFIC ROE PERSISTENCE TESTS ====================
+# Added for 4-tier market cap framework implementation
+
+def test_large_cap_roe_persistence():
+    """Test Large Cap ROE persistence validation (5+ years ROE >15%)."""
+    print("\n🧪 Testing Large Cap ROE Persistence Validation...")
+
+    analyzer = QualityPersistenceAnalyzer()
+
+    # Create data with 6 consecutive years ROE >15%
+    df_pass = pd.DataFrame({
+        'year': list(range(2018, 2024)),
+        'net_income': [25e9] * 6,
+        'shareholder_equity': [100e9] * 6  # ROE = 25% each year
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_LARGE_PASS',
+        MarketCapTier.LARGE_CAP,
+        df_pass
+    )
+
+    assert passes == True, f"Should pass with 6 years: {reason}"
+    assert "6 consecutive years" in reason
+    print("  ✓ Large cap passes with 6 consecutive years ROE >15%")
+
+    # Create data with only 4 consecutive years ROE >15%
+    df_fail = pd.DataFrame({
+        'year': list(range(2018, 2024)),
+        'net_income': [25e9, 25e9, 25e9, 25e9, 5e9, 25e9],
+        'shareholder_equity': [100e9] * 6  # 4 consecutive, then dip, then recovery
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_LARGE_FAIL',
+        MarketCapTier.LARGE_CAP,
+        df_fail
+    )
+
+    assert passes == False, f"Should fail with only 4 consecutive years: {reason}"
+    assert "NOT met" in reason
+    print("  ✓ Large cap fails with only 4 consecutive years ROE >15%")
+
+    # Test exactly 5 years (boundary)
+    df_boundary = pd.DataFrame({
+        'year': list(range(2019, 2024)),
+        'net_income': [25e9] * 5,
+        'shareholder_equity': [100e9] * 5  # Exactly 5 years
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_LARGE_BOUNDARY',
+        MarketCapTier.LARGE_CAP,
+        df_boundary
+    )
+
+    assert passes == True, f"Should pass with exactly 5 years: {reason}"
+    print("  ✓ Large cap passes with exactly 5 consecutive years (boundary)")
+
+
+def test_mid_cap_roe_persistence():
+    """Test Mid Cap ROE persistence validation (2-3 years ROE >15%)."""
+    print("\n🧪 Testing Mid Cap ROE Persistence Validation...")
+
+    analyzer = QualityPersistenceAnalyzer()
+
+    # Create data with 3 consecutive years ROE >15%
+    df_pass = pd.DataFrame({
+        'year': list(range(2021, 2024)),
+        'net_income': [10e9] * 3,
+        'shareholder_equity': [50e9] * 3  # ROE = 20% each year
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_MID_PASS',
+        MarketCapTier.MID_CAP,
+        df_pass
+    )
+
+    assert passes == True, f"Should pass with 3 years: {reason}"
+    assert "3 consecutive years" in reason
+    print("  ✓ Mid cap passes with 3 consecutive years ROE >15%")
+
+    # Create data with only 1 year ROE >15%
+    df_fail = pd.DataFrame({
+        'year': list(range(2021, 2024)),
+        'net_income': [10e9, 5e9, 5e9],
+        'shareholder_equity': [50e9] * 3  # Only first year >15%
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_MID_FAIL',
+        MarketCapTier.MID_CAP,
+        df_fail
+    )
+
+    assert passes == False, f"Should fail with only 1 year: {reason}"
+    assert "NOT met" in reason
+    print("  ✓ Mid cap fails with only 1 year ROE >15%")
+
+    # Test exactly 2 years (boundary)
+    df_boundary = pd.DataFrame({
+        'year': list(range(2022, 2024)),
+        'net_income': [10e9] * 2,
+        'shareholder_equity': [50e9] * 2  # Exactly 2 years
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_MID_BOUNDARY',
+        MarketCapTier.MID_CAP,
+        df_boundary
+    )
+
+    assert passes == True, f"Should pass with exactly 2 years: {reason}"
+    print("  ✓ Mid cap passes with exactly 2 consecutive years (boundary)")
+
+
+def test_small_cap_roe_persistence():
+    """Test Small Cap ROE persistence validation (positive ROE trend)."""
+    print("\n🧪 Testing Small Cap ROE Persistence Validation...")
+
+    analyzer = QualityPersistenceAnalyzer()
+
+    # Create data with positive ROE trend
+    df_pass = pd.DataFrame({
+        'year': list(range(2020, 2024)),
+        'net_income': [2e9, 3e9, 4e9, 5e9],  # Growing
+        'shareholder_equity': [20e9] * 4  # Increasing ROE: 10%, 15%, 20%, 25%
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_SMALL_PASS',
+        MarketCapTier.SMALL_CAP,
+        df_pass
+    )
+
+    assert passes == True, f"Should pass with positive trend: {reason}"
+    assert "Positive ROE trend" in reason
+    print("  ✓ Small cap passes with positive ROE trend")
+
+    # Create data with negative ROE trend
+    df_fail = pd.DataFrame({
+        'year': list(range(2020, 2024)),
+        'net_income': [5e9, 4e9, 3e9, 2e9],  # Declining
+        'shareholder_equity': [20e9] * 4  # Decreasing ROE
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_SMALL_FAIL',
+        MarketCapTier.SMALL_CAP,
+        df_fail
+    )
+
+    assert passes == False, f"Should fail with negative trend: {reason}"
+    assert "negative" in reason.lower()
+    print("  ✓ Small cap fails with negative ROE trend")
+
+
+def test_micro_cap_not_eligible():
+    """Test that Micro Cap tier is not eligible."""
+    print("\n🧪 Testing Micro Cap Ineligibility...")
+
+    analyzer = QualityPersistenceAnalyzer()
+
+    df = pd.DataFrame({
+        'year': [2023],
+        'net_income': [100e6],
+        'shareholder_equity': [500e6]
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_MICRO',
+        MarketCapTier.MICRO_CAP,
+        df
+    )
+
+    assert passes == False, "Micro cap should not be eligible"
+    assert "not eligible" in reason.lower()
+    print("  ✓ Micro cap correctly marked as not eligible")
+
+
+def test_incremental_roce_calculation():
+    """Test incremental ROCE calculation for mid-cap detection."""
+    print("\n🧪 Testing Incremental ROCE Calculation...")
+
+    analyzer = QualityPersistenceAnalyzer()
+
+    # Create data where incremental ROCE > traditional ROCE
+    # (efficient capital deployment)
+    df_good = pd.DataFrame({
+        'year': [2022, 2023],
+        'nopat': [10e9, 15e9],  # NOPAT increased by $5B
+        'total_debt': [30e9, 32e9],  # Invested capital increased by $4B
+        'shareholder_equity': [70e9, 72e9]  # ($2B debt + $2B equity)
+    })
+
+    advantage = analyzer.calculate_incremental_roce(df_good)
+
+    # Incremental ROCE = 5B / 4B = 125%
+    # Traditional ROCE = 15B / 104B = 14.4%
+    # Advantage should be significant positive
+    assert advantage > 0, f"Should have positive advantage: {advantage:.1f}%"
+    print(f"  ✓ Incremental ROCE advantage calculated: +{advantage:.1f}%")
+
+    # Create data where incremental ROCE < traditional ROCE
+    # (inefficient capital deployment)
+    df_bad = pd.DataFrame({
+        'year': [2022, 2023],
+        'nopat': [10e9, 11e9],  # NOPAT increased by only $1B
+        'total_debt': [30e9, 40e9],  # Invested capital increased by $12B
+        'shareholder_equity': [70e9, 72e9]  # ($10B debt + $2B equity = poor returns)
+    })
+
+    advantage = analyzer.calculate_incremental_roce(df_bad)
+
+    # Incremental ROCE = 1B / 12B = 8.3%
+    # Traditional ROCE = 11B / 112B = 9.8%
+    # Advantage should be negative
+    assert advantage < 0, f"Should have negative advantage: {advantage:.1f}%"
+    print(f"  ✓ Negative incremental ROCE detected: {advantage:.1f}%")
+
+
+def test_incremental_roce_edge_cases():
+    """Test incremental ROCE edge cases (insufficient data, no capital change)."""
+    print("\n🧪 Testing Incremental ROCE Edge Cases...")
+
+    analyzer = QualityPersistenceAnalyzer()
+
+    # Only 1 year of data
+    df_insufficient = pd.DataFrame({
+        'year': [2023],
+        'nopat': [10e9],
+        'total_debt': [30e9],
+        'shareholder_equity': [70e9]
+    })
+
+    advantage = analyzer.calculate_incremental_roce(df_insufficient)
+    assert advantage == 0.0, "Should return 0 with insufficient data"
+    print("  ✓ Returns 0.0 with insufficient data")
+
+    # Invested capital decreased
+    df_negative_delta = pd.DataFrame({
+        'year': [2022, 2023],
+        'nopat': [10e9, 12e9],
+        'total_debt': [40e9, 30e9],  # Paid down debt
+        'shareholder_equity': [70e9, 65e9]  # Bought back shares
+    })
+
+    advantage = analyzer.calculate_incremental_roce(df_negative_delta)
+    assert advantage == 0.0, "Should return 0 when invested capital decreases"
+    print("  ✓ Returns 0.0 when invested capital decreases")
+
+
+def test_tier_eligibility_dataclass():
+    """Test TierEligibility dataclass creation and serialization."""
+    print("\n🧪 Testing TierEligibility Dataclass...")
+
+    eligibility = TierEligibility(
+        ticker='TEST',
+        market_cap=100e9,
+        market_cap_tier=MarketCapTier.LARGE_CAP,
+        meets_roe_persistence=True,
+        roe_persistence_years=6.0,
+        incremental_roce_advantage=None,
+        reasoning="Passes all requirements",
+        validation_date="2025-11-06"
+    )
+
+    assert eligibility.ticker == 'TEST'
+    assert eligibility.market_cap_tier == MarketCapTier.LARGE_CAP
+    assert eligibility.meets_roe_persistence == True
+    print("  ✓ TierEligibility dataclass created successfully")
+
+    # Test to_dict()
+    d = eligibility.to_dict()
+    assert d['ticker'] == 'TEST'
+    assert d['market_cap_tier'] == 'Large Cap'
+    assert d['meets_roe_persistence'] == True
+    print("  ✓ TierEligibility to_dict() works correctly")
+
+
+def test_roe_persistence_missing_data():
+    """Test ROE persistence validation with missing data."""
+    print("\n🧪 Testing ROE Persistence with Missing Data...")
+
+    analyzer = QualityPersistenceAnalyzer()
+
+    # Missing required columns
+    df_missing_cols = pd.DataFrame({
+        'year': [2023],
+        'revenue': [100e9]
+        # Missing net_income and shareholder_equity
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_MISSING',
+        MarketCapTier.LARGE_CAP,
+        df_missing_cols
+    )
+
+    assert passes == False, "Should fail with missing columns"
+    assert "Missing required columns" in reason
+    print("  ✓ Correctly handles missing columns")
+
+    # All ROE values are NaN
+    df_nan_roe = pd.DataFrame({
+        'year': [2023],
+        'net_income': [100e9],
+        'shareholder_equity': [0]  # Division by zero -> NaN
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_NAN',
+        MarketCapTier.LARGE_CAP,
+        df_nan_roe
+    )
+
+    assert passes == False, "Should fail with no valid ROE data"
+    assert "No valid ROE data" in reason
+    print("  ✓ Correctly handles NaN ROE values")
+
+
+def test_roe_persistence_interruption():
+    """Test that interruption in ROE >15% streak resets counter."""
+    print("\n🧪 Testing ROE Persistence Streak Interruption...")
+
+    analyzer = QualityPersistenceAnalyzer()
+
+    # Large cap with interruption: 3 years good, 1 bad, 3 years good
+    df_interrupted = pd.DataFrame({
+        'year': list(range(2017, 2024)),
+        'net_income': [25e9, 25e9, 25e9, 5e9, 25e9, 25e9, 25e9],  # Dip in year 4
+        'shareholder_equity': [100e9] * 7
+    })
+
+    passes, reason = analyzer.validate_roe_persistence_for_tier(
+        'TEST_INTERRUPTED',
+        MarketCapTier.LARGE_CAP,
+        df_interrupted
+    )
+
+    # Should fail because no 5 consecutive years
+    assert passes == False, "Should fail with interrupted streak"
+    assert "3 consecutive years" in reason  # Max streak is 3
+    print("  ✓ Correctly detects streak interruption")
+
+
 def run_all_tests():
     """Run all test suites."""
     print("\n")
@@ -341,7 +690,17 @@ def run_all_tests():
         test_cyclical_detection,
         test_universe_analysis,
         test_llm_prompt_generation,
-        test_visualization
+        test_visualization,
+        # NEW: Tier-specific tests (4-tier framework)
+        test_large_cap_roe_persistence,
+        test_mid_cap_roe_persistence,
+        test_small_cap_roe_persistence,
+        test_micro_cap_not_eligible,
+        test_incremental_roce_calculation,
+        test_incremental_roce_edge_cases,
+        test_tier_eligibility_dataclass,
+        test_roe_persistence_missing_data,
+        test_roe_persistence_interruption
     ]
 
     passed = 0

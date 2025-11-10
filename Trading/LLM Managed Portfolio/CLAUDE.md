@@ -116,11 +116,11 @@ python steps_orchestrator.py --verbose
 3B. **Thematic Discovery** - Score opportunistic thematic investments
 4. **Competitive Analysis** - Compare holdings against direct competitors
 5. **Valuation Analysis** - Assess whether stocks are reasonably valued
-6. **Portfolio Construction** - Determine optimal 80/20 allocation
+6. **Portfolio Construction** - Determine optimal 4-tier allocation (Large/Mid/Small/Thematic)
 7. **Rebalancing Trades** - Generate specific trades to reach targets
 8. **Trade Synthesis** - Integrate all analysis into final recommendations
 9. **Data Validation** - Verify data completeness and freshness
-10. **Framework Validation** - Ensure 80/20 compliance
+10. **Framework Validation** - Ensure 4-tier framework compliance
 
 **Outputs:**
 - `outputs/market_environment_YYYYMMDD.json` - Market assessment
@@ -198,9 +198,9 @@ python market_environment_analyzer.py --verbose
 
 ### 🏗️ STEP 6: Portfolio Constructor
 
-**Implements systematic 80/20 allocation enforcement and score-based position sizing.**
+**Implements systematic 4-tier market cap allocation enforcement and score-based position sizing.**
 
-The Portfolio Constructor module calculates optimal portfolio allocations based on quality and thematic scores, generates rebalancing trades, and enforces the 80/20 framework constraints.
+The Portfolio Constructor module calculates optimal portfolio allocations based on market cap tiers (Large/Mid/Small/Thematic), quality scores, ROE persistence, and strict filters. Generates rebalancing trades and enforces the 4-tier framework constraints.
 
 Execute standalone portfolio construction:
 
@@ -214,26 +214,34 @@ python test_portfolio_constructor.py
 ```
 
 **Key Features:**
-- **Score-Based Position Sizing** - Automatic position sizes based on quality (7-10) and thematic (28-40) scores
-- **80/20 Framework Enforcement** - Quality 75-85%, Thematic 15-25%, Cash ≥3%
+- **4-Tier Market Cap Framework** - Large Cap (65-70%), Mid Cap (15-20%), Small Cap (10-15%), Thematic (5-10%)
+- **Tier-Specific Requirements** - ROE persistence, incremental ROCE, strict quality filters by tier
 - **Rebalancing Trade Generation** - Specific buy/sell orders to reach target allocation
-- **Risk Parameter Calculation** - Stop-losses and profit targets by position type
+- **Risk Parameter Calculation** - Stop-losses and profit targets by tier
 - **Violation Detection** - Identifies constraint violations for human review
 - **$50 Minimum Trade Size** - Prevents uneconomical micro-trades
 
-**Position Sizing Rules:**
+**Position Sizing Rules by Tier:**
 
-*Quality Holdings (0-10 scale):*
-- **Elite (9-10)**: 10-20% per position, -15% stop, +40% target
-- **Strong (8-8.99)**: 7-12% per position, -15% stop, +40% target
-- **Moderate (7-7.99)**: 5-8% per position, -20% stop, +40% target
-- **Weak (<7)**: EXIT position (0%)
+*Large Cap Holdings (65-70% of portfolio):*
+- **Requirements**: 5+ years ROE >15%, quality ≥75
+- **Position Range**: 8-15% per position
+- **Risk/Reward**: -15% stop, +30% target
 
-*Thematic Holdings (0-40 scale):*
-- **Leader (35-40)**: 5-7% per position, -27.5% stop, +50% target
-- **Strong Contender (30-34.9)**: 3-5% per position, -27.5% stop, +50% target
-- **Contender (28-29.9)**: 2-3% per position, -27.5% stop, +50% target
-- **Laggard (<28)**: EXIT position (0%)
+*Mid Cap Holdings (15-20% of portfolio):*
+- **Requirements**: 2-3 years ROE >15%, incremental ROCE +5%, quality ≥70
+- **Position Range**: 5-10% per position
+- **Risk/Reward**: -20% stop, +40% target
+
+*Small Cap Holdings (10-15% of portfolio):*
+- **Requirements**: 6-8 quarters ROE trend, FCF+, D/E<1.0, GP>30%, quality ≥65
+- **Position Range**: 2-4% per position
+- **Risk/Reward**: -25% stop, +50% target
+
+*Thematic Holdings (5-10% of portfolio):*
+- **Requirements**: Thematic score ≥28/40
+- **Position Range**: 1.5-2.5% per position
+- **Risk/Reward**: -30% stop, +60% target
 
 **Outputs:**
 - `outputs/portfolio_allocation_YYYYMMDD.json` - Target allocation with violations
@@ -249,11 +257,15 @@ python test_portfolio_constructor.py
 **Core Dataclasses:**
 ```python
 @dataclass
-class PortfolioAllocation:
-    quality_holdings: Dict[str, float]  # ticker → target %
-    thematic_holdings: Dict[str, float]  # ticker → target %
+class TieredAllocation:
+    large_cap_holdings: Dict[str, float]  # ticker → target %
+    mid_cap_holdings: Dict[str, float]    # ticker → target %
+    small_cap_holdings: Dict[str, float]  # ticker → target %
+    thematic_holdings: Dict[str, float]   # ticker → target %
     cash_reserve: float
-    total_quality_pct: float
+    total_large_cap_pct: float
+    total_mid_cap_pct: float
+    total_small_cap_pct: float
     total_thematic_pct: float
     violations: List[str]
 
@@ -261,17 +273,18 @@ class PortfolioAllocation:
 class RiskParameters:
     ticker: str
     stop_loss_pct: float  # e.g., -15.0
-    profit_target_pct: float  # e.g., +50.0
-    position_type: str  # QUALITY or THEMATIC
+    profit_target_pct: float  # e.g., +30.0
+    position_type: str  # LARGE_CAP, MID_CAP, SMALL_CAP, or THEMATIC
 ```
 
 **Algorithm:**
-1. Calculate raw position sizes based on quality/thematic scores
-2. Normalize quality holdings to 80% total allocation
-3. Normalize thematic holdings to 20% total allocation
-4. Reserve 5% cash
-5. Detect and report violations (oversized positions, wrong ratios, etc.)
-6. Generate specific trades to move from current to target allocation
+1. Classify holdings by market cap tier (Large/Mid/Small/Thematic)
+2. Validate tier-specific requirements (ROE persistence, strict filters, etc.)
+3. Calculate raw position sizes within each tier
+4. Normalize each tier independently to its target allocation
+5. Reserve 5% cash
+6. Detect and report violations (oversized positions, tier mismatches, etc.)
+7. Generate specific trades to move from current to target allocation
 
 **Performance:**
 - Runtime: <1 second for typical portfolio (5-15 positions)
@@ -1494,7 +1507,7 @@ The data validator is automatically called by `steps_orchestrator.py` in STEP 9.
 ## 📊 Framework Compliance Validator (NEW)
 
 ### Overview
-A comprehensive framework compliance validation system that ensures portfolio adheres to the 80/20 quality/opportunistic framework from PM_README_V3.md. Validates allocation, position sizing, quality thresholds, and thematic thresholds. Implements STEP 10 (Framework Validation) of the STEPS methodology.
+A comprehensive framework compliance validation system that ensures portfolio adheres to the 4-tier market cap framework from quality_investing_thresholds_research.md. Validates allocation, position sizing, tier-specific requirements (ROE persistence, strict filters), and tier mismatches. Implements STEP 10 (Framework Validation) of the STEPS methodology.
 
 ### Quick Start
 ```bash
@@ -1514,34 +1527,28 @@ python "Portfolio Scripts Schwab/steps_orchestrator.py"
 
 ### Key Features
 
-**80/20 Allocation Validation:**
-- Quality holdings: 75-85% (target 80%, ±5% tolerance)
-- Opportunistic holdings: 15-25% (target 20%, ±5% tolerance)
+**4-Tier Allocation Validation:**
+- Large Cap holdings: 62.5-72.5% (target 67.5%, ±5% tolerance)
+- Mid Cap holdings: 12.5-22.5% (target 17.5%, ±5% tolerance)
+- Small Cap holdings: 7.5-17.5% (target 12.5%, ±5% tolerance)
+- Thematic holdings: 2.5-12.5% (target 7.5%, ±5% tolerance)
 - Cash reserve: ≥3% minimum (5% recommended)
-- Violations: CRITICAL (<70% or >90% quality, >30% opportunistic, <2% cash)
-- Violations: WARNING (70-75% or 85-90% quality, 25-30% opportunistic, 2-3% cash)
+- Violations: CRITICAL if any tier >30% or cash <2%
+- Violations: WARNING if tiers outside ±2.5% tolerance
 
 **Position Sizing Validation:**
-- Quality holdings (score-based ranges):
-  - Quality 9-10 (90-100): 10-20% position range
-  - Quality 8-8.9 (80-89): 7-12% position range
-  - Quality 7-7.9 (70-79): 5-8% position range
-- Thematic holdings (score-based ranges):
-  - Thematic 35-40: 5-7% position range
-  - Thematic 30-34: 3-5% position range
-  - Thematic 28-29: 2-3% position range
+- Large Cap holdings: 8-15% position range (max 15%)
+- Mid Cap holdings: 5-10% position range (max 10%)
+- Small Cap holdings: 2-4% position range (max 4%)
+- Thematic holdings: 1.5-2.5% position range (max 2.5%)
 - Concentration risk: Any position >20% triggers CRITICAL
-- Thematic max: Any thematic position >7% triggers CRITICAL
 
-**Quality Threshold Validation:**
-- Core holdings must have quality score ≥70 (7.0 on 10-point scale)
-- CRITICAL violation if quality holding <70
-- WARNING violation if quality holding 70-75 (near threshold)
-
-**Thematic Threshold Validation:**
-- Opportunistic holdings must have thematic score ≥28/40
-- CRITICAL violation if thematic holding <28
-- WARNING violation if thematic holding 28-30 (near threshold)
+**Tier-Specific Requirement Validation:**
+- Large Cap: Must have 5+ years ROE >15%, quality ≥75
+- Mid Cap: Must have 2-3 years ROE >15%, incremental ROCE +5%, quality ≥70
+- Small Cap: Must have 6-8 quarters ROE trend, FCF+, D/E<1.0, GP>30%, quality ≥65
+- Thematic: Must have thematic score ≥28/40
+- CRITICAL violation if holding fails tier requirements (tier mismatch)
 
 **Compliance Score Calculation:**
 - Starts at 100 points
