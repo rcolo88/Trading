@@ -12,19 +12,24 @@ Features:
 - Market breadth and risk appetite assessment
 - 4-hour caching for efficiency
 - JSON and markdown export
+- Uses Schwab API for real-time price data
 
 Author: LLM Portfolio Management System
-Date: November 3, 2025
+Date: November 10, 2025 (Updated to use Schwab API)
 """
 
-import yfinance as yf
 import pickle
 import json
 import logging
+import pandas as pd
+import numpy as np
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from pathlib import Path
+
+# Import Schwab data fetcher for real-time price data
+from schwab_data_fetcher import SchwabDataFetcher
 
 # Configure logging
 logging.basicConfig(
@@ -138,35 +143,61 @@ class MarketEnvironmentAnalyzer:
             enable_cache: If True, use 4-hour cache for market data
         """
         self.cache = MarketCache() if enable_cache else None
+        self.schwab_fetcher = SchwabDataFetcher()
+        logger.info("Initialized MarketEnvironmentAnalyzer with Schwab API")
 
     def fetch_sp500_data(self) -> Dict:
         """
-        Fetch S&P 500 data using yfinance
+        Fetch S&P 500 data using Schwab API
 
         Returns:
             Dict with price, moving averages, and returns
         """
         try:
-            logger.info("Fetching S&P 500 data...")
-            sp500 = yf.Ticker("^GSPC")
+            logger.info("Fetching S&P 500 data via Schwab API...")
 
-            # Get historical data (1 year for moving averages)
-            hist = sp500.history(period="1y")
+            # Fetch 1 year of historical data for moving averages
+            sp500_ticker = "$SPX.X"  # Schwab format for S&P 500 index
 
-            if hist.empty:
+            # Get historical data (252 trading days ≈ 1 year)
+            response = self.schwab_fetcher.client.get_price_history_every_day(
+                sp500_ticker,
+                start_datetime=datetime.now() - timedelta(days=365),
+                end_datetime=datetime.now()
+            )
+
+            if response.status_code != 200:
+                logger.error(f"Failed to fetch S&P 500 history: Status {response.status_code}")
+                return None
+
+            history_data = response.json()
+
+            # Parse historical candles into pandas Series
+            if 'candles' not in history_data or not history_data['candles']:
+                logger.error("No S&P 500 historical data available")
+                return None
+
+            candles = history_data['candles']
+            dates = [pd.to_datetime(c['datetime'], unit='ms') for c in candles]
+            close_prices = [c['close'] for c in candles]
+
+            # Create pandas Series for calculations
+            hist = pd.Series(close_prices, index=dates)
+
+            if len(hist) == 0:
                 logger.error("No S&P 500 data available")
                 return None
 
             # Current price
-            current_price = hist['Close'].iloc[-1]
+            current_price = hist.iloc[-1]
 
             # Calculate moving averages
-            ma_50 = hist['Close'].tail(50).mean()
-            ma_200 = hist['Close'].tail(200).mean()
+            ma_50 = hist.tail(50).mean() if len(hist) >= 50 else hist.mean()
+            ma_200 = hist.tail(200).mean() if len(hist) >= 200 else hist.mean()
 
             # Calculate returns
-            one_month_ago_price = hist['Close'].iloc[-21] if len(hist) >= 21 else hist['Close'].iloc[0]
-            ytd_start_price = hist['Close'].iloc[0]
+            one_month_ago_price = hist.iloc[-21] if len(hist) >= 21 else hist.iloc[0]
+            ytd_start_price = hist.iloc[0]
 
             one_month_return = ((current_price - one_month_ago_price) / one_month_ago_price) * 100
             ytd_return = ((current_price - ytd_start_price) / ytd_start_price) * 100
@@ -179,36 +210,54 @@ class MarketEnvironmentAnalyzer:
                 'ytd_return': ytd_return
             }
 
-            logger.info(f"S&P 500: ${current_price:.2f} (1M: {one_month_return:+.2f}%, YTD: {ytd_return:+.2f}%)")
+            logger.info(f"S&P 500: ${current_price:.2f} (1M: {one_month_return:+.2f}%, YTD: {ytd_return:+.2f}%) [Schwab API]")
             return result
 
         except Exception as e:
-            logger.error(f"Failed to fetch S&P 500 data: {e}")
+            logger.error(f"Failed to fetch S&P 500 data from Schwab API: {e}")
             return None
 
     def fetch_vix_data(self) -> Dict:
         """
-        Fetch VIX data using yfinance
+        Fetch VIX data using Schwab API
 
         Returns:
             Dict with current level and 20-day average
         """
         try:
-            logger.info("Fetching VIX data...")
-            vix = yf.Ticker("^VIX")
+            logger.info("Fetching VIX data via Schwab API...")
+            vix_ticker = "$VIX.X"  # Schwab format for VIX index
 
             # Get historical data (1 month for 20-day average)
-            hist = vix.history(period="1mo")
+            response = self.schwab_fetcher.client.get_price_history_every_day(
+                vix_ticker,
+                start_datetime=datetime.now() - timedelta(days=30),
+                end_datetime=datetime.now()
+            )
 
-            if hist.empty:
+            if response.status_code != 200:
+                logger.warning(f"No VIX data available from Schwab API (Status {response.status_code}), using default 20.0")
+                return {'level': 20.0, 'ma_20': 20.0, 'quality': 'PARTIAL'}
+
+            history_data = response.json()
+
+            # Parse historical candles
+            if 'candles' not in history_data or not history_data['candles']:
+                logger.warning("No VIX historical data available, using default 20.0")
+                return {'level': 20.0, 'ma_20': 20.0, 'quality': 'PARTIAL'}
+
+            candles = history_data['candles']
+            close_prices = [c['close'] for c in candles]
+
+            if len(close_prices) == 0:
                 logger.warning("No VIX data available, using default 20.0")
                 return {'level': 20.0, 'ma_20': 20.0, 'quality': 'PARTIAL'}
 
             # Current level
-            current_level = hist['Close'].iloc[-1]
+            current_level = close_prices[-1]
 
             # Calculate 20-day average
-            ma_20 = hist['Close'].tail(20).mean()
+            ma_20 = np.mean(close_prices[-20:]) if len(close_prices) >= 20 else np.mean(close_prices)
 
             result = {
                 'level': current_level,
@@ -216,41 +265,51 @@ class MarketEnvironmentAnalyzer:
                 'quality': 'COMPLETE'
             }
 
-            logger.info(f"VIX: {current_level:.2f} (20-day avg: {ma_20:.2f})")
+            logger.info(f"VIX: {current_level:.2f} (20-day avg: {ma_20:.2f}) [Schwab API]")
             return result
 
         except Exception as e:
-            logger.warning(f"Failed to fetch VIX data: {e}, using default")
+            logger.warning(f"Failed to fetch VIX data from Schwab API: {e}, using default")
             return {'level': 20.0, 'ma_20': 20.0, 'quality': 'PARTIAL'}
 
     def fetch_sector_performance(self) -> Dict[str, float]:
         """
-        Fetch 1-month performance for 11 sector ETFs
+        Fetch 1-month performance for 11 sector ETFs using Schwab API
 
         Returns:
             Dict mapping sector name to 1-month return %
         """
-        logger.info("Fetching sector performance...")
+        logger.info("Fetching sector performance via Schwab API...")
         sector_performance = {}
 
         for etf, sector_name in SECTOR_ETF_MAP.items():
             try:
-                ticker = yf.Ticker(etf)
-                hist = ticker.history(period="1mo")
+                # Get 1 month of historical data
+                response = self.schwab_fetcher.client.get_price_history_every_day(
+                    etf,
+                    start_datetime=datetime.now() - timedelta(days=30),
+                    end_datetime=datetime.now()
+                )
 
-                if not hist.empty and len(hist) >= 2:
-                    start_price = hist['Close'].iloc[0]
-                    end_price = hist['Close'].iloc[-1]
-                    one_month_return = ((end_price - start_price) / start_price) * 100
-                    sector_performance[sector_name] = one_month_return
-                    logger.debug(f"{sector_name} ({etf}): {one_month_return:+.2f}%")
+                if response.status_code == 200:
+                    history_data = response.json()
+
+                    if 'candles' in history_data and history_data['candles'] and len(history_data['candles']) >= 2:
+                        candles = history_data['candles']
+                        start_price = candles[0]['close']
+                        end_price = candles[-1]['close']
+                        one_month_return = ((end_price - start_price) / start_price) * 100
+                        sector_performance[sector_name] = one_month_return
+                        logger.debug(f"{sector_name} ({etf}): {one_month_return:+.2f}%")
+                    else:
+                        logger.warning(f"Insufficient data for {etf}")
                 else:
-                    logger.warning(f"Insufficient data for {etf}")
+                    logger.warning(f"Failed to fetch {etf}: Status {response.status_code}")
 
             except Exception as e:
                 logger.warning(f"Failed to fetch {etf}: {e}")
 
-        logger.info(f"Successfully fetched {len(sector_performance)}/11 sectors")
+        logger.info(f"Successfully fetched {len(sector_performance)}/11 sectors via Schwab API")
         return sector_performance
 
     def classify_trend(self, price: float, ma_50: float, ma_200: float) -> str:

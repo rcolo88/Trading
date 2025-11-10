@@ -116,6 +116,20 @@ python Daily_Portfolio_Script.py
 
 #### Step 2: Generate AI Trading Recommendations
 
+**Two Orchestration Systems Available:**
+
+| Feature | DEFAULT Orchestrator | STEPS Orchestrator |
+|---------|---------------------|-------------------|
+| **Purpose** | Trade execution & reporting | Complete 10-step portfolio analysis |
+| **Price Data Source** | ✅ Schwab API (real-time) | ✅ Schwab API (real-time) |
+| **Fundamental Data** | N/A | yfinance (Schwab doesn't provide fundamentals) |
+| **Market Hours Required** | Trading only | Analysis: 24/7, Trading: market hours |
+| **Schwab Integration** | Full (account sync, live trading) | Price data + optional trading |
+| **Speed** | Fast (<1 min) | Comprehensive (5-10 min) |
+| **Best For** | Daily execution workflow | Weekly deep analysis |
+| **Trading Recommendations** | Via manual_trades_override.json | Via trading_recommendations.md |
+| **4-Tier Framework** | ✅ Fully integrated | ✅ Fully integrated |
+
 **Option A: STEPS Orchestrator (RECOMMENDED - Complete 10-Step Analysis)**
 
 **System**: Comprehensive STEPS Portfolio Analysis Framework
@@ -133,19 +147,46 @@ python steps_orchestrator.py --dry-run
 ```
 
 **What happens:**
-1. **Market Environment** - Analyzes S&P 500, VIX, sector rotation
-2. **Holdings Quality** - Calculates quality scores (CRITICAL STEP)
+1. **Market Environment** - Analyzes S&P 500, VIX, sector rotation (✅ Schwab API for real-time prices)
+2. **Holdings Quality** - Calculates quality scores with 4-tier classification (yfinance for fundamentals)
 3A. **Core Screening** - Identifies quality opportunities from S&P 500
 3B. **Thematic Discovery** - Scores opportunistic investments
 4. **Competitive Analysis** - Compares vs. direct competitors
 5. **Valuation Analysis** - Assesses reasonable pricing
-6. **Portfolio Construction** - Determines 80/20 allocation
+6. **Portfolio Construction** - Determines 4-tier allocation
 7. **Rebalancing Trades** - Generates specific trade recommendations
-8. **Trade Synthesis** - Integrates all analysis
+8. **Trade Synthesis** - Integrates all analysis with tier-aware reasoning
 9. **Data Validation** - Verifies data quality
-10. **Framework Validation** - Ensures 80/20 compliance
+10. **Framework Validation** - Ensures 4-tier compliance
 
-**Option B: HuggingFace Multi-Agent Analysis Pipeline (Legacy)**
+**Data Source Strategy**:
+- **Price Data**: ✅ Schwab API (real-time quotes for S&P 500, VIX, sector ETFs, holdings)
+- **Fundamental Data**: yfinance (balance sheets, income statements - Schwab API doesn't provide)
+- **Best of both worlds**: Real-time pricing accuracy + comprehensive fundamental data
+
+**Option B: DEFAULT Orchestrator (Fast Trade Execution)**
+
+**System**: Main portfolio management workflow with Schwab integration
+
+```bash
+# Generate portfolio report
+cd "Portfolio Scripts Schwab"
+python main.py --report-only
+
+# Execute trades from manual_trades_override.json
+python main.py
+```
+
+**What happens:**
+- ✅ Uses Schwab API for real-time price data
+- ✅ Full Schwab account integration (sync, live trading)
+- ✅ Fast execution (<1 minute)
+- ✅ Market hours validation
+- ⚠️ No comprehensive 10-step analysis (requires STEPS)
+
+**Data Source**: Uses SchwabDataFetcher for all price quotes, ensuring real-time accuracy for trading decisions.
+
+**Option C: HuggingFace Multi-Agent Analysis Pipeline (Legacy)**
 
 **Automated Agent Workflow**:
 ```bash
