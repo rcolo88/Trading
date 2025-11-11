@@ -17,11 +17,32 @@
 ### Environment Creation
 ```bash
 # Create new recommended environment
-conda create -n trading_env python=3.11 yfinance matplotlib pandas numpy pandas-market-calendars pytz -c conda-forge -y
+conda create -n trading_env python=3.11 yfinance matplotlib pandas numpy pandas-market-calendars pytz scipy -c conda-forge -y
 
 # Or use existing legacy environment
 conda activate options
 ```
+
+### Troubleshooting: pip "bad interpreter" Error
+
+**Symptom**: `pip: bad interpreter: No such file or directory` when trying to install packages
+
+**Root Cause**: pip executable has incorrect shebang path (often `/Users/robertcologero/opt/...` instead of `/opt/...`)
+
+**Solutions**:
+```bash
+# Option 1: Use python -m pip (immediate workaround)
+/opt/anaconda3/envs/trading_env/bin/python -m pip install <package>
+
+# Option 2: Reinstall pip to fix shebang (permanent fix)
+/opt/anaconda3/bin/conda install -n trading_env --force-reinstall pip -y
+
+# Verify fix
+head -1 /opt/anaconda3/envs/trading_env/bin/pip  # Should show correct path
+pip --version  # Should work without errors
+```
+
+**Note**: This issue can occur when conda environments are moved or when environment paths change. Always use `conda install --force-reinstall pip` to regenerate pip with correct paths.
 
 ## How to Run Scripts
 
