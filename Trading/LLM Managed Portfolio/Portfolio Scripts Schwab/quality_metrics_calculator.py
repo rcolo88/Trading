@@ -97,13 +97,18 @@ class QualityMetricsCalculator:
         >>> print(f"Tier: {result.tier.value}")
     """
 
-    # Metric weights (must sum to 1.0) - DEFAULT framework
+    # Metric weights (must sum to 1.0) - Research-backed priority order
+    # 1. Gross profitability: Sharpe ratio 0.85, strongest predictor
+    # 2. ROE: Powerful for persistence (15%+ for 10 years)
+    # 3. Operating profitability: Comparable to gross profitability in Fama-French
+    # 4. FCF yield: Top quintile outperforms by ~10% annually
+    # 5. ROIC: Core quality assessment metric
     METRIC_WEIGHTS = {
-        'gross_profitability': 0.25,
-        'roe': 0.20,
-        'operating_profitability': 0.20,
-        'fcf_yield': 0.20,
-        'roic': 0.15
+        'gross_profitability': 0.30,   # Strongest predictor (was 0.25)
+        'roe': 0.25,                   # Persistence power (was 0.20)
+        'operating_profitability': 0.20,  # Comparable to gross prof
+        'fcf_yield': 0.15,             # Strong performance (was 0.20)
+        'roic': 0.10                   # Core metric (was 0.15)
     }
 
     # STEPS framework weights (4 dimensions, must sum to 1.0)

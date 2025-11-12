@@ -19,11 +19,12 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent))
 
-from financial_data_fetcher import FinancialDataFetcher, FinancialData, get_sp500_tickers
+from financial_data_fetcher import FinancialDataFetcher, FinancialData
 from quality_metrics_calculator import QualityMetricsCalculator, QualityAnalysisResult
 from market_cap_classifier import MarketCapClassifier
 from quality_persistence_analyzer import ROEPersistenceAnalyzer
 from hf_config import HFConfig
+from watchlist_config import WatchlistConfig, WatchlistIndex
 
 # Setup logging
 logging.basicConfig(
@@ -39,7 +40,7 @@ class QualityAnalysisScript:
 
     Workflow:
     1. Load current portfolio holdings
-    2. Fetch S&P 500 tickers as watchlist
+    2. Fetch watchlist tickers from configured index (SP500/SP400/SP600/etc.)
     3. Fetch financial data for holdings + watchlist
     4. Calculate quality metrics for all tickers
     5. Identify SELL candidates (holdings with quality <70)
@@ -47,8 +48,14 @@ class QualityAnalysisScript:
     7. Export results to JSON and summary text
     """
 
-    def __init__(self):
-        """Initialize quality analysis script"""
+    def __init__(self, watchlist_config: Optional[WatchlistConfig] = None):
+        """
+        Initialize quality analysis script
+
+        Args:
+            watchlist_config: Watchlist configuration (defaults to HFConfig.WATCHLIST_CONFIG)
+        """
+        self.watchlist_config = watchlist_config or HFConfig.WATCHLIST_CONFIG
         self.financial_fetcher = FinancialDataFetcher(enable_cache=True)
         self.market_cap_classifier = MarketCapClassifier()
         self.roe_analyzer = ROEPersistenceAnalyzer()
@@ -81,33 +88,40 @@ class QualityAnalysisScript:
             logger.error(f"Failed to load portfolio holdings: {e}")
             return []
 
-    def get_watchlist_tickers(self, limit: Optional[int] = 50) -> List[str]:
+    def get_watchlist_tickers(self, limit: Optional[int] = None) -> List[str]:
         """
-        Get watchlist tickers (defaults to top S&P 500 stocks)
+        Get watchlist tickers from configured index
 
         Args:
-            limit: Maximum number of watchlist tickers (default: 50)
+            limit: Optional limit (overrides watchlist_config.limit if provided)
 
         Returns:
             List of ticker symbols
         """
-        # Check if custom watchlist is configured
+        # Legacy support: check deprecated WATCHLIST_TICKERS first
         if HFConfig.WATCHLIST_TICKERS:
+            logger.warning("WATCHLIST_TICKERS is deprecated. Use WATCHLIST_CONFIG instead.")
             watchlist = HFConfig.WATCHLIST_TICKERS[:limit] if limit else HFConfig.WATCHLIST_TICKERS
-            logger.info(f"Using configured watchlist: {len(watchlist)} tickers")
+            logger.info(f"Using legacy WATCHLIST_TICKERS: {len(watchlist)} tickers")
             return watchlist
 
-        # Default to S&P 500 screening
-        logger.info("Fetching S&P 500 tickers for watchlist screening")
-        sp500 = get_sp500_tickers()
+        # Use new WatchlistConfig system
+        # Apply limit override if provided
+        if limit:
+            config_with_limit = WatchlistConfig(
+                index=self.watchlist_config.index,
+                custom_tickers=self.watchlist_config.custom_tickers,
+                limit=limit
+            )
+            watchlist = config_with_limit.get_tickers()
+        else:
+            watchlist = self.watchlist_config.get_tickers()
 
-        if not sp500:
-            logger.error("Failed to fetch S&P 500 tickers")
+        if not watchlist:
+            logger.error(f"Failed to fetch tickers from {self.watchlist_config.index.value}")
             return []
 
-        # Limit to manageable size for daily analysis
-        watchlist = sp500[:limit] if limit else sp500
-        logger.info(f"Using S&P 500 watchlist: {len(watchlist)} tickers (limited from {len(sp500)})")
+        logger.info(f"Using {self.watchlist_config.index.value} watchlist: {len(watchlist)} tickers")
         return watchlist
 
     def fetch_financial_data(self, tickers: List[str]) -> Dict[str, FinancialData]:
@@ -536,17 +550,44 @@ def main():
         description="Analyze quality metrics for portfolio holdings vs watchlist alternatives"
     )
     parser.add_argument(
-        '--watchlist-limit',
+        '--index',
+        type=str,
+        default='sp500',
+        choices=['sp500', 'sp400', 'sp600', 'nasdaq100', 'combined_sp'],
+        help='Index to screen (default: sp500). Options: sp500 (large cap ~500), '
+             'sp400 (mid cap ~400), sp600 (small cap ~600), nasdaq100 (tech ~100), '
+             'combined_sp (S&P 1500 ~1500)'
+    )
+    parser.add_argument(
+        '--limit',
         type=int,
         default=50,
-        help='Maximum number of watchlist tickers to analyze (default: 50, full S&P 500: 500)'
+        help='Maximum number of watchlist tickers to analyze (default: 50). '
+             'Use 0 for no limit (screen entire index)'
     )
 
     args = parser.parse_args()
 
+    # Map CLI argument to WatchlistIndex enum
+    index_map = {
+        'sp500': WatchlistIndex.SP500,
+        'sp400': WatchlistIndex.SP400,
+        'sp600': WatchlistIndex.SP600,
+        'nasdaq100': WatchlistIndex.NASDAQ100,
+        'combined_sp': WatchlistIndex.COMBINED_SP
+    }
+
+    # Create watchlist config
+    watchlist_config = WatchlistConfig(
+        index=index_map[args.index],
+        limit=args.limit if args.limit > 0 else None
+    )
+
+    logger.info(f"Using watchlist configuration: {watchlist_config}")
+
     # Run analysis
-    script = QualityAnalysisScript()
-    script.run(watchlist_limit=args.watchlist_limit)
+    script = QualityAnalysisScript(watchlist_config=watchlist_config)
+    script.run(watchlist_limit=args.limit if args.limit > 0 else None)
 
 
 if __name__ == "__main__":

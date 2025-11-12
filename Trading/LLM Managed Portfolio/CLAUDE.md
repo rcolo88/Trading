@@ -166,6 +166,24 @@ python steps_orchestrator.py --verbose
 - Calls existing `recommendation_generator_script.py` for STEP 8
 - Generates trading_template.md format output
 
+**Human-in-the-Loop Workflow:**
+```bash
+# Step 1: Run STEPS analysis (generates recommendations)
+cd "Portfolio Scripts Schwab"
+python steps_orchestrator.py
+
+# Step 2: Review the generated recommendations
+cat ../trading_recommendations/trading_recommendations_20251110.md
+
+# Step 3: If approved, manually edit manual_trades_override.json
+# Copy approved trades from recommendations, set "enabled": true
+
+# Step 4: Execute approved trades (requires market hours)
+python main.py
+```
+
+**IMPORTANT**: STEPS analysis generates recommendations, but **does NOT execute trades automatically**. All trades require manual approval via `manual_trades_override.json` before execution by `main.py`.
+
 ### 📊 STEP 1: Market Environment Analyzer
 
 **Implements market environment assessment for STEPS methodology.**
@@ -325,7 +343,7 @@ conda run -n options python Daily_Portfolio_Script_new_parse.py --test-parser
 1. **`main.py`** - System orchestrator and entry point
 2. **`steps_orchestrator.py`** - STEPS 10-step portfolio analysis orchestrator (NEW)
 3. **`market_environment_analyzer.py`** - Market environment assessment (STEP 1) (NEW)
-4. **`portfolio_constructor.py`** - 80/20 portfolio construction and rebalancing (STEP 6) (NEW)
+4. **`portfolio_constructor.py`** - 4-tier market cap allocation and rebalancing (STEP 6) (NEW)
 5. **`portfolio_manager.py`** - Holdings, cash, and state management
 6. **`schwab_data_fetcher.py`** - Schwab API market data retrieval
 7. **`schwab_account_manager.py`** - Account synchronization with Schwab
@@ -356,19 +374,25 @@ conda run -n options python Daily_Portfolio_Script_new_parse.py --test-parser
 16. **`news_analysis_script.py`** - Standalone news sentiment analysis
 17. **`quality_analysis_script.py`** - Quality metrics comparison (holdings vs watchlist)
 18. **`thematic_analysis_script.py`** - Thematic scoring for opportunistic holdings (STEP 3B)
-19. **`watchlist_generator_script.py`** - Weekly S&P 500 quality screening
+19. **`watchlist_generator_script.py`** - Configurable watchlist screening (SP500/SP400/SP600/NASDAQ100/Combined)
+
+**Watchlist Configuration System (NEW):**
+20. **`watchlist_config.py`** - Configurable watchlist module (replaces hardcoded S&P 500)
+21. **`financial_data_fetcher.py`** - Index fetchers for SP500, SP400, SP600, NASDAQ100
+22. **`test_watchlist_config.py`** - Watchlist configuration test suite (30 tests)
+23. **`WATCHLIST_CONFIGURATION_GUIDE.md`** - Complete watchlist configuration documentation
 
 **Reasoning & Orchestration (Phase 3 & 4):**
-20. **`agents/reasoning_agent.py`** - DeepSeek-R1 decision synthesis (BUY/SELL/HOLD) with position sizing
-21. **`recommendation_generator_script.py`** - Master orchestrator (generates trading_template.md)
-22. **`run_all_analysis.sh`** - Automated pipeline execution
+24. **`agents/reasoning_agent.py`** - DeepSeek-R1 decision synthesis (BUY/SELL/HOLD) with position sizing
+25. **`recommendation_generator_script.py`** - Master orchestrator (generates trading_template.md)
+26. **`run_all_analysis.sh`** - Automated pipeline execution
 
 **Testing:**
-23. **`test_news_fetcher.py`** - News fetching test suite
-24. **`test_financial_fetcher.py`** - Financial data test suite
-25. **`test_thematic_analysis.py`** - Thematic analysis test suite (18 tests)
-26. **`test_reasoning_agent.py`** - Reasoning agent test suite (32 tests)
-27. **`test_agent_pipeline.py`** - End-to-end pipeline tests
+27. **`test_news_fetcher.py`** - News fetching test suite
+28. **`test_financial_fetcher.py`** - Financial data test suite
+29. **`test_thematic_analysis.py`** - Thematic analysis test suite (18 tests)
+30. **`test_reasoning_agent.py`** - Reasoning agent test suite (32 tests)
+31. **`test_agent_pipeline.py`** - End-to-end pipeline tests
 
 ### Agent System Architecture Overview
 
@@ -389,7 +413,9 @@ conda run -n options python Daily_Portfolio_Script_new_parse.py --test-parser
 │                                                              │
 │  • news_analysis_script     → Sentiment analysis            │
 │  • quality_analysis_script  → Holdings vs watchlist compare │
-│  • watchlist_generator      → S&P 500 screening (weekly)    │
+│  • watchlist_generator      → Multi-index screening         │
+│                               (SP500/SP400/SP600/NASDAQ100/ │
+│                                S&P 1500 Combined)            │
 │                                                              │
 │  OUTPUT: JSON files in outputs/                             │
 └─────────────────────────────────────────────────────────────┘
@@ -513,7 +539,228 @@ conda run -n trading_env python "Portfolio Scripts Schwab/main.py" --account-sta
 6. **Report Generation** - Create analysis, charts, and export data
 7. **State Persistence** - Save all changes for next run
 
+## 📊 Watchlist Configuration System (NEW)
+
+### Overview
+A flexible watchlist configuration system that enables screening across multiple stock indexes to identify investment opportunities across different market cap tiers. Replaces the hardcoded S&P 500 watchlist with support for mid-cap and small-cap screening.
+
+**Key Benefit**: Screen 1,500+ stocks from the S&P Composite 1500 (large + mid + small cap) to find quality opportunities across the full market cap spectrum.
+
+### Supported Indexes
+
+| Index | Description | Tickers | Market Cap | Runtime |
+|-------|-------------|---------|------------|---------|
+| **SP500** | S&P 500 | ~500 | ≥$50B | 12-17 min |
+| **SP400** | S&P MidCap 400 | ~400 | $2B-$50B | 10-14 min |
+| **SP600** | S&P SmallCap 600 | ~600 | $500M-$2B | 15-20 min |
+| **NASDAQ100** | NASDAQ-100 | ~100 | Tech Focus | 3-5 min |
+| **COMBINED_SP** | S&P Composite 1500 | ~1,500 | $500M+ | 45-60 min |
+| **CUSTOM** | Custom List | Variable | Any | Variable |
+
+### Quick Start Examples
+
+**Daily Quick Check (2-5 min, uses cache):**
+```bash
+cd "Portfolio Scripts Schwab"
+python quality_analysis_script.py --index sp500 --limit 50
+```
+
+**Weekly Full Screening (12-17 min):**
+```bash
+python steps_orchestrator.py --watchlist-index sp500
+```
+
+**Monthly Deep Dive (45-60 min, screens 1,500 stocks):**
+```bash
+python steps_orchestrator.py --watchlist-index combined_sp
+```
+
+**Focus on Mid-Caps:**
+```bash
+python watchlist_generator_script.py --index sp400
+```
+
+**Focus on Small-Caps:**
+```bash
+python watchlist_generator_script.py --index sp600
+```
+
+### Python API Usage
+
+```python
+from watchlist_config import WatchlistConfig, WatchlistIndex
+from quality_analysis_script import QualityAnalysisScript
+
+# Daily screening (50 tickers from S&P 500)
+config = WatchlistConfig(index=WatchlistIndex.SP500, limit=50)
+script = QualityAnalysisScript(watchlist_config=config)
+script.run()
+
+# Weekly screening (full S&P 500)
+config = WatchlistConfig(index=WatchlistIndex.SP500)
+script = QualityAnalysisScript(watchlist_config=config)
+script.run()
+
+# Monthly screening (S&P 1500 - all market caps)
+config = WatchlistConfig(index=WatchlistIndex.COMBINED_SP)
+script = QualityAnalysisScript(watchlist_config=config)
+script.run()
+
+# Custom ticker list
+config = WatchlistConfig(
+    index=WatchlistIndex.CUSTOM,
+    custom_tickers=['NVDA', 'GOOGL', 'MSFT', 'AMZN']
+)
+script = QualityAnalysisScript(watchlist_config=config)
+script.run()
+```
+
+### Configuration in hf_config.py
+
+```python
+from watchlist_config import WatchlistConfig, WatchlistIndex
+
+# Default: S&P 500 (recommended for weekly analysis)
+WATCHLIST_CONFIG = WatchlistConfig(index=WatchlistIndex.SP500)
+
+# Alternative: S&P 1500 for comprehensive screening
+WATCHLIST_CONFIG = WatchlistConfig(index=WatchlistIndex.COMBINED_SP)
+
+# Alternative: Limited S&P 500 for daily quick checks
+WATCHLIST_CONFIG = WatchlistConfig(index=WatchlistIndex.SP500, limit=50)
+
+# Alternative: Custom ticker list
+WATCHLIST_CONFIG = WatchlistConfig(
+    index=WatchlistIndex.CUSTOM,
+    custom_tickers=['NVDA', 'GOOGL', 'MSFT', 'AMZN', 'TSLA']
+)
+```
+
+### CLI Arguments Reference
+
+**quality_analysis_script.py:**
+```bash
+--index {sp500,sp400,sp600,nasdaq100,combined_sp}  # Index to screen (default: sp500)
+--limit LIMIT                                       # Max tickers (default: 50, 0=no limit)
+```
+
+**watchlist_generator_script.py:**
+```bash
+--index {sp500,sp400,sp600,nasdaq100,combined_sp}  # Index to screen (default: sp500)
+--limit LIMIT                                       # Limit tickers (optional)
+--min-quality SCORE                                 # Min quality score (default: 70.0)
+--workers N                                         # Parallel workers (default: 10)
+```
+
+**steps_orchestrator.py:**
+```bash
+--watchlist-index {sp500,sp400,sp600,nasdaq100,combined_sp}  # Index (default: sp500)
+--watchlist-limit LIMIT                                       # Limit tickers (optional)
+```
+
+### Integration with 4-Tier Framework
+
+The watchlist system integrates seamlessly with the 4-tier market cap framework:
+
+**Large Cap (65-70% allocation):**
+- Source: `--watchlist-index sp500` or `--watchlist-index nasdaq100`
+- Criteria: Market cap ≥$50B, 5+ years ROE >15%
+- Position Size: 8-15% per holding
+
+**Mid Cap (15-20% allocation):**
+- Source: `--watchlist-index sp400`
+- Criteria: Market cap $2B-$50B, 2-3 years ROE >15%, incremental ROCE >5%
+- Position Size: 5-10% per holding
+
+**Small Cap (10-15% allocation):**
+- Source: `--watchlist-index sp600`
+- Criteria: Market cap $500M-$2B, 6-8 qtrs ROE trend, strict filters
+- Position Size: 2-4% per holding
+
+**Thematic (5-10% allocation):**
+- Source: Custom ticker lists for specific themes
+- Criteria: Thematic score ≥28/40
+- Position Size: 1.5-2.5% per holding
+
+### Key Files
+
+1. **`watchlist_config.py`** - Core configuration module
+   - `WatchlistIndex` enum (SP500/SP400/SP600/NASDAQ100/COMBINED_SP/CUSTOM)
+   - `WatchlistConfig` dataclass with `get_tickers()` method
+   - Default configurations for daily/weekly/monthly frequencies
+
+2. **`financial_data_fetcher.py`** - Index fetcher functions
+   - `get_sp500_tickers()` - Fetch S&P 500 from Wikipedia
+   - `get_sp400_tickers()` - Fetch S&P MidCap 400 from Wikipedia
+   - `get_sp600_tickers()` - Fetch S&P SmallCap 600 from Wikipedia
+   - `get_nasdaq100_tickers()` - Fetch NASDAQ-100 from Wikipedia
+
+3. **`test_watchlist_config.py`** - Comprehensive test suite (30 tests)
+   - Enum validation
+   - Ticker fetching with deduplication
+   - Limit parameter functionality
+   - Custom ticker lists
+   - Error handling
+
+4. **`WATCHLIST_CONFIGURATION_GUIDE.md`** - Complete user documentation
+   - Detailed CLI usage examples
+   - Python API reference
+   - Integration with 4-tier framework
+   - Performance expectations
+   - Troubleshooting guide
+
+### Migration from Legacy WATCHLIST_TICKERS
+
+**Old Code (DEPRECATED):**
+```python
+from hf_config import HFConfig
+HFConfig.WATCHLIST_TICKERS = ['NVDA', 'GOOGL', 'MSFT']
+```
+
+**New Code:**
+```python
+from watchlist_config import WatchlistConfig, WatchlistIndex
+from hf_config import HFConfig
+
+HFConfig.WATCHLIST_CONFIG = WatchlistConfig(
+    index=WatchlistIndex.CUSTOM,
+    custom_tickers=['NVDA', 'GOOGL', 'MSFT']
+)
+```
+
+**Backward Compatibility**: The legacy `WATCHLIST_TICKERS` is still supported but logs a deprecation warning.
+
+### Performance Optimization
+
+- **Daily (2-5 min)**: `--index sp500 --limit 50` (uses 24-hour cache)
+- **Weekly (12-17 min)**: `--index sp500` (full S&P 500)
+- **Monthly (45-60 min)**: `--index combined_sp` (S&P 1500)
+- **Faster Analysis**: Use `--limit` to reduce ticker count
+- **Parallel Processing**: ThreadPoolExecutor with 10 workers (configurable)
+
+### Testing
+
+Run the comprehensive test suite:
+```bash
+cd "Portfolio Scripts Schwab"
+python test_watchlist_config.py
+```
+
+Expected: 30 tests passing, covering enum validation, ticker fetching, deduplication, limits, custom lists, and error handling.
+
 ## Recent Updates
+
+### Watchlist Configuration System (2025-11-11)
+- **NEW**: Flexible watchlist configuration module (`watchlist_config.py`)
+- **REPLACES**: Hardcoded S&P 500 with configurable multi-index system
+- **SUPPORTED INDEXES**: SP500, SP400 (mid-cap), SP600 (small-cap), NASDAQ100, S&P 1500 Combined
+- **CLI ARGUMENTS**: `--index sp500/sp400/sp600/nasdaq100/combined_sp` and `--limit N`
+- **PYTHON API**: `WatchlistConfig(index=WatchlistIndex.SP500, limit=50)`
+- **INTEGRATION**: Full support in quality_analysis_script.py, watchlist_generator_script.py, steps_orchestrator.py
+- **TESTING**: 30 comprehensive tests in test_watchlist_config.py
+- **DOCUMENTATION**: Complete guide in WATCHLIST_CONFIGURATION_GUIDE.md
+- **BENEFIT**: Screen 1,500+ stocks across all market cap tiers for mid/small-cap opportunities
+- **BACKWARD COMPATIBLE**: Legacy WATCHLIST_TICKERS still supported with deprecation warning
 
 ### Market Hours Policy Update (2025-10-13)
 - **ENHANCED**: Market hours validation now distinguishes between trading and read-only operations
@@ -1251,12 +1498,29 @@ python "Portfolio Scripts Schwab/test_quality_persistence.py"
 5. **`example_quality_integration.py`** - yfinance integration examples
 6. **`example_quality_agent_integration.py`** - Multi-agent synthesis examples
 
-### The Five Quality Metrics
-1. **Gross Profitability** (25% weight) = (Revenue - COGS) / Total Assets
-2. **Return on Equity** (20% weight) = Net Income / Shareholder Equity
+### The Five Quality Metrics (Research-Backed Weights)
+
+The metric weights are prioritized based on academic research findings:
+
+1. **Gross Profitability** (30% weight) = (Revenue - COGS) / Total Assets
+   - **Strongest predictor**: Sharpe ratio 0.85 for combined profitability/value strategies
+   - Top priority metric for identifying quality compounders
+
+2. **Return on Equity** (25% weight) = Net Income / Shareholder Equity
+   - **Persistence power**: Companies maintaining 15%+ ROE for 10 years vastly outperform
+   - Critical for long-term quality assessment
+
 3. **Operating Profitability** (20% weight) = (Revenue - COGS - SG&A) / Total Assets
-4. **FCF Yield** (20% weight) = Free Cash Flow / Market Cap
-5. **ROIC** (15% weight) = NOPAT / (Total Debt + Total Equity)
+   - **Comparable to gross profitability** in Fama-French five-factor model
+   - Strong indicator of operational efficiency
+
+4. **FCF Yield** (15% weight) = Free Cash Flow / Market Cap
+   - **Top quintile outperforms** bottom by ~10% annually per FactSet research
+   - Essential for cash generation assessment
+
+5. **ROIC** (10% weight) = NOPAT / (Total Debt + Total Equity)
+   - **Core quality metric** emphasized by practitioners
+   - Measures capital efficiency
 
 ### Quality Classifications
 - **Elite** (85-100): Exceptional quality, strong moats

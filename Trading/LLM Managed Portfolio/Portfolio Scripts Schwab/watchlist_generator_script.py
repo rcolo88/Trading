@@ -22,9 +22,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # Add parent directory to path for imports
 sys.path.append(str(Path(__file__).parent))
 
-from financial_data_fetcher import FinancialDataFetcher, FinancialData, get_sp500_tickers
+from financial_data_fetcher import FinancialDataFetcher, FinancialData
 from quality_metrics_calculator import QualityMetricsCalculator, QualityAnalysisResult
 from hf_config import HFConfig
+from watchlist_config import WatchlistConfig, WatchlistIndex
 
 # Setup logging
 logging.basicConfig(
@@ -36,10 +37,10 @@ logger = logging.getLogger(__name__)
 
 class WatchlistGenerator:
     """
-    Weekly S&P 500 quality screening
+    Configurable quality screening across multiple indexes
 
     Workflow:
-    1. Fetch S&P 500 ticker list
+    1. Fetch ticker list from configured index (SP500/SP400/SP600/NASDAQ100/Combined)
     2. Fetch financial data for all tickers (parallel)
     3. Calculate quality metrics
     4. Filter by quality threshold (>70)
@@ -47,14 +48,21 @@ class WatchlistGenerator:
     6. Export top stocks to watchlist
     """
 
-    def __init__(self, min_quality_score: float = 70.0, max_workers: int = 10):
+    def __init__(
+        self,
+        watchlist_config: Optional[WatchlistConfig] = None,
+        min_quality_score: float = 70.0,
+        max_workers: int = 10
+    ):
         """
         Initialize watchlist generator
 
         Args:
+            watchlist_config: Watchlist configuration (defaults to HFConfig.WATCHLIST_CONFIG)
             min_quality_score: Minimum quality score for inclusion (default: 70)
             max_workers: Number of parallel workers for fetching (default: 10)
         """
+        self.watchlist_config = watchlist_config or HFConfig.WATCHLIST_CONFIG
         self.min_quality_score = min_quality_score
         self.max_workers = max_workers
         self.financial_fetcher = FinancialDataFetcher(enable_cache=True)
@@ -62,19 +70,19 @@ class WatchlistGenerator:
 
     def get_universe_tickers(self) -> List[str]:
         """
-        Get universe of tickers to screen (S&P 500)
+        Get universe of tickers to screen (configured index)
 
         Returns:
             List of ticker symbols
         """
-        logger.info("Fetching S&P 500 ticker list")
-        tickers = get_sp500_tickers()
+        logger.info(f"Fetching ticker list from {self.watchlist_config}")
+        tickers = self.watchlist_config.get_tickers()
 
         if not tickers:
-            logger.error("Failed to fetch S&P 500 tickers")
+            logger.error(f"Failed to fetch tickers from {self.watchlist_config.index.value}")
             return []
 
-        logger.info(f"Fetched {len(tickers)} S&P 500 tickers")
+        logger.info(f"Fetched {len(tickers)} tickers from {self.watchlist_config.index.value}")
         return tickers
 
     def fetch_financial_data_parallel(self, tickers: List[str]) -> Dict[str, FinancialData]:
@@ -381,7 +389,22 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Generate quality watchlist from S&P 500 screening (weekly)"
+        description="Generate quality watchlist from configurable index screening"
+    )
+    parser.add_argument(
+        '--index',
+        type=str,
+        default='sp500',
+        choices=['sp500', 'sp400', 'sp600', 'nasdaq100', 'combined_sp'],
+        help='Index to screen (default: sp500). Options: sp500 (large cap ~500), '
+             'sp400 (mid cap ~400), sp600 (small cap ~600), nasdaq100 (tech ~100), '
+             'combined_sp (S&P 1500 ~1500)'
+    )
+    parser.add_argument(
+        '--limit',
+        type=int,
+        default=None,
+        help='Limit number of tickers to screen (for performance)'
     )
     parser.add_argument(
         '--min-quality',
@@ -398,8 +421,26 @@ def main():
 
     args = parser.parse_args()
 
+    # Map CLI argument to WatchlistIndex enum
+    index_map = {
+        'sp500': WatchlistIndex.SP500,
+        'sp400': WatchlistIndex.SP400,
+        'sp600': WatchlistIndex.SP600,
+        'nasdaq100': WatchlistIndex.NASDAQ100,
+        'combined_sp': WatchlistIndex.COMBINED_SP
+    }
+
+    # Create watchlist config
+    watchlist_config = WatchlistConfig(
+        index=index_map[args.index],
+        limit=args.limit
+    )
+
+    logger.info(f"Using watchlist configuration: {watchlist_config}")
+
     # Run watchlist generation
     generator = WatchlistGenerator(
+        watchlist_config=watchlist_config,
         min_quality_score=args.min_quality,
         max_workers=args.workers
     )

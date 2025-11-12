@@ -34,24 +34,110 @@ pip install PyPDF2      # Alternative PDF processing
 
 ### Quick Start
 
-#### Modular System (Recommended)
+**New to the system? Follow this 5-minute guide to run your first investment opportunity analysis.**
+
+#### Step 1: Quick Analysis (2-5 minutes)
+
+Find quality investment opportunities from S&P 500:
+
 ```bash
-# Full execution (trading + reporting)
-conda run -n trading_env python "Portfolio Scripts/main.py"
-
-# Report generation only (safe for any time)
-conda run -n trading_env python "Portfolio Scripts/main.py" --report-only
-
-# Load positions from saved state (recovery mode)
-conda run -n trading_env python "Portfolio Scripts/main.py" --load-previous-day
-
-# Test document parsing without trading
-conda run -n trading_env python "Portfolio Scripts/main.py" --test-parser
+cd "Portfolio Scripts Schwab"
+python quality_analysis_script.py --limit 50
 ```
 
-#### Legacy System (Deprecated)
+**What this does:**
+- Screens top 50 S&P 500 stocks by market cap
+- Calculates quality scores using 5 research-backed metrics
+- Identifies SELL candidates (weak holdings with quality <70)
+- Identifies BUY alternatives (strong opportunities with quality ≥85)
+- Outputs to `outputs/quality_analysis_YYYYMMDD.json`
+
+**Expected output:**
+```
+Analyzing 50 tickers from S&P 500...
+✅ Fetched financial data for 48/50 tickers
+📊 Quality Analysis Complete:
+   - SELL Candidates: 2 holdings (quality <70)
+   - BUY Alternatives: 5 opportunities (quality ≥85)
+   - Results saved to outputs/quality_analysis_20251111.json
+```
+
+#### Step 2: Weekly Screening (12-17 minutes)
+
+Complete 10-step STEPS analysis:
+
 ```bash
-python Daily_Portfolio_Script.py
+cd "Portfolio Scripts Schwab"
+python steps_orchestrator.py
+```
+
+**What this does:**
+- Runs complete STEPS methodology (10 steps)
+- Screens full S&P 500 (~500 stocks) for opportunities
+- Analyzes market environment (S&P 500, VIX, sector rotation)
+- Compares holdings quality vs watchlist alternatives
+- Integrates news sentiment and risk analysis
+- Generates trading_recommendations.md with specific BUY/SELL/HOLD orders
+
+**Expected output:**
+```
+STEP 1/10: Market Environment Assessment ✅
+STEP 2/10: Holdings Quality Analysis ✅
+STEP 3A/10: Core Quality Screening (S&P 500) ✅
+...
+STEP 10/10: Framework Validation ✅
+
+📋 Trading Recommendations Generated:
+   - File: trading_recommendations/trading_recommendations_20251111.md
+   - SELL: 2 positions (quality <70)
+   - BUY: 3 opportunities (quality ≥85)
+   - HOLD: 5 positions (maintain allocation)
+```
+
+#### Step 3: Review & Approve Recommendations
+
+```bash
+# Review the generated recommendations
+cat trading_recommendations/trading_recommendations_20251111.md
+
+# If you approve, edit manual override file
+# Copy approved trades to:
+nano "Portfolio Scripts Schwab/manual_trades_override.json"
+
+# Set "enabled": true to authorize execution
+```
+
+#### Step 4: Execute Trades (Market Hours Only)
+
+```bash
+# Execute approved trades
+python main.py
+```
+
+**Important:** Trades only execute during market hours (Mon-Fri 9:30AM-4PM ET).
+
+---
+
+#### Advanced Options
+
+**Test run (no file writes):**
+```bash
+python steps_orchestrator.py --dry-run
+```
+
+**Quick analysis (skip optional steps):**
+```bash
+python steps_orchestrator.py --skip-thematic --skip-competitive --skip-valuation
+```
+
+**Report generation only (available 24/7):**
+```bash
+python main.py --report-only
+```
+
+**Account status check (available 24/7):**
+```bash
+python main.py --account-status --dry-run
 ```
 
 ## Command Line Options
@@ -94,6 +180,165 @@ conda run -n trading_env python "Portfolio Scripts/main.py" --test-parser
 
 Useful for validating trading recommendations before live execution.
 
+## System Architecture Overview
+
+### How the System Works
+
+The LLM Managed Portfolio system uses a **hybrid approach** combining:
+1. **Data-driven analysis** (STEPS 1-7): Quantitative quality metrics, market cap classification, financial data
+2. **AI-powered synthesis** (STEP 8): HuggingFace FinBERT agents + DeepSeek-R1 reasoning for BUY/SELL/HOLD decisions
+3. **Human approval** (You): Review recommendations before executing any trades
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ DATA SOURCES                                                     │
+│   • Schwab API: Real-time prices (S&P 500, VIX, sectors, holdings)
+│   • yfinance: Fundamentals (balance sheets, income, cash flow)  │
+│   • Yahoo Finance: News articles (7-day history)                │
+│   • Wikipedia: Index lists (S&P 500, S&P 400, S&P 600)         │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEPS 1-7: DATA ANALYSIS (Pure Math, No AI)                     │
+│                                                                  │
+│  STEP 1: Market Environment (Schwab API)                        │
+│    → S&P 500 trend, VIX volatility, sector rotation            │
+│                                                                  │
+│  STEP 2: Quality Analysis (5 Research-Backed Metrics)           │
+│    → Gross Profitability (30%) - Strongest predictor           │
+│    → ROE (25%) - Persistence power                             │
+│    → Operating Profitability (20%)                             │
+│    → FCF Yield (15%)                                           │
+│    → ROIC (10%)                                                │
+│    → Classify into 4-tier market cap framework                 │
+│                                                                  │
+│  STEP 3A: Quality Screening (S&P 500 Watchlist)                │
+│    → Screen ~500 stocks for quality ≥70                        │
+│    → Output: quality_watchlist_YYYYMMDD.csv                    │
+│                                                                  │
+│  STEP 3B-5: Additional Analysis (Optional)                      │
+│    → Thematic scoring, competitive analysis, valuation         │
+│                                                                  │
+│  STEP 6: Portfolio Construction (4-Tier Framework)              │
+│    → Large Cap (65-70%): $50B+, position 8-15%                 │
+│    → Mid Cap (15-20%): $2B-$50B, position 5-10%                │
+│    → Small Cap (10-15%): $500M-$2B, position 2-4%              │
+│    → Thematic (5-10%): Score ≥28/40, position 1.5-2.5%         │
+│                                                                  │
+│  STEP 7: Rebalancing Trades                                     │
+│    → Generate specific buy/sell orders                         │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 8: TRADE SYNTHESIS (AI Agents Make Decisions)              │
+│                                                                  │
+│  1. Load all STEPS 1-7 outputs (quality, thematic, tier data)   │
+│                                                                  │
+│  2. Run FinBERT Sentiment Agents:                               │
+│     • NewsAgent: Analyzes recent news sentiment                 │
+│     • MarketAgent: Overall market sentiment                     │
+│     • RiskAgent: Portfolio risk assessment                      │
+│     • ToneAgent: Market tone detection                          │
+│                                                                  │
+│  3. For EACH stock (holdings + watchlist):                      │
+│     Build agent_outputs dict:                                   │
+│       {                                                         │
+│         'quality_analysis': {score: 85, tier: 'ELITE', ...},   │
+│         'thematic_score': 32,                                   │
+│         'market_cap_tier': 'LARGE_CAP',                         │
+│         'roe_persistence_years': 8,                             │
+│         'news_sentiment': {...},  # From NewsAgent             │
+│         'market_sentiment': {...},  # From MarketAgent         │
+│         'risk_assessment': {...},  # From RiskAgent            │
+│         'current_holding': True,  # Context flag               │
+│         'current_shares': 15  # Actual shares owned            │
+│       }                                                         │
+│                                                                  │
+│  4. Run ReasoningAgent (DeepSeek-R1):                           │
+│     • Synthesizes ALL inputs                                    │
+│     • Applies STEPS thresholds:                                 │
+│       - Quality <70 → EXIT                                      │
+│       - Thematic <28 → EXIT                                     │
+│       - Red flags >3 → EXIT                                     │
+│     • Returns ReasoningDecision:                                │
+│       {                                                         │
+│         action: 'BUY',  # or SELL/HOLD                         │
+│         confidence: 0.85,                                       │
+│         reasoning_steps: ["Step 1...", "Step 2..."],           │
+│         target_position_pct: 12.0,  # From tier rules          │
+│         position_type: 'QUALITY',                              │
+│         stop_loss_pct: -15.0,                                  │
+│         profit_target_pct: 40.0                                │
+│       }                                                         │
+│                                                                  │
+│  5. Python Code Formats Markdown (NOT an LLM):                  │
+│     • Uses hardcoded template structure                         │
+│     • Inserts ReasoningAgent decisions                          │
+│     • Categorizes by priority (HIGH/MEDIUM/LOW)                 │
+│     • Writes to trading_recommendations_YYYYMMDD.md             │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEPS 9-10: VALIDATION                                          │
+│   • Data quality check (completeness, freshness)                │
+│   • Framework compliance check (allocation, position sizing)    │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ OUTPUT FILES                                                     │
+│   📄 trading_recommendations/trading_recommendations_YYYYMMDD.md│
+│   📊 outputs/quality_analysis_YYYYMMDD.json                     │
+│   📊 outputs/quality_watchlist_YYYYMMDD.csv                     │
+│   📊 outputs/market_environment_YYYYMMDD.json                   │
+│   📊 outputs/compliance_YYYYMMDD.json                           │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ HUMAN REVIEW & APPROVAL (You)                                   │
+│   1. Review trading_recommendations.md                          │
+│   2. Edit manual_trades_override.json with approved trades      │
+│   3. Set "enabled": true                                        │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ TRADE EXECUTION (market hours only)                             │
+│   • python main.py (executes approved trades)                   │
+│   • Updates portfolio_state.json                                │
+│   • Logs all actions to trade_execution.log                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Architectural Principles
+
+**1. Data-Driven Foundation (STEPS 1-7)**
+- Pure mathematical calculations, no AI hallucination
+- 5 research-backed quality metrics with academic validation
+- 4-tier market cap framework from quality_investing_thresholds_research.md
+- Deterministic, reproducible, transparent
+
+**2. AI for Synthesis, Not Analysis (STEP 8)**
+- FinBERT agents analyze sentiment (news, market, risk)
+- DeepSeek-R1 reasoning agent synthesizes ALL inputs
+- AI makes BUY/SELL/HOLD recommendations with reasoning
+- Python code formats output (not an LLM summarizer)
+
+**3. Human-in-the-Loop (Always)**
+- System NEVER executes trades automatically
+- All recommendations require manual review and approval
+- You control what gets executed via manual_trades_override.json
+- Safety-first design
+
+**4. Performance-Optimized**
+- Daily analysis: 50 tickers, 2-5 minutes
+- Weekly screening: 500 tickers (S&P 500), 12-17 minutes
+- Monthly deep dive: 1,500 tickers (future: S&P 500+400+600), 45-60 minutes
+- 24-hour caching for financial data, 4-hour for market cap
+
+**5. No Vendor Lock-In**
+- Free data sources: yfinance, Yahoo Finance, Wikipedia
+- Open-source models: FinBERT (HuggingFace), DeepSeek-R1
+- Optional: Schwab API for real-time quotes (free for customers)
+
 ## Daily Workflow
 
 ### Morning Routine (Every Trading Day)
@@ -116,99 +361,251 @@ python Daily_Portfolio_Script.py
 
 #### Step 2: Generate AI Trading Recommendations
 
-**Two Orchestration Systems Available:**
+**STEPS Orchestrator - Primary Workflow**
 
-| Feature | DEFAULT Orchestrator | STEPS Orchestrator |
-|---------|---------------------|-------------------|
-| **Purpose** | Trade execution & reporting | Complete 10-step portfolio analysis |
-| **Price Data Source** | ✅ Schwab API (real-time) | ✅ Schwab API (real-time) |
-| **Fundamental Data** | N/A | yfinance (Schwab doesn't provide fundamentals) |
-| **Market Hours Required** | Trading only | Analysis: 24/7, Trading: market hours |
-| **Schwab Integration** | Full (account sync, live trading) | Price data + optional trading |
-| **Speed** | Fast (<1 min) | Comprehensive (5-10 min) |
-| **Best For** | Daily execution workflow | Weekly deep analysis |
-| **Trading Recommendations** | Via manual_trades_override.json | Via trading_recommendations.md |
-| **4-Tier Framework** | ✅ Fully integrated | ✅ Fully integrated |
-
-**Option A: STEPS Orchestrator (RECOMMENDED - Complete 10-Step Analysis)**
-
-**System**: Comprehensive STEPS Portfolio Analysis Framework
+The STEPS (Systematic Trading & Evaluation for Portfolio Success) framework is the **recommended workflow** for all portfolio analysis and trading decisions. It implements a comprehensive 10-step methodology with a research-backed 4-tier market cap framework.
 
 ```bash
-# Full 10-step STEPS analysis
+# Full 10-step STEPS analysis (recommended)
 cd "Portfolio Scripts Schwab"
 python steps_orchestrator.py
 
-# Quick analysis (skip optional steps)
+# Quick analysis (skip optional steps for faster execution)
 python steps_orchestrator.py --skip-thematic --skip-competitive --skip-valuation
 
-# Test run
+# Test run (show what would be done without executing)
 python steps_orchestrator.py --dry-run
+
+# Detailed logging for debugging
+python steps_orchestrator.py --verbose
 ```
 
-**What happens:**
-1. **Market Environment** - Analyzes S&P 500, VIX, sector rotation (✅ Schwab API for real-time prices)
-2. **Holdings Quality** - Calculates quality scores with 4-tier classification (yfinance for fundamentals)
-3A. **Core Screening** - Identifies quality opportunities from S&P 500
-3B. **Thematic Discovery** - Scores opportunistic investments
-4. **Competitive Analysis** - Compares vs. direct competitors
-5. **Valuation Analysis** - Assesses reasonable pricing
-6. **Portfolio Construction** - Determines 4-tier allocation
-7. **Rebalancing Trades** - Generates specific trade recommendations
-8. **Trade Synthesis** - Integrates all analysis with tier-aware reasoning
-9. **Data Validation** - Verifies data quality
-10. **Framework Validation** - Ensures 4-tier compliance
+**The 10 STEPS Framework:**
+
+1. **Market Environment Assessment**
+   - Analyzes S&P 500 trend, VIX volatility, 11-sector rotation
+   - Uses **Schwab API** for real-time price data
+   - Classifies market conditions: STRONG_BULL/BULL/NEUTRAL/BEAR/STRONG_BEAR
+   - Determines risk appetite: RISK_ON/NEUTRAL/RISK_OFF
+
+2. **Holdings Quality Analysis** (CRITICAL STEP)
+   - Calculates quality scores using 5 research-backed metrics (weighted by importance):
+     1. **Gross Profitability (30%)**: Revenue - COGS / Assets (Sharpe ratio 0.85, strongest predictor)
+     2. **ROE (25%)**: Powerful for persistence (15%+ for 10 years vastly outperforms)
+     3. **Operating Profitability (20%)**: Comparable to gross profitability in Fama-French
+     4. **FCF Yield (15%)**: Top quintile outperforms by ~10% annually
+     5. **ROIC (10%)**: Core quality assessment metric
+   - Classifies holdings into 4-tier market cap framework
+   - Uses **yfinance** for fundamental data (Schwab API doesn't provide)
+
+3A. **Core Quality Screening**
+   - Identifies quality opportunities from S&P 500 universe
+   - Filters by tier-specific requirements (ROE persistence, strict filters)
+
+3B. **Thematic Opportunity Discovery**
+   - Scores opportunistic/thematic investments (0-40 scale)
+   - Themes: AI Infrastructure, Nuclear, Defense, Climate, Longevity/Biotech
+
+4. **Competitive Analysis**
+   - Compares holdings vs. direct competitors
+   - Identifies better alternatives in same sector
+
+5. **Valuation Analysis**
+   - Assesses whether stocks are reasonably priced
+   - P/E, P/B, PEG ratio analysis
+
+6. **Portfolio Construction** (4-Tier Framework)
+   - **Large Cap (65-70%)**: $50B+, 5+ years ROE >15%, position 8-15%
+   - **Mid Cap (15-20%)**: $2B-$50B, 2-3 years ROE >15%, incremental ROCE +5%, position 5-10%
+   - **Small Cap (10-15%)**: $500M-$2B, 6-8 quarters ROE trend, strict filters (FCF+, D/E<1.0, GP>30%), position 2-4%
+   - **Thematic (5-10%)**: Thematic score ≥28/40, position 1.5-2.5%
+   - Determines optimal allocation and position sizes
+
+7. **Rebalancing Trades**
+   - Generates specific buy/sell orders to reach target allocation
+   - Minimum $50 trade size to avoid micro-trades
+
+8. **Trade Synthesis** (Agent-Powered Decision Making)
+   - **recommendation_generator_script.py** orchestrates the decision process:
+     - Loads all STEPS 1-7 outputs (quality scores, thematic scores, market environment, tier data)
+     - Runs **MarketAgent** (FinBERT) → market sentiment analysis
+     - Runs **RiskAgent** (FinBERT) → portfolio risk assessment
+     - Runs **ToneAgent** (FinBERT) → overall market tone
+     - For EACH stock (holdings + watchlist alternatives):
+       - Combines all data into `agent_outputs` dict (quality, thematic, tier, ROE persistence, news, market, risk)
+       - Runs **ReasoningAgent** (DeepSeek-R1) → synthesizes all inputs into BUY/SELL/HOLD decision with reasoning steps
+       - ReasoningAgent applies STEPS thresholds (quality <70 = EXIT, thematic <28 = EXIT, red flags >3 = EXIT)
+       - Returns `ReasoningDecision` with action, confidence, reasoning_steps, position sizing
+     - Python code programmatically generates trading_recommendations.md file (NOT an LLM summarizer)
+       - Uses hardcoded template structure (headers, sections, formatting)
+       - Inserts ReasoningAgent decisions and reasoning text into template
+       - Categorizes by priority (HIGH/MEDIUM/LOW) and action (BUY/SELL/HOLD)
+   - **Key Distinction**: ReasoningAgent makes decisions, Python code formats markdown file
+
+**STEP 8 Detailed Architecture:**
+
+```python
+# For EACH stock, build agent_outputs dict:
+agent_outputs = {
+    # From STEPS 1-7 (Data Analysis)
+    'quality_analysis': {
+        'composite_score': 85.0,           # From STEP 2 (0-100 scale)
+        'tier': 'ELITE',                   # From STEP 2
+        'red_flags_count': 1               # From STEP 2
+    },
+    'thematic_score': 32.0,                # From STEP 3B (0-40 scale, None if not thematic)
+    'market_cap_tier': 'LARGE_CAP',        # From STEP 6 (LARGE_CAP/MID_CAP/SMALL_CAP/THEMATIC)
+    'roe_persistence_years': 8,            # From STEP 2 (years of ROE >15%)
+    'roe_trend_quarters': None,            # From STEP 2 (for small caps only)
+    'incremental_roce': None,              # From STEP 2 (for mid caps only)
+    'strict_filters_passed': None,         # From STEP 2 (for small caps only)
+
+    # From FinBERT Agents (Live Analysis)
+    'news_sentiment': {...},               # NewsAgent (FinBERT) result
+    'market_sentiment': {...},             # MarketAgent (FinBERT) result
+    'risk_assessment': {...},              # RiskAgent (FinBERT) result
+
+    # Context Flags
+    'current_holding': True,               # FIXED: True for holdings, False for alternatives
+    'current_shares': 15                   # DYNAMIC: Actual shares from portfolio_state.json (0 for alternatives)
+}
+
+# ReasoningAgent (DeepSeek-R1) synthesizes all inputs:
+decision = reasoning_agent.synthesize_decision(ticker, agent_outputs)
+
+# Returns ReasoningDecision:
+ReasoningDecision(
+    action='BUY',                          # BUY/SELL/HOLD
+    confidence=0.85,                       # 0.0-1.0
+    reasoning_steps=[                      # Step-by-step reasoning
+        "Quality score 8.5/10 (STEPS: Strong tier)",
+        "Market cap tier: LARGE_CAP (position range 8-15%)",
+        "ROE persistence: 8 years >15% (meets Large Cap requirement)",
+        "News sentiment: positive, market: bullish",
+        "Decision: BUY with 12.0% position"
+    ],
+    target_position_pct=12.0,              # Position sizing from tier rules
+    position_type='QUALITY',               # QUALITY or THEMATIC
+    stop_loss_pct=-15.0,                   # Risk management
+    profit_target_pct=40.0
+)
+
+# Python code formats markdown (NOT LLM):
+f.write(f"**BUY 15 shares of NVDA** - {reasoning_steps}\n\n")
+```
+
+**Data Flow Summary:**
+- STEPS 1-7 generate quantitative data (scores, tiers, persistence metrics)
+- FinBERT agents generate sentiment data (news, market, risk)
+- ReasoningAgent (DeepSeek-R1) synthesizes ALL inputs → BUY/SELL/HOLD + reasoning
+- Python template code writes markdown file with decisions
+
+9. **Data Quality Validation**
+   - Verifies data completeness and freshness
+   - Tracks 9 required metrics, flags stale data (>90 days)
+
+10. **Framework Compliance Validation**
+   - Ensures 4-tier allocation compliance
+   - Validates position sizing, tier requirements
+   - Compliance score (0-100) with violation tracking
 
 **Data Source Strategy**:
-- **Price Data**: ✅ Schwab API (real-time quotes for S&P 500, VIX, sector ETFs, holdings)
-- **Fundamental Data**: yfinance (balance sheets, income statements - Schwab API doesn't provide)
-- **Best of both worlds**: Real-time pricing accuracy + comprehensive fundamental data
+- **Price Data**: ✅ **Schwab API** (real-time quotes for S&P 500, VIX, sector ETFs, all holdings)
+- **Fundamental Data**: yfinance (balance sheets, income statements, cash flow - Schwab API doesn't provide)
+- **Best of Both Worlds**: Real-time pricing accuracy + comprehensive fundamental data
 
-**Option B: DEFAULT Orchestrator (Fast Trade Execution)**
+**Output Files**:
+- `trading_recommendations/trading_recommendations_YYYYMMDD.md` - Final trading document
+- `outputs/market_environment_YYYYMMDD.json` - Market assessment
+- `outputs/quality_analysis_YYYYMMDD.json` - Quality scores for all holdings
+- `outputs/portfolio_allocation_YYYYMMDD.json` - Target allocation with violations
+- `outputs/compliance_YYYYMMDD.json` - Framework compliance report
 
-**System**: Main portfolio management workflow with Schwab integration
+**Performance**:
+- Target runtime: <30 minutes for full analysis
+- Uses caching for news and financial data (4-hour cache for market data)
+- Independent steps can run in parallel
 
-```bash
-# Generate portfolio report
-cd "Portfolio Scripts Schwab"
-python main.py --report-only
+**High-Level Workflow Diagram**:
 
-# Execute trades from manual_trades_override.json
-python main.py
 ```
-
-**What happens:**
-- ✅ Uses Schwab API for real-time price data
-- ✅ Full Schwab account integration (sync, live trading)
-- ✅ Fast execution (<1 minute)
-- ✅ Market hours validation
-- ⚠️ No comprehensive 10-step analysis (requires STEPS)
-
-**Data Source**: Uses SchwabDataFetcher for all price quotes, ensuring real-time accuracy for trading decisions.
-
-**Option C: HuggingFace Multi-Agent Analysis Pipeline (Legacy)**
-
-**Automated Agent Workflow**:
-```bash
-# Generate AI-powered trading recommendations
-python "Portfolio Scripts Schwab/main.py" --generate-hf-recommendations
+┌─────────────────────────────────────────────────────────────────┐
+│ INPUT: Portfolio State + Market Data                            │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 1: Market Environment (Schwab API)                         │
+│   → S&P 500, VIX, 11 sectors (real-time prices)                │
+│   → Trend, volatility, breadth, risk appetite                  │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 2: Quality Analysis (yfinance fundamentals)                │
+│   → 5 metrics weighted by research importance:                  │
+│      • Gross Profitability (30%) - strongest predictor          │
+│      • ROE (25%) - persistence power                            │
+│      • Operating Profitability (20%)                            │
+│      • FCF Yield (15%)                                          │
+│      • ROIC (10%)                                               │
+│   → Classify into 4-tier market cap framework                   │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEPS 3-5: Screening & Analysis                                 │
+│   → 3A: S&P 500 quality screening by tier                      │
+│   → 3B: Thematic scoring (AI/Nuclear/Defense/Climate/Bio)      │
+│   → 4: Competitive analysis vs. peers                          │
+│   → 5: Valuation analysis (P/E, P/B, PEG)                      │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 6: Portfolio Construction (4-Tier Framework)               │
+│   → Large Cap (65-70%): $50B+, 5yr ROE>15%, 8-15% position    │
+│   → Mid Cap (15-20%): $2-50B, 2yr ROE>15%, 5-10% position     │
+│   → Small Cap (10-15%): $0.5-2B, 6-8qtr trend, 2-4% position  │
+│   → Thematic (5-10%): Score≥28/40, 1.5-2.5% position          │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 7: Rebalancing Trades                                      │
+│   → Generate specific buy/sell orders                          │
+│   → Move current → target allocation                           │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEP 8: Trade Synthesis (Reasoning Agent)                       │
+│   → Apply decision thresholds:                                 │
+│      • Quality <70 → EXIT                                      │
+│      • Thematic <28 → EXIT                                     │
+│      • Red flags >3 → EXIT                                     │
+│   → Position sizing by tier and score                          │
+│   → Generate trading_recommendations.md                        │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ STEPS 9-10: Validation                                          │
+│   → 9: Data quality (completeness, freshness, consistency)     │
+│   → 10: Framework compliance (allocation, position sizing)     │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ OUTPUT: trading_recommendations_YYYYMMDD.md                     │
+│   + JSON reports (quality, allocation, compliance)             │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ HUMAN REVIEW & APPROVAL                                         │
+│   → Review recommendations                                      │
+│   → Edit manual_trades_override.json                           │
+│   → Set "enabled": true                                        │
+└────────────────────────┬────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────────────────┐
+│ TRADE EXECUTION (market hours)                                  │
+│   → python main.py (executes approved trades)                  │
+│   → Updates portfolio_state.json                               │
+└─────────────────────────────────────────────────────────────────┘
 ```
-
-**What happens:**
-- **News Agent** analyzes financial news sentiment for your holdings
-- **Market Agent** assesses overall market outlook and momentum
-- **Risk Agent** evaluates portfolio risk levels with conservative bias
-- **Tone Agent** determines aggregate market environment sentiment
-- **Quality Agent** scores fundamental quality metrics (drives 80% core allocation)
-- **Thematic Prompt Builder** evaluates sector-specific themes (drives 20% opportunistic)
-- **Catalyst Analyzer** identifies upcoming events affecting positions
-- **Trade Agent** synthesizes all signals into concrete BUY/SELL/HOLD orders
-
-**Output**: `trading_recommendations/trading_recommendations_YYYYMMDD.md`
-- Prioritized orders (HIGH/MEDIUM/LOW priority)
-- Detailed reasoning for each recommendation
-- Risk management parameters (stop-loss, profit targets)
-- AI analysis summary with confidence scores
 
 #### Step 3: Review and Approve Recommendations
 - Review the generated `trading_recommendations_YYYYMMDD.md` file
@@ -258,6 +655,1135 @@ python Daily_Portfolio_Script.py
 - Complete trade log saved to `trade_execution.log`
 - Updated performance metrics exported to CSV
 - Ready for next day's analysis
+
+## How Investment Discovery Works
+
+This section explains the core investment opportunity discovery process in detail.
+
+### STEP 3A: Quality Screening (Watchlist Generation)
+
+**Goal:** Screen the S&P 500 universe to find quality investment opportunities.
+
+**Process:**
+
+1. **Fetch S&P 500 Ticker List**
+   ```python
+   # From Wikipedia (free, updated regularly)
+   url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+   tickers = pd.read_html(url)[0]['Symbol'].tolist()
+   # Returns ~500-505 tickers
+   ```
+
+2. **Parallel Financial Data Fetching**
+   - Uses `ThreadPoolExecutor` with 10 workers
+   - Fetches via yfinance for each ticker:
+     - Income statement: revenue, COGS, SG&A, operating income, net income
+     - Balance sheet: total assets, shareholder equity, total debt
+     - Cash flow: operating cash flow, free cash flow
+     - Market data: market cap, current price, P/E ratio, sector, industry
+   - Takes 12-17 minutes for ~500 tickers
+   - Uses 24-hour cache to avoid redundant API calls
+
+3. **Quality Metrics Calculation**
+
+   For each stock, calculate 5 research-backed metrics:
+
+   | Metric | Formula | Weight | Research Basis |
+   |--------|---------|--------|----------------|
+   | **Gross Profitability** | (Revenue - COGS) / Assets | 30% | Sharpe ratio 0.85, strongest predictor |
+   | **ROE** | Net Income / Equity | 25% | 15%+ for 10 years vastly outperforms |
+   | **Operating Profitability** | (Rev - COGS - SG&A) / Assets | 20% | Comparable to GP in Fama-French |
+   | **FCF Yield** | Free Cash Flow / Market Cap | 15% | Top quintile +10% annually |
+   | **ROIC** | NOPAT / (Debt + Equity) | 10% | Core quality metric |
+
+   **Composite Score** = Weighted average (0-100 scale)
+
+4. **Market Cap Classification**
+   ```python
+   # 4-tier framework (from quality_investing_thresholds_research.md)
+   if market_cap >= 50e9:
+       tier = "LARGE_CAP"      # ≥$50B
+   elif market_cap >= 2e9:
+       tier = "MID_CAP"        # $2B-$50B
+   elif market_cap >= 500e6:
+       tier = "SMALL_CAP"      # $500M-$2B
+   else:
+       tier = "MICRO_CAP"      # <$500M (excluded from portfolio)
+   ```
+
+5. **Red Flag Detection**
+
+   Automatically identifies 6 types of quality concerns:
+   - **High Accruals:** (Net Income - OCF) / Assets > 10% (earnings quality issue)
+   - **Excessive Leverage:** Total Debt / Assets > 60% (financial risk)
+   - **Declining Margins:** Gross margin down >5% YoY (competitive pressure)
+   - **Aggressive Asset Growth:** Asset growth >20% YoY (empire building)
+   - **Negative Cash Flow:** FCF < 0 (cash burn)
+   - **Low ROIC:** ROIC < 10% (poor capital efficiency)
+
+6. **Filtering and Ranking**
+   ```python
+   # Filter by minimum quality score (default: 70)
+   quality_opportunities = [stock for stock in results if stock.score >= 70]
+
+   # Sort by composite score (highest first)
+   ranked = sorted(quality_opportunities, key=lambda x: x.score, reverse=True)
+   ```
+
+7. **Output Files**
+   - `outputs/quality_watchlist_YYYYMMDD.csv` - Top opportunities (CSV format)
+   - `outputs/quality_watchlist_YYYYMMDD_full.json` - Complete results with red flags
+   - `outputs/quality_watchlist_YYYYMMDD_summary.txt` - Human-readable top 50
+
+### STEP 2: Holdings Quality Analysis
+
+**Goal:** Analyze current portfolio holdings using same quality metrics and compare to watchlist.
+
+**Process:**
+
+1. **Load Portfolio Holdings**
+   ```python
+   # From portfolio_state.json
+   holdings = {
+       "NVDA": {"shares": 15, "cost_basis": 180.50},
+       "GOOGL": {"shares": 10, "cost_basis": 145.20},
+       # ...
+   }
+   ```
+
+2. **Calculate Quality for Holdings**
+   - Same 5 metrics as watchlist screening
+   - Same 4-tier market cap classification
+   - **Additional tier-specific analysis:**
+
+   **Large Cap ($50B+) Requirements:**
+   ```python
+   # Check ROE persistence (5+ years >15%)
+   roe_history = get_roe_history(ticker, years=10)
+   persistence_years = sum(1 for roe in roe_history if roe > 0.15)
+
+   if persistence_years >= 5:
+       meets_large_cap_criteria = True
+   ```
+
+   **Mid Cap ($2B-$50B) Requirements:**
+   ```python
+   # Check ROE persistence (2-3 years >15%)
+   roe_history = get_roe_history(ticker, years=5)
+   persistence_years = sum(1 for roe in roe_history if roe > 0.15)
+
+   # Check incremental ROCE improvement
+   incremental_roce = calculate_incremental_roce(ticker)
+
+   if persistence_years >= 2 and incremental_roce > 0.05:
+       meets_mid_cap_criteria = True
+   ```
+
+   **Small Cap ($500M-$2B) Requirements:**
+   ```python
+   # Check 6-8 quarters positive ROE trend
+   roe_quarterly = get_roe_quarterly(ticker, quarters=8)
+   trend_positive = all(roe_quarterly[i] < roe_quarterly[i+1] for i in range(len(roe_quarterly)-1))
+
+   # Apply strict filters
+   strict_filters = {
+       'fcf_positive': free_cash_flow > 0,
+       'debt_to_equity': total_debt / equity < 1.0,
+       'gross_margin': (revenue - cogs) / revenue > 0.30
+   }
+
+   if trend_positive and all(strict_filters.values()):
+       meets_small_cap_criteria = True
+   ```
+
+3. **Comparison Logic**
+
+   **Identify SELL Candidates (Weak Holdings):**
+   ```python
+   sell_candidates = []
+
+   for ticker, data in holdings_quality.items():
+       # EXIT if quality <70 (STEPS threshold from PM_README_V3.md)
+       if data['composite_score'] < 70:
+           sell_candidates.append({
+               'ticker': ticker,
+               'quality_score': data['composite_score'],
+               'reason': f"Quality {data['composite_score']:.1f} below STEPS threshold (70)"
+           })
+   ```
+
+   **Identify BUY Alternatives (Strong Opportunities):**
+   ```python
+   buy_alternatives = []
+
+   # Find weakest holding
+   weakest_holding_score = min(h['composite_score'] for h in holdings_quality.values())
+
+   for ticker, data in watchlist_quality.items():
+       # BUY if Elite quality (≥85)
+       if data['composite_score'] >= 85:
+           buy_alternatives.append({
+               'ticker': ticker,
+               'quality_score': data['composite_score'],
+               'tier': data['tier'],
+               'reason': f"Elite quality {data['composite_score']:.1f} (STEPS Elite tier ≥85)"
+           })
+
+       # BUY if 15+ points better than weakest holding
+       elif data['composite_score'] >= 70 and (data['composite_score'] - weakest_holding_score) > 15:
+           buy_alternatives.append({
+               'ticker': ticker,
+               'quality_score': data['composite_score'],
+               'improvement': data['composite_score'] - weakest_holding_score,
+               'reason': f"Quality {data['composite_score']:.1f}, +{improvement:.1f} better than weakest holding"
+           })
+   ```
+
+4. **Example Output**
+
+   ```json
+   {
+     "holdings_quality": {
+       "NVDA": {
+         "composite_score": 90.0,
+         "tier": "ELITE",
+         "market_cap_tier": "LARGE_CAP",
+         "roe_persistence_years": 8,
+         "red_flags": []
+       },
+       "XYZ": {
+         "composite_score": 65.0,
+         "tier": "WEAK",
+         "market_cap_tier": "LARGE_CAP",
+         "roe_persistence_years": 2,
+         "red_flags": ["declining_margins", "low_roic"]
+       }
+     },
+     "recommendations": {
+       "sell_candidates": [
+         {
+           "ticker": "XYZ",
+           "quality_score": 65.0,
+           "reason": "Quality 65.0 below STEPS threshold (70)"
+         }
+       ],
+       "buy_alternatives": [
+         {
+           "ticker": "MSFT",
+           "quality_score": 88.0,
+           "tier": "ELITE",
+           "reason": "Elite quality 88.0 (STEPS Elite tier ≥85)"
+         },
+         {
+           "ticker": "GOOGL",
+           "quality_score": 85.0,
+           "improvement": 20.0,
+           "reason": "Quality 85.0, +20.0 better than weakest holding"
+         }
+       ]
+     }
+   }
+   ```
+
+### News & Risk Integration
+
+**How news and risk analysis feed into decisions:**
+
+1. **News Sentiment Analysis (NewsAgent - FinBERT)**
+   ```python
+   # Fetch recent news (7 days from Yahoo Finance)
+   headlines = get_recent_news(ticker, days=7)
+
+   # Analyze sentiment with FinBERT
+   news_result = news_agent.analyze(headlines)
+   # Returns: {'sentiment': 'positive', 'score': 0.85, 'reasoning': '...'}
+   ```
+
+2. **Risk Assessment (RiskAgent - FinBERT)**
+   ```python
+   # Analyze portfolio-level risk
+   risk_result = risk_agent.analyze(portfolio_context)
+   # Returns: {'label': 'MODERATE', 'score': 0.6, 'reasoning': '...'}
+   ```
+
+3. **Integration in ReasoningAgent**
+   ```python
+   # Combine quality + news + risk → final decision
+   decision = reasoning_agent.synthesize_decision(ticker, {
+       'quality_analysis': {'composite_score': 85, 'tier': 'ELITE'},
+       'thematic_score': None,
+       'news_sentiment': {'sentiment': 'positive', 'score': 0.85},
+       'market_sentiment': {'sentiment': 'bullish'},
+       'risk_assessment': {'label': 'MODERATE'},
+       'current_holding': False
+   })
+
+   # Returns: ReasoningDecision(
+   #   action='BUY',
+   #   confidence=0.90,
+   #   reasoning_steps=[
+   #     "Quality score 8.5/10 (STEPS: Elite tier)",
+   #     "News sentiment: positive (0.85 confidence)",
+   #     "Market risk: MODERATE (acceptable for quality stock)",
+   #     "Decision: BUY with 12.0% position (Large Cap Elite tier: 10-20% range)"
+   #   ]
+   # )
+   ```
+
+4. **Decision Priority Logic**
+
+   The ReasoningAgent applies thresholds in this order:
+
+   ```python
+   # Priority 1: Thematic score check
+   if thematic_score and thematic_score < 28:
+       return ReasoningDecision(action='SELL', reason='Thematic <28 threshold')
+
+   # Priority 2: Quality score check
+   if quality_score < 70:
+       return ReasoningDecision(action='SELL', reason='Quality <70 threshold')
+
+   # Priority 3: Red flags check
+   if red_flags_count > 3:
+       return ReasoningDecision(action='SELL', reason='Excessive red flags')
+
+   # Priority 4: Elite quality BUY
+   if quality_score >= 85 and not current_holding:
+       return ReasoningDecision(action='BUY', reason='Elite quality ≥85')
+
+   # Priority 5: Negative news + marginal quality
+   if news_sentiment == 'negative' and quality_score < 75:
+       return ReasoningDecision(action='SELL', reason='Negative news + weak quality')
+
+   # Priority 6: Default HOLD
+   return ReasoningDecision(action='HOLD', reason='Quality ≥70, no major concerns')
+   ```
+
+### Complete Discovery Flow Example
+
+**Scenario:** Finding a replacement for weak holding XYZ
+
+1. **Weekly Screening (STEP 3A)**
+   ```bash
+   python steps_orchestrator.py
+   ```
+   - Screens S&P 500 (~500 stocks)
+   - Finds 50 stocks with quality ≥70
+   - Top result: MSFT (quality 88.0, Large Cap Elite)
+
+2. **Holdings Analysis (STEP 2)**
+   - Current holding: XYZ (quality 65.0, 2 red flags)
+   - Identified as SELL candidate (quality <70)
+
+3. **Comparison**
+   - MSFT quality 88.0 vs XYZ quality 65.0
+   - Improvement: +23.0 points
+   - Both Large Cap, so same position sizing rules apply
+
+4. **News & Risk Check (STEP 8)**
+   - MSFT news: Positive (Azure growth, AI partnerships)
+   - XYZ news: Negative (margin compression, losing market share)
+   - Portfolio risk: MODERATE (acceptable)
+
+5. **Final Recommendation**
+   ```markdown
+   ### 🔥 IMMEDIATE EXECUTION (HIGH PRIORITY)
+
+   **SELL all 10 shares of XYZ** - Quality score 6.5/10 below STEPS threshold (7.0).
+   Red flags: declining margins, low ROIC. News sentiment negative.
+   EXIT from core holdings (STEPS requirement).
+
+   **BUY 10 shares of MSFT** - Quality score 8.8/10 (STEPS: Elite tier).
+   Large Cap with 8 years ROE >15% persistence (meets Large Cap requirement).
+   News sentiment positive (Azure growth +39% YoY).
+   Target position: 12.0% (QUALITY). Stop-loss: -15%, Profit target: +40%.
+   ```
+
+6. **Human Review & Approval**
+   - Review trading_recommendations.md
+   - Decide: Approve the swap (makes sense - upgrade quality by 23 points)
+   - Edit manual_trades_override.json:
+   ```json
+   {
+     "enabled": true,
+     "trades": [
+       {"action": "SELL", "ticker": "XYZ", "shares": 10, "priority": "HIGH"},
+       {"action": "BUY", "ticker": "MSFT", "shares": 10, "priority": "HIGH"}
+     ]
+   }
+   ```
+
+7. **Execution (Market Hours)**
+   ```bash
+   python main.py
+   # Executes approved trades
+   # SELL XYZ first (generates cash)
+   # Then BUY MSFT (uses cash from XYZ sale)
+   ```
+
+This complete flow demonstrates how the system discovers opportunities, compares to holdings, integrates news/risk, and generates actionable recommendations—all while keeping you in control of final decisions.
+
+## Understanding Output Files
+
+The STEPS workflow generates multiple output files. Here's what each contains and how to use them.
+
+### 📊 `outputs/quality_watchlist_YYYYMMDD.csv`
+
+**Purpose:** Top quality investment opportunities from S&P 500 screening (STEP 3A).
+
+**Columns:**
+| Column | Description | Example | How to Use |
+|--------|-------------|---------|------------|
+| `ticker` | Stock ticker symbol | NVDA | Company identifier |
+| `quality_score` | Composite quality score (0-100) | 90.0 | Higher = better quality |
+| `tier` | Quality classification | ELITE | ELITE/STRONG/MODERATE/WEAK |
+| `market_cap_tier` | Market cap classification | LARGE_CAP | LARGE/MID/SMALL/MICRO |
+| `gross_profitability` | (Rev-COGS)/Assets | 0.45 | Higher = more efficient |
+| `roe` | Net Income/Equity | 0.32 | Higher = better returns |
+| `operating_profitability` | (Rev-COGS-SG&A)/Assets | 0.38 | Higher = operational efficiency |
+| `fcf_yield` | FCF/Market Cap | 0.05 | Higher = better cash generation |
+| `roic` | NOPAT/(Debt+Equity) | 0.25 | Higher = capital efficiency |
+| `market_cap` | Market capitalization | 2.8e12 | Company size in dollars |
+| `sector` | Business sector | Technology | Industry category |
+| `red_flags` | Number of quality concerns | 0 | Lower = fewer concerns |
+
+**How to Read:**
+```csv
+ticker,quality_score,tier,market_cap_tier,gross_profitability,roe,operating_profitability,fcf_yield,roic,market_cap,sector,red_flags
+NVDA,90.0,ELITE,LARGE_CAP,0.45,0.32,0.38,0.05,0.25,2800000000000,Technology,0
+MSFT,88.0,ELITE,LARGE_CAP,0.42,0.35,0.36,0.04,0.28,3100000000000,Technology,0
+GOOGL,85.0,ELITE,LARGE_CAP,0.38,0.25,0.32,0.06,0.24,1900000000000,Communication Services,0
+```
+
+**Typical Use:**
+- **Top 10-20 rows**: Elite quality opportunities (score ≥85) for immediate consideration
+- **Filter by `market_cap_tier`**: Focus on Large/Mid/Small caps based on portfolio needs
+- **Check `red_flags`**: Prefer 0-1 red flags, avoid 3+ red flags
+- **Compare `quality_score` to holdings**: Look for 15+ point improvements
+
+### 📄 `outputs/quality_analysis_YYYYMMDD.json`
+
+**Purpose:** Complete analysis of holdings quality + BUY/SELL recommendations.
+
+**Structure:**
+```json
+{
+  "holdings_quality": {
+    "NVDA": {
+      "composite_score": 90.0,
+      "tier": "ELITE",
+      "market_cap_tier": "LARGE_CAP",
+      "roe_persistence_years": 8,
+      "incremental_roce": null,
+      "roe_trend_quarters": null,
+      "strict_filters_passed": null,
+      "red_flags": [],
+      "metrics": {
+        "gross_profitability": 0.45,
+        "roe": 0.32,
+        "operating_profitability": 0.38,
+        "fcf_yield": 0.05,
+        "roic": 0.25
+      }
+    }
+  },
+  "market_cap_tiers": {
+    "NVDA": "LARGE_CAP"
+  },
+  "roe_persistence": {
+    "NVDA": {
+      "persistence_years": 8,
+      "avg_roe": 0.28,
+      "trend": "increasing"
+    }
+  },
+  "strict_filters": {
+    "SOME_SMALL_CAP": {
+      "passed": true,
+      "fcf_positive": true,
+      "debt_to_equity_below_1": true,
+      "gross_margin_above_30": true
+    }
+  },
+  "recommendations": {
+    "sell_candidates": [
+      {
+        "ticker": "XYZ",
+        "quality_score": 65.0,
+        "tier": "WEAK",
+        "reason": "Quality 65.0 below STEPS threshold (70)",
+        "red_flags": ["declining_margins", "low_roic"]
+      }
+    ],
+    "buy_alternatives": [
+      {
+        "ticker": "MSFT",
+        "quality_score": 88.0,
+        "tier": "ELITE",
+        "market_cap_tier": "LARGE_CAP",
+        "reason": "Elite quality 88.0 (STEPS Elite tier ≥85)",
+        "red_flags": []
+      }
+    ]
+  }
+}
+```
+
+**How to Use:**
+- **`holdings_quality`**: Check quality score for each current holding
+  - Score <70: Consider selling
+  - Score 70-84: Monitor, maintain
+  - Score ≥85: Hold/add if underweight
+- **`roe_persistence`**: Verify tier-specific requirements
+  - Large Cap: Need 5+ years ROE >15%
+  - Mid Cap: Need 2-3 years ROE >15%
+  - Small Cap: Check `strict_filters_passed`
+- **`recommendations.sell_candidates`**: Weak holdings to exit
+- **`recommendations.buy_alternatives`**: Strong opportunities to add
+
+### 📝 `trading_recommendations/trading_recommendations_YYYYMMDD.md`
+
+**Purpose:** Final trading document with specific BUY/SELL/HOLD orders (template format).
+
+**Sections:**
+
+1. **Document Header**
+   ```markdown
+   *Date: 2025-11-11*
+   *Market Conditions: S&P 500 +1.2%, VIX 15.8 (low volatility), sector rotation to Technology*
+   *Portfolio Performance: 8 holdings, $95,432 total value, +12.3% YTD*
+   ```
+
+2. **Risk Management Updates**
+   ```markdown
+   **MAX-POSITION-SIZE 20%** - Maximum single position risk
+   **CASH-RESERVE 5%** - Maintain liquidity for opportunities
+   **RISK-BUDGET MODERATE** - Balanced approach given MODERATE risk environment
+   ```
+
+3. **Orders Section** (by priority)
+
+   **HIGH PRIORITY (Execute First):**
+   ```markdown
+   **SELL all 10 shares of XYZ** - Quality score 6.5/10 below STEPS threshold (7.0).
+   Red flags: declining margins, low ROIC. News sentiment negative.
+   EXIT from core holdings (STEPS requirement).
+
+   **BUY 10 shares of MSFT** - Quality score 8.8/10 (STEPS: Elite tier).
+   Large Cap with 8 years ROE >15% persistence. News sentiment positive.
+   Target position: 12.0% (QUALITY). Stop-loss: -15%, Profit target: +40%.
+   ```
+
+   **MEDIUM PRIORITY:**
+   ```markdown
+   **HOLD all 15 shares of NVDA** - Quality 9.0/10 (STEPS: Elite tier).
+   Maintain allocation at 18.5%. News sentiment positive.
+   ```
+
+   **LOW PRIORITY:**
+   ```markdown
+   **BUY 5 shares of GOOGL** - Quality 8.5/10 (STEPS: Elite tier).
+   Strategic positioning for long-term growth.
+   ```
+
+4. **Market Analysis & Rationale**
+   - Current market environment
+   - Catalyst calendar (upcoming events)
+   - Risk assessment
+   - Performance attribution
+
+**How to Use:**
+1. Read each section carefully
+2. Understand the reasoning for each trade
+3. Decide which trades to approve
+4. Copy approved trades to `manual_trades_override.json`
+5. Set `"enabled": true` to authorize
+
+### 📊 `outputs/market_environment_YYYYMMDD.json`
+
+**Purpose:** Market conditions from STEP 1 (trend, volatility, sector rotation).
+
+**Structure:**
+```json
+{
+  "sp500_price": 5800.45,
+  "sp500_50ma": 5650.20,
+  "sp500_200ma": 5400.10,
+  "sp500_1m_return": 0.025,
+  "sp500_ytd_return": 0.18,
+  "trend": "BULL",
+  "vix_level": 15.8,
+  "vix_20ma": 16.5,
+  "volatility_regime": "LOW",
+  "leading_sectors": ["Technology", "Communication Services", "Consumer Discretionary"],
+  "lagging_sectors": ["Energy", "Materials", "Utilities"],
+  "sector_performance": {
+    "XLK": 0.032,
+    "XLC": 0.028,
+    "XLY": 0.025,
+    ...
+  },
+  "market_breadth": "MODERATE",
+  "risk_appetite": "RISK_ON",
+  "summary": "S&P 500 in confirmed BULL trend above 50/200-day MAs. Low volatility (VIX 15.8) supports risk-taking. Technology leading with 3.2% monthly gain.",
+  "analysis_date": "2025-11-11"
+}
+```
+
+**How to Use:**
+- **`trend`**: STRONG_BULL/BULL → favor quality growth, BEAR/STRONG_BEAR → favor defensive
+- **`volatility_regime`**: LOW → normal position sizing, HIGH → reduce position sizes by 30-50%
+- **`risk_appetite`**: RISK_ON → aggressive positioning, RISK_OFF → raise cash to 10-15%
+- **`leading_sectors`**: Consider adding exposure to top 3 sectors
+- **`market_breadth`**: NARROW → sector-specific risk, BROAD → diversify broadly
+
+### 📋 `outputs/compliance_YYYYMMDD.json`
+
+**Purpose:** Framework validation from STEP 10 (4-tier allocation, position sizing).
+
+**Structure:**
+```json
+{
+  "portfolio_value": 100000.0,
+  "compliance_score": 92.0,
+  "framework_compliant": true,
+  "allocation_quality_pct": 78.0,
+  "allocation_thematic_pct": 17.0,
+  "allocation_cash_pct": 5.0,
+  "violations": [
+    {
+      "severity": "INFO",
+      "category": "ALLOCATION",
+      "message": "Quality allocation 78.0% slightly below target range (80% ±5%)",
+      "current_value": 78.0,
+      "expected_value": 80.0
+    }
+  ],
+  "validation_date": "2025-11-11"
+}
+```
+
+**Severity Levels:**
+- **INFO** (-1 point): Minor deviation, no action needed
+- **WARNING** (-5 points): Near threshold, monitor closely
+- **CRITICAL** (-20 points): Violation, must fix before trading
+
+**How to Use:**
+- **`framework_compliant`**: Must be `true` to execute trades
+- **`compliance_score`**: 80+ = good, 60-80 = needs rebalancing, <60 = critical issues
+- **`violations`**: Address CRITICAL violations immediately, WARNING within 1 week
+- **Target allocation**:
+  - Quality: 75-85% (target 80%)
+  - Thematic: 15-25% (target 20%)
+  - Cash: ≥3% (target 5%)
+
+### 📈 `outputs/data_validation_YYYYMMDD.json`
+
+**Purpose:** Data quality validation from STEP 9 (completeness, freshness).
+
+**Structure:**
+```json
+{
+  "NVDA": {
+    "ticker": "NVDA",
+    "overall_quality": "COMPLETE",
+    "quality_score": 10.0,
+    "missing_metrics": [],
+    "stale_metrics": [],
+    "warnings": [],
+    "metrics": [
+      {
+        "metric_name": "revenue",
+        "value": 130500000000,
+        "source": "yfinance",
+        "fetch_date": "2025-11-11",
+        "confidence": "HIGH"
+      }
+    ],
+    "validation_date": "2025-11-11"
+  }
+}
+```
+
+**Quality Classifications:**
+- **COMPLETE** (score ≥8.0): All data present and recent, full confidence
+- **PARTIAL** (score 5.0-7.9): Some missing/stale data, moderate confidence
+- **INSUFFICIENT** (score <5.0): Critical data missing, low confidence, DO NOT TRADE
+
+**How to Use:**
+- Check `overall_quality` before trading
+- INSUFFICIENT → Skip stock, data too poor
+- PARTIAL → Acceptable but monitor closely
+- COMPLETE → Full confidence
+- Review `stale_metrics` (>90 days old) and consider updating
+
+### Quick Reference: Which File to Use When
+
+| Use Case | File to Check | What to Look For |
+|----------|---------------|------------------|
+| Find new opportunities | `quality_watchlist_*.csv` | Top 20 rows with score ≥85 |
+| Check holding quality | `quality_analysis_*.json` | `holdings_quality` section |
+| Identify weak holdings | `quality_analysis_*.json` | `sell_candidates` array |
+| Get trading recommendations | `trading_recommendations_*.md` | All sections, copy to override |
+| Check market conditions | `market_environment_*.json` | `trend`, `volatility_regime`, `risk_appetite` |
+| Verify framework compliance | `compliance_*.json` | `framework_compliant`, `violations` |
+| Validate data quality | `data_validation_*.json` | `overall_quality` per ticker |
+
+All JSON files can be loaded into Python for programmatic analysis:
+```python
+import json
+
+with open('outputs/quality_analysis_20251111.json', 'r') as f:
+    data = json.load(f)
+
+# Check if any holdings need to be sold
+sell_candidates = data['recommendations']['sell_candidates']
+for candidate in sell_candidates:
+    print(f"SELL {candidate['ticker']}: {candidate['reason']}")
+```
+
+## Common Workflows
+
+Practical workflows for different analysis frequencies and use cases.
+
+### Workflow 1: Daily Quick Check (2-5 minutes)
+
+**Goal:** Quickly identify any urgent opportunities or risks in top S&P 500 stocks.
+
+**When to run:** Every trading day, morning or lunch break.
+
+```bash
+cd "Portfolio Scripts Schwab"
+
+# Quick analysis of top 50 S&P 500 stocks
+python quality_analysis_script.py --limit 50
+```
+
+**What to look for:**
+1. Check `outputs/quality_analysis_YYYYMMDD_summary.txt`
+2. Look for SELL candidates (holdings with quality <70)
+3. Look for BUY alternatives scoring ≥85 (Elite opportunities)
+4. If any CRITICAL alerts, investigate further
+
+**Action items:**
+- If 0 SELL candidates + 0 Elite alternatives → No action needed
+- If SELL candidates found → Flag for weekly review
+- If Elite alternative appears → Consider adding to shopping list
+
+**Time:** 2-5 minutes (uses 24-hour cache, no refetching needed)
+
+---
+
+### Workflow 2: Weekly Full Screening (12-17 minutes)
+
+**Goal:** Complete STEPS analysis to generate trading recommendations.
+
+**When to run:** Once per week (recommended: Sunday evening or Monday morning).
+
+```bash
+cd "Portfolio Scripts Schwab"
+
+# Full 10-step STEPS analysis
+python steps_orchestrator.py
+
+# Review generated recommendations
+cat ../trading_recommendations/trading_recommendations_20251111.md
+```
+
+**What the system does:**
+1. **STEP 1**: Analyze market environment (S&P 500, VIX, sectors)
+2. **STEP 2**: Calculate quality for all holdings
+3. **STEP 3A**: Screen full S&P 500 (~500 stocks) for opportunities
+4. **STEP 3B**: Score thematic/opportunistic positions (optional, use `--skip-thematic` to skip)
+5. **STEPS 4-7**: Competitive analysis, valuation, portfolio construction, rebalancing
+6. **STEP 8**: AI synthesis (agents make BUY/SELL/HOLD decisions)
+7. **STEPS 9-10**: Data validation, framework compliance check
+
+**Output files generated:**
+- `trading_recommendations/trading_recommendations_YYYYMMDD.md` ← **Main file**
+- `outputs/quality_watchlist_YYYYMMDD.csv` ← Top opportunities
+- `outputs/quality_analysis_YYYYMMDD.json` ← Holdings analysis
+- `outputs/market_environment_YYYYMMDD.json` ← Market conditions
+- `outputs/compliance_YYYYMMDD.json` ← Framework validation
+
+**Review checklist:**
+- [ ] Read trading_recommendations.md from top to bottom
+- [ ] Understand the reasoning for each recommended trade
+- [ ] Check market environment (BULL/BEAR, volatility regime)
+- [ ] Verify compliance score ≥80 (framework compliant)
+- [ ] Decide which trades to approve
+
+**If you approve trades:**
+```bash
+# Edit manual override file
+nano "Portfolio Scripts Schwab/manual_trades_override.json"
+
+# Add approved trades (copy from trading_recommendations.md)
+# Set "enabled": true
+
+# Execute during market hours (Mon-Fri 9:30AM-4PM ET)
+python main.py
+```
+
+**Time:** 12-17 minutes total (screening 10-15 min, review 2-5 min)
+
+---
+
+### Workflow 3: Monthly Deep Dive (Future: 45-60 minutes)
+
+**Goal:** Comprehensive analysis across S&P 1500 (Large + Mid + Small caps).
+
+**When to run:** Once per month (first Sunday of the month).
+
+**Note:** This workflow requires the configurable watchlist module (coming in Week 2-4).
+
+```bash
+cd "Portfolio Scripts Schwab"
+
+# Monthly deep dive with expanded universe
+python steps_orchestrator.py --watchlist-index combined_sp
+
+# This screens:
+# - S&P 500 (Large Cap: ~500 stocks)
+# - S&P MidCap 400 (Mid Cap: ~400 stocks)
+# - S&P SmallCap 600 (Small Cap: ~600 stocks)
+# Total: ~1,500 stocks
+```
+
+**What's different from weekly:**
+- **3x more stocks** screened (~1,500 vs ~500)
+- **Mid/Small cap focus** - Find quality opportunities outside S&P 500
+- **Longer runtime** - 45-60 minutes (vs 12-17 minutes weekly)
+
+**Best practices:**
+- Run overnight or during off-hours (long runtime)
+- Focus on Small Cap section (highest potential for undiscovered quality)
+- Check strict filters for Small Caps (FCF+, D/E<1.0, GP>30%)
+- Verify ROE persistence for Mid Caps (2-3 years >15%)
+
+**Unique opportunities:**
+- Small caps with quality ≥70 (2-4% position, high growth potential)
+- Mid caps with incremental ROCE >5% (5-10% position, emerging quality)
+
+**Time:** 45-60 minutes (screening 40-50 min, review 5-10 min)
+
+---
+
+### Workflow 4: Finding Small Cap Opportunities
+
+**Goal:** Identify high-quality small caps that meet strict STEPS criteria.
+
+**When to run:** After monthly deep dive (when screening S&P 600).
+
+```bash
+# Step 1: Screen S&P SmallCap 600 (Future: requires watchlist module)
+python quality_analysis_script.py --index sp600
+
+# Step 2: Open CSV and filter
+# In Excel/Google Sheets/Python:
+import pandas as pd
+
+df = pd.read_csv('outputs/quality_watchlist_20251111.csv')
+
+# Filter for small caps with quality ≥70
+small_caps = df[
+    (df['market_cap_tier'] == 'SMALL_CAP') &
+    (df['quality_score'] >= 70) &
+    (df['red_flags'] <= 1)
+].sort_values('quality_score', ascending=False)
+
+print(f"Found {len(small_caps)} quality small caps")
+print(small_caps[['ticker', 'quality_score', 'sector', 'fcf_yield', 'roe']].head(20))
+```
+
+**Additional checks for small caps:**
+1. **Strict filters** (from outputs/quality_analysis_*.json):
+   ```python
+   strict_filters = data['strict_filters'][ticker]
+   if strict_filters['passed']:
+       print(f"✅ {ticker} passes all strict filters")
+       print(f"  FCF Positive: {strict_filters['fcf_positive']}")
+       print(f"  D/E < 1.0: {strict_filters['debt_to_equity_below_1']}")
+       print(f"  GP > 30%: {strict_filters['gross_margin_above_30']}")
+   ```
+
+2. **ROE trend** (6-8 quarters positive):
+   ```python
+   roe_data = data['roe_persistence'][ticker]
+   if roe_data['trend_quarters'] >= 6:
+       print(f"✅ {ticker} has {roe_data['trend_quarters']} quarters positive ROE trend")
+   ```
+
+3. **News sentiment** (avoid negative catalysts):
+   ```python
+   # Check news analysis output
+   news = news_data['results'][ticker]
+   if news['sentiment'] == 'negative':
+       print(f"⚠️ {ticker} has negative news sentiment - investigate")
+   ```
+
+**Position sizing for small caps:**
+- Quality 70-79: 2-3% position
+- Quality ≥80: 3-4% position (max for small caps)
+- Never exceed 4% for single small cap (higher risk)
+- Total small cap allocation: 10-15% of portfolio
+
+---
+
+### Workflow 5: Replacing Weak Holdings
+
+**Goal:** Systematically upgrade portfolio quality by swapping weak holdings for strong alternatives.
+
+**When to run:** After weekly screening, when SELL candidates identified.
+
+```bash
+# Step 1: Identify weak holdings
+python quality_analysis_script.py
+
+# Step 2: Review sell_candidates
+cat outputs/quality_analysis_20251111_summary.txt | grep -A 10 "SELL Candidates"
+```
+
+**Example output:**
+```
+SELL Candidates (2):
+1. XYZ - Quality 65.0/10 (WEAK)
+   - Reason: Quality 65.0 below STEPS threshold (70)
+   - Red flags: declining_margins, low_roic
+   - Market Cap Tier: LARGE_CAP
+
+2. ABC - Quality 68.0/10 (WEAK)
+   - Reason: Quality 68.0 below STEPS threshold (70)
+   - Red flags: excessive_leverage
+   - Market Cap Tier: MID_CAP
+```
+
+**Step 3: Find replacements from same tier**
+
+For XYZ (Large Cap, quality 65.0):
+```bash
+# Look for Large Cap alternatives scoring ≥80
+cat outputs/quality_watchlist_20251111.csv | grep "LARGE_CAP" | head -20
+```
+
+**Comparison criteria:**
+- [ ] Alternative quality ≥80 (15+ points better than XYZ 65.0)
+- [ ] Same market cap tier (LARGE_CAP)
+- [ ] Red flags ≤1 (XYZ has 2)
+- [ ] Positive news sentiment (check outputs/news_analysis_*.json)
+- [ ] Meets tier-specific requirements (5+ years ROE >15% for Large Cap)
+
+**Example: Replacing XYZ (quality 65.0) with MSFT (quality 88.0)**
+
+Decision rationale:
+- Quality improvement: +23 points (88.0 - 65.0)
+- Red flags improvement: 0 vs 2
+- Both Large Cap (same tier, same position sizing rules)
+- MSFT: 8 years ROE >15% (meets Large Cap requirement)
+- News sentiment: MSFT positive, XYZ negative
+
+**Step 4: Execute swap**
+```json
+{
+  "enabled": true,
+  "trades": [
+    {
+      "action": "SELL",
+      "ticker": "XYZ",
+      "shares": 10,
+      "reason": "Quality 65.0 below threshold, 2 red flags",
+      "priority": "HIGH"
+    },
+    {
+      "action": "BUY",
+      "ticker": "MSFT",
+      "shares": 10,
+      "reason": "Quality 88.0, Elite tier, +23 improvement over XYZ",
+      "priority": "HIGH"
+    }
+  ]
+}
+```
+
+---
+
+### Workflow 6: Risk Management Check
+
+**Goal:** Verify portfolio is within risk parameters before trading.
+
+**When to run:** Before executing any trades.
+
+```bash
+# Check framework compliance
+cat outputs/compliance_20251111.json | python -m json.tool | grep -A 5 "framework_compliant"
+
+# Check data quality
+cat outputs/data_validation_20251111.json | python -m json.tool | grep "overall_quality"
+
+# Check market environment
+cat outputs/market_environment_20251111.json | python -m json.tool | grep -E "(trend|volatility_regime|risk_appetite)"
+```
+
+**Risk checkpoints:**
+
+1. **Framework Compliance** (CRITICAL - must pass)
+   ```json
+   {
+     "framework_compliant": true,  // Must be true
+     "compliance_score": 92.0,      // ≥80 recommended
+     "violations": []               // No CRITICAL violations
+   }
+   ```
+   - If `framework_compliant: false` → **DO NOT TRADE** until fixed
+   - If `compliance_score < 60` → Rebalance before adding new positions
+
+2. **Data Quality** (CRITICAL - must be COMPLETE or PARTIAL)
+   ```json
+   {
+     "NVDA": {
+       "overall_quality": "COMPLETE"  // COMPLETE/PARTIAL acceptable, INSUFFICIENT not
+     }
+   }
+   ```
+   - If any ticker shows `INSUFFICIENT` → Skip that ticker
+   - If multiple tickers `PARTIAL` → Consider waiting for data refresh
+
+3. **Market Environment** (Adjust position sizing)
+   ```json
+   {
+     "trend": "BULL",                    // BULL → normal sizing, BEAR → reduce
+     "volatility_regime": "LOW",         // LOW → normal, HIGH → reduce 30-50%
+     "risk_appetite": "RISK_ON"          // RISK_ON → aggressive, RISK_OFF → defensive
+   }
+   ```
+
+   **Position sizing adjustments:**
+   | Market Condition | Action |
+   |------------------|--------|
+   | BULL + LOW Vol + RISK_ON | Normal position sizes (use STEPS recommendations) |
+   | BEAR + HIGH Vol + RISK_OFF | Reduce all positions by 30-50%, raise cash to 15% |
+   | Mixed conditions | Moderate adjustment (-20%), be selective |
+
+**Example risk adjustment:**
+```
+Original recommendation: BUY 10 shares NVDA (12% position)
+Market: BEAR, HIGH volatility, RISK_OFF
+
+Adjusted: BUY 6 shares NVDA (7.2% position, 40% reduction)
+Reasoning: High volatility reduces position size, maintain quality but lower risk
+```
+
+---
+
+### Workflow 7: Portfolio Rebalancing
+
+**Goal:** Bring portfolio back to 4-tier framework targets.
+
+**When to run:** Quarterly, or when compliance score <80.
+
+```bash
+# Check current allocation
+cat outputs/compliance_20251111.json | python -m json.tool
+```
+
+**Target allocation (from quality_investing_thresholds_research.md):**
+- Quality: 75-85% (target 80%)
+- Thematic: 15-25% (target 20%)
+- Cash: ≥3% (target 5%)
+
+**Example rebalancing scenario:**
+
+Current allocation:
+- Quality: 72% (**below** 75% minimum)
+- Thematic: 23% (within range)
+- Cash: 5% (target)
+
+**Action plan:**
+1. Identify underweight quality positions
+2. Add to top-rated quality holdings (score ≥85)
+3. Or sell lowest-quality thematic positions to buy quality
+
+```bash
+# Find top quality opportunities to add
+head -10 outputs/quality_watchlist_20251111.csv
+# Focus on tickers scoring 85-100
+
+# Manual trades to increase quality allocation to 80%
+# Need to add 8% quality exposure
+# If portfolio value = $100,000, need $8,000 more quality positions
+```
+
+---
+
+### Quick Reference: When to Use Each Workflow
+
+| Frequency | Workflow | Runtime | Purpose |
+|-----------|----------|---------|---------|
+| **Daily** | Quick Check | 2-5 min | Catch urgent opportunities/risks |
+| **Weekly** | Full Screening | 12-17 min | Generate trading recommendations |
+| **Monthly** | Deep Dive | 45-60 min | Find small/mid cap opportunities |
+| **As needed** | Small Cap Search | 10-15 min | Focus on small cap universe |
+| **As needed** | Replace Weak Holdings | 15-20 min | Systematic quality upgrade |
+| **Before trading** | Risk Management Check | 5 min | Verify safe to trade |
+| **Quarterly** | Portfolio Rebalancing | 20-30 min | Maintain framework compliance |
+
+## Watchlist Configuration
+
+The system supports flexible watchlist screening across multiple stock indexes to find opportunities across different market cap tiers.
+
+### Supported Indexes
+
+| Index | Tickers | Market Cap | Use Case | Runtime |
+|-------|---------|------------|----------|---------|
+| **SP500** | ~500 | Large Cap (≥$50B) | Weekly screening | 12-17 min |
+| **SP400** | ~400 | Mid Cap ($2B-$50B) | Mid-cap opportunities | 10-14 min |
+| **SP600** | ~600 | Small Cap ($500M-$2B) | Small-cap discovery | 15-20 min |
+| **NASDAQ100** | ~100 | Tech Focus | Tech sector analysis | 3-5 min |
+| **COMBINED_SP** | ~1,500 | All Tiers | Monthly deep dive | 45-60 min |
+
+### Configuration Examples
+
+**Daily Quick Check (50 tickers):**
+```bash
+python quality_analysis_script.py --index sp500 --limit 50
+```
+
+**Weekly Full Screening (S&P 500):**
+```bash
+python steps_orchestrator.py --watchlist-index sp500
+```
+
+**Monthly Deep Dive (S&P 1,500 - all market caps):**
+```bash
+python steps_orchestrator.py --watchlist-index combined_sp
+```
+
+**Focus on Mid-Caps:**
+```bash
+python watchlist_generator_script.py --index sp400
+```
+
+**Focus on Small-Caps:**
+```bash
+python watchlist_generator_script.py --index sp600
+```
+
+### Configuration in Code
+
+```python
+from watchlist_config import WatchlistConfig, WatchlistIndex
+
+# Configure in hf_config.py
+WATCHLIST_CONFIG = WatchlistConfig(index=WatchlistIndex.SP500)
+
+# Or use different index
+WATCHLIST_CONFIG = WatchlistConfig(index=WatchlistIndex.COMBINED_SP)
+
+# With limit for faster analysis
+WATCHLIST_CONFIG = WatchlistConfig(index=WatchlistIndex.SP500, limit=50)
+```
+
+**For detailed configuration options, see:** [`Portfolio Scripts Schwab/WATCHLIST_CONFIGURATION_GUIDE.md`](Portfolio%20Scripts%20Schwab/WATCHLIST_CONFIGURATION_GUIDE.md)
 
 ## State Management & Data Persistence
 

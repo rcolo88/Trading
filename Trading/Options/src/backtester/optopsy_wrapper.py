@@ -203,33 +203,62 @@ class OptopsyBacktester:
                     commission = self._calculate_commission(position.contracts)
                     self.account_value -= commission
 
-                    # Record trade
-                    # Get entry DTE from position notes if available
+                    # Record trade with detailed leg information
                     entry_dte = None
                     if hasattr(position, 'entry_dte'):
                         entry_dte = position.entry_dte
 
-                    self.all_trades.append({
+                    # Build detailed trade record
+                    trade_record = {
                         'entry_date': position.entry_date,
                         'exit_date': position.exit_date,
                         'strategy': strategy.name,
+                        'underlying_price_entry': getattr(position, 'underlying_price_entry', None),
+                        'underlying_price_exit': underlying_price,
+                        'vix_entry': getattr(position, 'vix_entry', None),
+                        'vix_exit': vix if 'vix' in daily_options.columns else None,
                         'entry_dte': entry_dte,
+                        'entry_price': position.entry_price,
+                        'exit_price': position.exit_price,
+                        'contracts': position.contracts,
                         'pnl': position.realized_pnl,
                         'commission': commission,
                         'net_pnl': position.realized_pnl - commission,
                         'days_in_trade': position.days_in_trade,
                         'exit_reason': exit_signal.exit_reason
-                    })
+                    }
+
+                    # Add leg details
+                    for i, leg in enumerate(position.legs):
+                        leg_num = i + 1
+                        trade_record[f'leg{leg_num}_strike'] = leg['strike']
+                        trade_record[f'leg{leg_num}_type'] = leg['option_type']
+                        trade_record[f'leg{leg_num}_position'] = 1 if leg['position'] == 'long' else -1
+                        trade_record[f'leg{leg_num}_delta'] = getattr(leg, 'delta', None) if hasattr(leg, 'delta') else leg.get('delta')
+                        trade_record[f'leg{leg_num}_price'] = getattr(leg, 'price', None) if hasattr(leg, 'price') else leg.get('price')
+                        trade_record[f'leg{leg_num}_expiration'] = getattr(leg, 'expiration', None) if hasattr(leg, 'expiration') else leg.get('expiration')
+
+                    # Add calendar-specific fields
+                    if hasattr(position, 'near_expiration'):
+                        trade_record['near_expiration'] = position.near_expiration
+                    if hasattr(position, 'far_expiration'):
+                        trade_record['far_expiration'] = position.far_expiration
+
+                    self.all_trades.append(trade_record)
 
             # Check for new entry signals
             max_positions = self.config.get('position_sizing', {}).get('max_positions', 5)
             current_positions = len(strategy.get_open_positions())
 
             if current_positions < max_positions:
+                # Get VIX for the day (if available)
+                vix = daily_options['vix'].iloc[0] if 'vix' in daily_options.columns and not daily_options.empty else None
+
                 entry_signal = strategy.generate_entry_signal(
                     date=current_date,
                     options_data=daily_options,
-                    underlying_price=underlying_price
+                    underlying_price=underlying_price,
+                    vix=vix
                 )
 
                 if entry_signal:
@@ -245,6 +274,19 @@ class OptopsyBacktester:
                     entry_price = self._get_entry_price(daily_options, entry_signal)
 
                     if entry_price and contracts > 0:
+                        # Get leg details from options data
+                        option_type = 'put' if 'put' in strategy.spread_type else 'call'
+
+                        # Get short leg details
+                        short_leg_data = self._get_leg_details(
+                            daily_options, entry_signal.short_strike, option_type, entry_signal
+                        )
+
+                        # Get long leg details
+                        long_leg_data = self._get_leg_details(
+                            daily_options, entry_signal.long_strike, option_type, entry_signal, is_long=True
+                        )
+
                         # Create position
                         position = Position(
                             strategy_name=strategy.name,
@@ -254,21 +296,37 @@ class OptopsyBacktester:
                             legs=[
                                 {
                                     'strike': entry_signal.short_strike,
-                                    'option_type': 'put' if 'put' in strategy.spread_type else 'call',
-                                    'position': 'short'
+                                    'option_type': option_type,
+                                    'position': 'short',
+                                    'delta': short_leg_data.get('delta'),
+                                    'price': short_leg_data.get('price'),
+                                    'expiration': short_leg_data.get('expiration')
                                 },
                                 {
                                     'strike': entry_signal.long_strike,
-                                    'option_type': 'put' if 'put' in strategy.spread_type else 'call',
-                                    'position': 'long'
+                                    'option_type': option_type,
+                                    'position': 'long',
+                                    'delta': long_leg_data.get('delta'),
+                                    'price': long_leg_data.get('price'),
+                                    'expiration': long_leg_data.get('expiration')
                                 }
                             ],
                             notes=entry_signal.notes
                         )
 
+                        # Store entry market conditions
+                        position.underlying_price_entry = underlying_price
+                        position.vix_entry = vix
+
                         # Store entry DTE for Kelly analysis
                         if hasattr(entry_signal, 'dte') and entry_signal.dte is not None:
                             position.entry_dte = entry_signal.dte
+
+                        # Store expiration dates for calendar spreads
+                        if hasattr(entry_signal, 'near_expiration'):
+                            position.near_expiration = entry_signal.near_expiration
+                        if hasattr(entry_signal, 'far_expiration'):
+                            position.far_expiration = entry_signal.far_expiration
 
                         strategy.positions.append(position)
 
@@ -312,23 +370,143 @@ class OptopsyBacktester:
         """Get entry price for a spread."""
         option_type = 'put' if 'put' in signal.strategy_name.lower() else 'call'
 
-        short_option = options_data[
-            (options_data['strike'] == signal.short_strike) &
-            (options_data['option_type'] == option_type)
-        ]
-        long_option = options_data[
-            (options_data['strike'] == signal.long_strike) &
-            (options_data['option_type'] == option_type)
-        ]
+        # Check if this is a calendar spread (same strike, different DTEs)
+        is_calendar = (signal.short_strike == signal.long_strike) and ('calendar' in signal.strategy_name.lower())
 
-        if short_option.empty or long_option.empty:
-            return None
+        if is_calendar:
+            # For calendar spreads, use stored expiration dates from signal
+            if hasattr(signal, 'near_expiration') and hasattr(signal, 'far_expiration'):
+                near_term = options_data[
+                    (options_data['strike'] == signal.short_strike) &
+                    (options_data['option_type'] == option_type) &
+                    (options_data['expiration'] == signal.near_expiration)
+                ]
 
-        # Use mid price for entry
-        short_price = (short_option.iloc[0]['bid'] + short_option.iloc[0]['ask']) / 2
-        long_price = (long_option.iloc[0]['bid'] + long_option.iloc[0]['ask']) / 2
+                far_term = options_data[
+                    (options_data['strike'] == signal.short_strike) &
+                    (options_data['option_type'] == option_type) &
+                    (options_data['expiration'] == signal.far_expiration)
+                ]
 
-        return short_price - long_price
+                if near_term.empty or far_term.empty:
+                    return None
+
+                # Use bid for sell (near-term), ask for buy (far-term)
+                short_price = near_term.iloc[0]['bid']
+                long_price = far_term.iloc[0]['ask']
+
+                # Calendar spread is a debit: we pay (far - near)
+                net_debit = long_price - short_price
+
+                return net_debit if net_debit > 0 else None
+            else:
+                # Fallback: use shortest and longest DTE
+                short_option = options_data[
+                    (options_data['strike'] == signal.short_strike) &
+                    (options_data['option_type'] == option_type)
+                ].sort_values('dte')
+
+                if short_option.empty or len(short_option) < 2:
+                    return None
+
+                near_term = short_option.iloc[0]
+                far_term = short_option.iloc[-1]
+
+                short_price = near_term['bid']
+                long_price = far_term['ask']
+
+                net_debit = long_price - short_price
+
+                return net_debit if net_debit > 0 else None
+        else:
+            # Vertical spread - different strikes
+            short_option = options_data[
+                (options_data['strike'] == signal.short_strike) &
+                (options_data['option_type'] == option_type)
+            ]
+            long_option = options_data[
+                (options_data['strike'] == signal.long_strike) &
+                (options_data['option_type'] == option_type)
+            ]
+
+            if short_option.empty or long_option.empty:
+                return None
+
+            # Use mid price for entry
+            short_price = (short_option.iloc[0]['bid'] + short_option.iloc[0]['ask']) / 2
+            long_price = (long_option.iloc[0]['bid'] + long_option.iloc[0]['ask']) / 2
+
+            return short_price - long_price
+
+    def _get_leg_details(
+        self,
+        options_data: pd.DataFrame,
+        strike: float,
+        option_type: str,
+        signal: Signal,
+        is_long: bool = False
+    ) -> Dict:
+        """
+        Get detailed leg information (delta, price, expiration) for trade export.
+
+        Args:
+            options_data: Options data for the day
+            strike: Strike price
+            option_type: 'call' or 'put'
+            signal: Entry signal (contains expiration info for calendar spreads)
+            is_long: True if this is the long leg, False for short leg
+
+        Returns:
+            Dictionary with delta, price, and expiration
+        """
+        # Check if calendar spread
+        is_calendar = (signal.short_strike == signal.long_strike) and hasattr(signal, 'near_expiration')
+
+        if is_calendar:
+            # Use stored expirations for calendar spreads
+            if is_long and hasattr(signal, 'far_expiration'):
+                expiration = signal.far_expiration
+            elif not is_long and hasattr(signal, 'near_expiration'):
+                expiration = signal.near_expiration
+            else:
+                expiration = None
+
+            # Filter by expiration if available
+            if expiration is not None:
+                leg_options = options_data[
+                    (options_data['strike'] == strike) &
+                    (options_data['option_type'] == option_type) &
+                    (options_data['expiration'] == expiration)
+                ]
+            else:
+                leg_options = options_data[
+                    (options_data['strike'] == strike) &
+                    (options_data['option_type'] == option_type)
+                ].sort_values('dte')
+                leg_options = leg_options.iloc[[-1] if is_long else [0]]
+        else:
+            # Vertical spread - just filter by strike
+            leg_options = options_data[
+                (options_data['strike'] == strike) &
+                (options_data['option_type'] == option_type)
+            ]
+
+        if leg_options.empty:
+            return {'delta': None, 'price': None, 'expiration': None}
+
+        leg = leg_options.iloc[0]
+
+        # Use ask for long, bid for short
+        if is_long:
+            price = leg['ask']
+        else:
+            price = leg['bid']
+
+        return {
+            'delta': leg.get('delta'),
+            'price': price,
+            'expiration': leg.get('expiration')
+        }
 
     def _calculate_commission(self, contracts: int) -> float:
         """Calculate commission for a trade."""
@@ -364,7 +542,10 @@ class OptopsyBacktester:
         risk_free_rate = 0.02  # 2% annual
         daily_rf = risk_free_rate / 252
         excess_returns = equity_df['returns'] - daily_rf
-        sharpe_ratio = np.sqrt(252) * excess_returns.mean() / excess_returns.std() if len(excess_returns) > 1 else 0
+        if len(excess_returns) > 1 and excess_returns.std() > 0:
+            sharpe_ratio = np.sqrt(252) * excess_returns.mean() / excess_returns.std()
+        else:
+            sharpe_ratio = 0
 
         # Win rate and profit metrics
         if len(trades_df) > 0:
@@ -409,3 +590,104 @@ class OptopsyBacktester:
         print(f"Avg Loss:           ${results['avg_loss']:.2f}")
         print(f"Profit Factor:      {results['profit_factor']:.2f}")
         print("="*60 + "\n")
+
+    def export_trades(
+        self,
+        results: Dict,
+        output_dir: str = 'backtest_results',
+        format: str = 'csv'
+    ) -> str:
+        """
+        Export detailed trade information to CSV or XLSX file.
+
+        Args:
+            results: Backtest results dictionary
+            output_dir: Directory to save export files (default: 'backtest_results')
+            format: Export format - 'csv' or 'xlsx' (default: 'csv')
+
+        Returns:
+            Path to the exported file
+        """
+        import os
+        from datetime import datetime as dt
+
+        # Create output directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Sanitize strategy name for filename
+        strategy_name = results['strategy_name'].replace(' ', '_').replace('/', '_')
+
+        # Create filename (static, will overwrite on each run)
+        if format == 'xlsx':
+            filename = f"{strategy_name}.xlsx"
+        else:
+            filename = f"{strategy_name}.csv"
+
+        filepath = os.path.join(output_dir, filename)
+
+        # Get trades DataFrame
+        trades_df = results['trades'].copy()
+
+        if trades_df.empty:
+            print(f"⚠️  No trades to export for {results['strategy_name']}")
+            return None
+
+        # Reorder columns for better readability
+        column_order = [
+            'entry_date',
+            'exit_date',
+            'strategy',
+            'underlying_price_entry',
+            'underlying_price_exit',
+            'vix_entry',
+            'vix_exit',
+            'entry_dte',
+            'entry_price',
+            'exit_price',
+            'contracts',
+            # Leg 1 (short)
+            'leg1_strike',
+            'leg1_type',
+            'leg1_position',
+            'leg1_delta',
+            'leg1_price',
+            'leg1_expiration',
+            # Leg 2 (long)
+            'leg2_strike',
+            'leg2_type',
+            'leg2_position',
+            'leg2_delta',
+            'leg2_price',
+            'leg2_expiration',
+            # Calendar specific
+            'near_expiration',
+            'far_expiration',
+            # P&L
+            'pnl',
+            'commission',
+            'net_pnl',
+            'days_in_trade',
+            'exit_reason'
+        ]
+
+        # Only include columns that exist in the DataFrame
+        ordered_columns = [col for col in column_order if col in trades_df.columns]
+        trades_export = trades_df[ordered_columns]
+
+        # Export to file
+        if format == 'xlsx':
+            try:
+                import openpyxl
+                trades_export.to_excel(filepath, index=False, engine='openpyxl')
+                print(f"✅ Exported {len(trades_export)} trades to: {filepath}")
+            except ImportError:
+                print("⚠️  openpyxl not installed. Install with: pip install openpyxl")
+                print("   Falling back to CSV export...")
+                filepath = filepath.replace('.xlsx', '.csv')
+                trades_export.to_csv(filepath, index=False)
+                print(f"✅ Exported {len(trades_export)} trades to: {filepath}")
+        else:
+            trades_export.to_csv(filepath, index=False)
+            print(f"✅ Exported {len(trades_export)} trades to: {filepath}")
+
+        return filepath

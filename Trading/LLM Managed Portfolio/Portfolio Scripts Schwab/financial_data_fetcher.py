@@ -369,6 +369,75 @@ def get_sp500_tickers() -> List[str]:
         return []
 
 
+def get_sp400_tickers() -> List[str]:
+    """
+    Get S&P MidCap 400 ticker list from Wikipedia
+
+    The S&P MidCap 400 covers mid-cap companies with market caps
+    typically between $2B and $50B.
+
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_400_companies'
+        tables = pd.read_html(url)
+        sp400_table = tables[0]
+        tickers = sp400_table['Symbol'].tolist()
+        logger.info(f"Fetched {len(tickers)} S&P MidCap 400 tickers")
+        return tickers
+    except Exception as e:
+        logger.error(f"Failed to fetch S&P 400 tickers: {e}")
+        return []
+
+
+def get_sp600_tickers() -> List[str]:
+    """
+    Get S&P SmallCap 600 ticker list from Wikipedia
+
+    The S&P SmallCap 600 covers small-cap companies with market caps
+    typically between $500M and $2B.
+
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_600_companies'
+        tables = pd.read_html(url)
+        sp600_table = tables[0]
+        tickers = sp600_table['Symbol'].tolist()
+        logger.info(f"Fetched {len(tickers)} S&P SmallCap 600 tickers")
+        return tickers
+    except Exception as e:
+        logger.error(f"Failed to fetch S&P 600 tickers: {e}")
+        return []
+
+
+def get_nasdaq100_tickers() -> List[str]:
+    """
+    Get NASDAQ-100 ticker list from Wikipedia
+
+    The NASDAQ-100 includes the 100 largest non-financial companies
+    listed on the NASDAQ stock exchange, heavily weighted toward
+    technology companies.
+
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        url = 'https://en.wikipedia.org/wiki/Nasdaq-100'
+        tables = pd.read_html(url)
+        # The ticker list is typically in the 4th table (index 3)
+        # It has columns including 'Ticker'
+        nasdaq_table = tables[3]
+        tickers = nasdaq_table['Ticker'].tolist()
+        logger.info(f"Fetched {len(tickers)} NASDAQ-100 tickers")
+        return tickers
+    except Exception as e:
+        logger.error(f"Failed to fetch NASDAQ-100 tickers: {e}")
+        return []
+
+
 # Example usage
 if __name__ == "__main__":
     # Initialize fetcher

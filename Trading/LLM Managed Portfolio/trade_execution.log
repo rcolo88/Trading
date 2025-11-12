@@ -1880,3 +1880,42 @@
 2025-10-13 16:21:38,406 - INFO - TradeExecutor initialized in SIMULATED mode
 2025-10-13 17:01:55,136 - INFO - TradeExecutor initialized in SIMULATED mode
 2025-10-13 17:18:55,639 - INFO - TradeExecutor initialized in SIMULATED mode
+2025-11-10 10:59:25,912 - INFO - ================================================================================
+2025-11-10 10:59:25,913 - INFO - STEPS PORTFOLIO ANALYSIS ORCHESTRATOR
+2025-11-10 10:59:25,913 - INFO - ================================================================================
+2025-11-10 10:59:25,913 - INFO - Skip thematic: False
+2025-11-10 10:59:25,913 - INFO - Skip competitive: False
+2025-11-10 10:59:25,913 - INFO - Skip valuation: False
+2025-11-10 10:59:25,913 - INFO - ================================================================================
+2025-11-10 10:59:25,913 - INFO - 
+🚀 Starting STEPS analysis at 2025-11-10 10:59:25
+
+2025-11-10 10:59:25,913 - INFO - ================================================================================
+2025-11-10 10:59:25,913 - INFO - 🌍 Running STEP 1: Market Environment Assessment...
+2025-11-10 10:59:35,653 - INFO - ============================================================
+2025-11-10 10:59:35,653 - INFO - STEP 1: Market Environment Assessment
+2025-11-10 10:59:35,653 - INFO - ============================================================
+2025-11-10 10:59:35,653 - INFO - Fetching S&P 500 data...
+2025-11-10 10:59:36,278 - INFO - S&P 500: $6783.16 (1M: +1.93%, YTD: +13.03%)
+2025-11-10 10:59:36,279 - INFO - Fetching VIX data...
+2025-11-10 10:59:36,334 - INFO - VIX: 18.17 (20-day avg: 18.52)
+2025-11-10 10:59:36,334 - INFO - Fetching sector performance...
+2025-11-10 10:59:38,163 - INFO - Successfully fetched 11/11 sectors
+2025-11-10 10:59:38,164 - INFO - Cached market data to market_environment_cache.pkl
+2025-11-10 10:59:38,164 - INFO - ============================================================
+2025-11-10 10:59:38,164 - INFO - Market Summary: S&P 500 at 6783 (+1.93% 1M), moderate volatility (VIX 18.2), Technology leadership. Strong bull environment with moderate breadth. Neutral risk environment (maintain balanced allocation).
+2025-11-10 10:59:38,164 - INFO - ============================================================
+2025-11-10 10:59:38,165 - INFO - Exported market environment to outputs/market_environment_20251110.json
+2025-11-10 10:59:38,166 - INFO - Exported markdown report to outputs/market_environment_20251110.md
+2025-11-10 10:59:38,166 - INFO - ✅ STEP 1 Complete: S&P 500 at 6783 (+1.93% 1M), moderate volatility (VIX 18.2), Technology leadership. Strong bull environment with moderate breadth. Neutral risk environment (maintain balanced allocation).
+2025-11-10 10:59:38,166 - INFO - ================================================================================
+2025-11-10 10:59:38,166 - INFO - 📊 Running STEP 2: Holdings Quality Analysis & Market Cap Classification...
+2025-11-10 10:59:38,166 - INFO - Executing quality_analysis_script.py...
+2025-11-10 10:59:39,035 - ERROR - Quality analysis script failed: Traceback (most recent call last):
+  File "/Users/robertcologero/GitHub/Trading/LLM Managed Portfolio/Portfolio Scripts Schwab/quality_analysis_script.py", line 25, in <module>
+    from quality_persistence_analyzer import ROEPersistenceAnalyzer
+  File "/Users/robertcologero/GitHub/Trading/LLM Managed Portfolio/Portfolio Scripts Schwab/quality_persistence_analyzer.py", line 26, in <module>
+    from scipy import stats
+ModuleNotFoundError: No module named 'scipy'
+
+2025-11-10 10:59:39,035 - ERROR - CRITICAL: STEP 2 failed - Cannot continue without quality analysis

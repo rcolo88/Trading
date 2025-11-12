@@ -61,3 +61,6 @@ htmlcov/
 # Logs
 *.log
 logs/
+
+# Backtest results (exported trade files)
+backtest_results/

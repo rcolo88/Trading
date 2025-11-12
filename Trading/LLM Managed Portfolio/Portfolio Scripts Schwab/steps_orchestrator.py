@@ -22,6 +22,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import subprocess
 
+# Add parent directory to path
+sys.path.append(str(Path(__file__).parent))
+from watchlist_config import WatchlistConfig, WatchlistIndex
+from hf_config import HFConfig
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -183,14 +188,26 @@ class STEPSOrchestrator:
         skip_thematic: bool = False,
         skip_competitive: bool = False,
         skip_valuation: bool = False,
-        verbose: bool = False
+        verbose: bool = False,
+        watchlist_config: Optional[WatchlistConfig] = None
     ):
-        """Initialize orchestrator with configuration flags"""
+        """
+        Initialize orchestrator with configuration flags
+
+        Args:
+            dry_run: Test mode without writing files
+            skip_thematic: Skip thematic analysis (STEP 3B)
+            skip_competitive: Skip competitive analysis (STEP 4)
+            skip_valuation: Skip valuation analysis (STEP 5)
+            verbose: Enable detailed debug logging
+            watchlist_config: Watchlist configuration (defaults to HFConfig.WATCHLIST_CONFIG)
+        """
         self.dry_run = dry_run
         self.skip_thematic = skip_thematic
         self.skip_competitive = skip_competitive
         self.skip_valuation = skip_valuation
         self.verbose = verbose
+        self.watchlist_config = watchlist_config or HFConfig.WATCHLIST_CONFIG
 
         # Set logging level
         if verbose:
@@ -211,6 +228,7 @@ class STEPSOrchestrator:
         logger.info("=" * 80)
         if dry_run:
             logger.info("DRY RUN MODE: No files will be written")
+        logger.info(f"Watchlist configuration: {self.watchlist_config}")
         logger.info(f"Skip thematic: {skip_thematic}")
         logger.info(f"Skip competitive: {skip_competitive}")
         logger.info(f"Skip valuation: {skip_valuation}")
@@ -373,10 +391,17 @@ class STEPSOrchestrator:
         logger.info("📊 Running STEP 2: Holdings Quality Analysis & Market Cap Classification...")
 
         try:
-            # Run quality analysis script
-            logger.info("Executing quality_analysis_script.py...")
+            # Run quality analysis script with watchlist configuration
+            logger.info(f"Executing quality_analysis_script.py with {self.watchlist_config}...")
+
+            # Build command with watchlist configuration
+            cmd = ["python", "quality_analysis_script.py"]
+            cmd.extend(["--index", self.watchlist_config.index.value])
+            if self.watchlist_config.limit:
+                cmd.extend(["--limit", str(self.watchlist_config.limit)])
+
             result = subprocess.run(
-                ["python", "quality_analysis_script.py"],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=300
@@ -452,10 +477,17 @@ class STEPSOrchestrator:
         logger.info("🔍 Running STEP 3A: Core Quality Screening...")
 
         try:
-            # Run watchlist generator
-            logger.info("Executing watchlist_generator_script.py...")
+            # Run watchlist generator with watchlist configuration
+            logger.info(f"Executing watchlist_generator_script.py with {self.watchlist_config}...")
+
+            # Build command with watchlist configuration
+            cmd = ["python", "watchlist_generator_script.py"]
+            cmd.extend(["--index", self.watchlist_config.index.value])
+            if self.watchlist_config.limit:
+                cmd.extend(["--limit", str(self.watchlist_config.limit)])
+
             result = subprocess.run(
-                ["python", "watchlist_generator_script.py"],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=600
@@ -1209,10 +1241,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python steps_orchestrator.py                     # Full analysis
-  python steps_orchestrator.py --dry-run           # Test without writing
-  python steps_orchestrator.py --skip-thematic     # Skip thematic analysis
-  python steps_orchestrator.py --verbose           # Detailed logging
+  python steps_orchestrator.py                            # Full analysis (S&P 500)
+  python steps_orchestrator.py --dry-run                  # Test without writing
+  python steps_orchestrator.py --skip-thematic            # Skip thematic analysis
+  python steps_orchestrator.py --verbose                  # Detailed logging
+  python steps_orchestrator.py --watchlist-index sp400    # Screen S&P MidCap 400
+  python steps_orchestrator.py --watchlist-index combined_sp  # Screen S&P 1500 (large+mid+small)
+  python steps_orchestrator.py --watchlist-limit 100      # Limit to 100 tickers (faster)
         """
     )
 
@@ -1241,8 +1276,38 @@ Examples:
         action='store_true',
         help='Enable detailed debug logging'
     )
+    parser.add_argument(
+        '--watchlist-index',
+        type=str,
+        default='sp500',
+        choices=['sp500', 'sp400', 'sp600', 'nasdaq100', 'combined_sp'],
+        help='Watchlist index to screen (default: sp500). Options: sp500 (large cap ~500), '
+             'sp400 (mid cap ~400), sp600 (small cap ~600), nasdaq100 (tech ~100), '
+             'combined_sp (S&P 1500 ~1500)'
+    )
+    parser.add_argument(
+        '--watchlist-limit',
+        type=int,
+        default=None,
+        help='Limit number of watchlist tickers (default: None for no limit)'
+    )
 
     args = parser.parse_args()
+
+    # Map CLI argument to WatchlistIndex enum
+    index_map = {
+        'sp500': WatchlistIndex.SP500,
+        'sp400': WatchlistIndex.SP400,
+        'sp600': WatchlistIndex.SP600,
+        'nasdaq100': WatchlistIndex.NASDAQ100,
+        'combined_sp': WatchlistIndex.COMBINED_SP
+    }
+
+    # Create watchlist config
+    watchlist_config = WatchlistConfig(
+        index=index_map[args.watchlist_index],
+        limit=args.watchlist_limit
+    )
 
     try:
         orchestrator = STEPSOrchestrator(
@@ -1250,7 +1315,8 @@ Examples:
             skip_thematic=args.skip_thematic,
             skip_competitive=args.skip_competitive,
             skip_valuation=args.skip_valuation,
-            verbose=args.verbose
+            verbose=args.verbose,
+            watchlist_config=watchlist_config
         )
 
         output_file = orchestrator.run_full_analysis()

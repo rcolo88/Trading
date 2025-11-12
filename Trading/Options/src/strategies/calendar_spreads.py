@@ -180,6 +180,8 @@ class CalendarSpread(BaseStrategy):
     ) -> Optional[Signal]:
         """Generate entry signal for calendar spread."""
 
+        debug = kwargs.get('debug', False)
+
         # Get DTE targets
         near_dte_target = self.entry_config.get('near_dte', 30)
         far_dte_target = self.entry_config.get('far_dte', 60)
@@ -197,6 +199,8 @@ class CalendarSpread(BaseStrategy):
         ].copy()
 
         if near_options.empty or far_options.empty:
+            if debug:
+                print(f"  ❌ DTE filter failed: near={len(near_options)}, far={len(far_options)}")
             return None
 
         # Check VIX filters - strategy-specific first, then global fallback
@@ -206,6 +210,8 @@ class CalendarSpread(BaseStrategy):
         vix_min = self.entry_config.get('vix_min', kwargs.get('vix_min', 0))
 
         if vix and (vix > vix_max or vix < vix_min):
+            if debug:
+                print(f"  ❌ VIX filter failed: vix={vix}, range=[{vix_min}, {vix_max}]")
             return None  # VIX outside strategy's acceptable range
 
         # Find strike based on strategy configuration
@@ -226,9 +232,13 @@ class CalendarSpread(BaseStrategy):
                 near_options, underlying_price, moneyness, option_type
             )
         else:
+            if debug:
+                print(f"  ❌ Invalid strike_selection: {strike_selection}")
             return None
 
         if not strike:
+            if debug:
+                print(f"  ❌ Strike selection failed (method: {strike_selection})")
             return None
 
         # Verify the strike exists in far-term options too
@@ -238,6 +248,8 @@ class CalendarSpread(BaseStrategy):
         ].empty
 
         if not far_strike_exists:
+            if debug:
+                print(f"  ❌ Strike ${strike} not found in far-term options")
             return None
 
         # Get actual DTEs
@@ -257,6 +269,8 @@ class CalendarSpread(BaseStrategy):
         )
 
         if spread_price is None or spread_price <= 0:
+            if debug:
+                print(f"  ❌ Spread price calculation failed: price={spread_price}")
             return None
 
         # Optional: Check minimum credit/debit requirements
@@ -264,9 +278,22 @@ class CalendarSpread(BaseStrategy):
         max_debit = self.entry_config.get('max_debit', float('inf'))
 
         if spread_price < min_debit or spread_price > max_debit:
+            if debug:
+                print(f"  ❌ Debit outside limits: ${spread_price:.2f}, range=[${min_debit}, ${max_debit}]")
             return None
 
-        return Signal(
+        # Get expiration dates for tracking
+        near_expiration = near_options[
+            (near_options['strike'] == strike) &
+            (near_options['option_type'] == option_type)
+        ].iloc[0]['expiration']
+
+        far_expiration = far_options[
+            (far_options['strike'] == strike) &
+            (far_options['option_type'] == option_type)
+        ].iloc[0]['expiration']
+
+        signal = Signal(
             date=date,
             signal_type='entry',
             strategy_name=self.name,
@@ -276,6 +303,12 @@ class CalendarSpread(BaseStrategy):
             dte=near_dte_actual,  # Near-term DTE for tracking
             notes=f"{self.spread_type}: Sell {near_dte_actual}DTE / Buy {far_dte_actual}DTE @ ${strike} {option_type}"
         )
+
+        # Store expiration dates in signal for later use
+        signal.near_expiration = near_expiration
+        signal.far_expiration = far_expiration
+
+        return signal
 
     def generate_exit_signal(
         self,
@@ -293,44 +326,72 @@ class CalendarSpread(BaseStrategy):
         strike = short_leg['strike']
         option_type = short_leg['option_type']
 
-        # Find current near-term DTE
-        near_option = options_data[
-            (options_data['strike'] == strike) &
-            (options_data['option_type'] == option_type)
-        ]
+        # Use stored expiration dates if available (calendar spread specific)
+        if hasattr(position, 'near_expiration') and hasattr(position, 'far_expiration'):
+            near_expiration = position.near_expiration
+            far_expiration = position.far_expiration
 
-        if near_option.empty:
-            return None
+            # Find options matching the original expirations
+            near_option = options_data[
+                (options_data['strike'] == strike) &
+                (options_data['option_type'] == option_type) &
+                (options_data['expiration'] == near_expiration)
+            ]
 
-        # Get the option closest to original near-term DTE
-        near_option_sorted = near_option.sort_values('dte')
-        current_near = near_option_sorted.iloc[0] if len(near_option_sorted) > 0 else None
+            if near_option.empty:
+                # Near-term option expired, exit immediately
+                return Signal(
+                    date=date,
+                    signal_type='exit',
+                    strategy_name=self.name,
+                    underlying_price=underlying_price,
+                    exit_reason="Near-term option expired"
+                )
 
-        if current_near is None:
-            return None
+            current_near = near_option.iloc[0]
+            current_near_dte = current_near['dte']
+        else:
+            # Fallback for positions without stored expirations
+            near_option = options_data[
+                (options_data['strike'] == strike) &
+                (options_data['option_type'] == option_type)
+            ]
 
-        current_near_dte = current_near['dte']
+            if near_option.empty:
+                return None
 
-        # Exit before near-term expiration (mandatory)
-        dte_exit = self.exit_config.get('dte_exit', 7)
-        if current_near_dte <= dte_exit:
-            return Signal(
-                date=date,
-                signal_type='exit',
-                strategy_name=self.name,
-                underlying_price=underlying_price,
-                exit_reason=f"Near-term expiration approaching: {current_near_dte} DTE <= {dte_exit}"
-            )
+            # Get the option closest to original near-term DTE
+            near_option_sorted = near_option.sort_values('dte')
+            current_near = near_option_sorted.iloc[0] if len(near_option_sorted) > 0 else None
 
-        # Calculate current spread value
-        far_option = options_data[
-            (options_data['strike'] == strike) &
-            (options_data['option_type'] == option_type) &
-            (options_data['dte'] > current_near_dte)
-        ]
+            if current_near is None:
+                return None
+
+            current_near_dte = current_near['dte']
+
+        # Calculate current spread value FIRST (needed for all exit conditions)
+        if hasattr(position, 'far_expiration'):
+            # Use stored far expiration
+            far_option = options_data[
+                (options_data['strike'] == strike) &
+                (options_data['option_type'] == option_type) &
+                (options_data['expiration'] == far_expiration)
+            ]
+        else:
+            # Fallback: find options with DTE > near-term
+            far_option = options_data[
+                (options_data['strike'] == strike) &
+                (options_data['option_type'] == option_type) &
+                (options_data['dte'] > current_near_dte)
+            ]
 
         if far_option.empty:
             # Far option may have expired, exit immediately
+            # Use near option price as current spread price (far = 0)
+            near_price = (current_near['bid'] + current_near['ask']) / 2
+            position.current_price = near_price  # Spread collapsed to near-term value
+            position.unrealized_pnl = (near_price - position.entry_price) * position.contracts * 100
+
             return Signal(
                 date=date,
                 signal_type='exit',
@@ -339,10 +400,8 @@ class CalendarSpread(BaseStrategy):
                 exit_reason="Far-term option data unavailable"
             )
 
-        # Use the far option with DTE closest to original far DTE
-        # For simplicity, use the first one found with higher DTE
-        far_option_sorted = far_option.sort_values('dte')
-        current_far = far_option_sorted.iloc[0]
+        # Get the far option (should be unique if filtered by expiration)
+        current_far = far_option.iloc[0]
 
         # Calculate current spread price
         near_price = (current_near['bid'] + current_near['ask']) / 2
@@ -352,6 +411,17 @@ class CalendarSpread(BaseStrategy):
         # Update position
         position.current_price = current_spread_price
         position.unrealized_pnl = (current_spread_price - position.entry_price) * position.contracts * 100
+
+        # Exit before near-term expiration (mandatory, but after price calculation)
+        dte_exit = self.exit_config.get('dte_exit', 7)
+        if current_near_dte <= dte_exit:
+            return Signal(
+                date=date,
+                signal_type='exit',
+                strategy_name=self.name,
+                underlying_price=underlying_price,
+                exit_reason=f"Near-term expiration approaching: {current_near_dte} DTE <= {dte_exit}"
+            )
 
         # Check profit target (for calendar spreads, we want spread to widen)
         profit_target_pct = self.exit_config.get('profit_target', 0.25)

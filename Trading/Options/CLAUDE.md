@@ -354,6 +354,83 @@ Where:
 - **Monthly/Yearly Returns**: Performance breakdown by period
 - **Correlation to SPY**: Strategy vs underlying correlation
 
+## Trade Export & Review
+
+### Exporting Trade Details
+
+After running a backtest, you can export detailed trade information to CSV or XLSX files for review and analysis.
+
+**Usage:**
+```python
+# Run backtest
+backtester = OptopsyBacktester(config)
+results = backtester.run_backtest(
+    strategy=strategy,
+    options_data=options_data,
+    underlying_data=underlying_data
+)
+
+# Export trades to CSV (default)
+backtester.export_trades(results)
+
+# Or export to Excel
+backtester.export_trades(results, format='xlsx')
+
+# Specify custom output directory
+backtester.export_trades(results, output_dir='my_trades', format='csv')
+```
+
+**Export Details:**
+
+Each exported file contains:
+
+1. **Entry Information**:
+   - `entry_date`: Date trade was executed
+   - `underlying_price_entry`: SPY price at entry
+   - `vix_entry`: VIX level at entry
+   - `entry_dte`: Days to expiration at entry
+   - `entry_price`: Spread entry price (debit or credit)
+   - `contracts`: Number of contracts traded
+
+2. **Leg Details** (for each leg):
+   - `leg1_strike`, `leg2_strike`: Strike prices
+   - `leg1_type`, `leg2_type`: 'call' or 'put'
+   - `leg1_position`, `leg2_position`: +1 (long) or -1 (short)
+   - `leg1_delta`, `leg2_delta`: Delta at entry
+   - `leg1_price`, `leg2_price`: Individual leg prices
+   - `leg1_expiration`, `leg2_expiration`: Expiration dates
+
+3. **Calendar Spread Specific**:
+   - `near_expiration`: Near-term contract expiration
+   - `far_expiration`: Far-term contract expiration
+
+4. **Exit Information**:
+   - `exit_date`: Date trade was closed
+   - `underlying_price_exit`: SPY price at exit
+   - `vix_exit`: VIX level at exit
+   - `exit_price`: Spread exit price
+   - `exit_reason`: Why the trade was closed
+
+5. **P&L**:
+   - `pnl`: Gross profit/loss
+   - `commission`: Transaction costs
+   - `net_pnl`: Net profit/loss after commissions
+   - `days_in_trade`: Duration of trade
+
+**Output Files:**
+
+Files are saved in `backtest_results/` directory (or custom path) with static filenames:
+- `Bull_Put_Spread.csv`
+- `Call_Calendar_Spread.xlsx`
+- `Bear_Call_Spread.csv`
+
+**Note**: Files are overwritten on each backtest run to maintain a clean workspace.
+
+**Requirements for XLSX export:**
+```bash
+pip install openpyxl
+```
+
 ## Development Progress
 
 ### Phase 1: Foundation (Current)
@@ -650,6 +727,30 @@ These delta values match the **"30-45 DTE, 30-40 delta" rule** used by professio
 - py_vollib: Black-Scholes Greeks library: [GitHub](https://github.com/vollib/py_vollib)
 
 ## Changelog
+
+### 2025-11-12 (Calendar Spread Backtesting Fixes & Trade Export)
+- **Fixed 6 Critical Issues** preventing Call Calendar Spread from executing trades:
+  1. **Sharpe Ratio Division by Zero**: Added `std() > 0` check before calculating Sharpe ratio
+  2. **Missing VIX Parameter**: Backtester now passes VIX to entry signal generator
+  3. **Max Debit Too Low**: Increased `max_debit` from $5 to $20 in config (SPY at ~$530 needs $8-12 debits)
+  4. **Entry Price Calculation**: Fixed to handle same-strike, different-DTE options using stored expirations
+  5. **Exit Signal Pricing**: Now calculates current spread price before all exit conditions to prevent TypeError
+  6. **Wrong DTE in Exit Logic**: Tracks and uses specific expiration dates from entry instead of picking shortest DTE
+- **Root Cause**: Calendar spreads use same strike but different expirations. Previous code filtered only by strike, finding multiple options (1 DTE, 7 DTE, 30 DTE, etc.) and picking arbitrarily, causing immediate exits and pricing errors
+- **Solution**: Store `near_expiration` and `far_expiration` in Signal and Position objects, filter by expiration dates in both entry and exit logic
+- **Debug Mode Added**: Calendar spread strategies now support `debug=True` parameter to show rejection reasons
+- **Trade Export Feature**: Added comprehensive trade export to CSV/XLSX
+  - Export individual trade details: underlying price, VIX, dates, strikes, deltas, prices, positions
+  - Support for both vertical and calendar spreads
+  - Static filenames (e.g., `Bull_Put_Spread.csv`) that overwrite on each run
+  - Includes leg-by-leg details: delta, price, expiration, position (+1 long, -1 short)
+  - Calendar-specific fields: near_expiration, far_expiration
+  - Usage: `backtester.export_trades(results, format='csv')` or `format='xlsx'`
+- **Files Modified**:
+  - [config/config.yaml](config/config.yaml): Increased `max_debit` to 20.0
+  - [src/backtester/optopsy_wrapper.py](src/backtester/optopsy_wrapper.py): VIX passing, expiration tracking, calendar-aware pricing, trade export, enhanced trade recording with leg details
+  - [src/strategies/calendar_spreads.py](src/strategies/calendar_spreads.py): Expiration tracking, debug mode, fixed exit logic
+- **Status**: ✅ Calendar spreads now backtest correctly with proper trade execution and exit timing; trade export available for all strategies
 
 ### 2025-10-26 (Delta Validation & IV Pricing Fix)
 - **Delta Validation Complete**: Comprehensive validation of synthetic data quality

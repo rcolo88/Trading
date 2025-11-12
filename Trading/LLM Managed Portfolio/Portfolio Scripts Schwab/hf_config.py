@@ -4,9 +4,11 @@ Configuration for financial sentiment analysis models and trading parameters
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List
 import json
 import os
+
+from watchlist_config import WatchlistConfig, WatchlistIndex
 
 
 @dataclass
@@ -124,10 +126,30 @@ class HFConfig:
     MAX_OPPORTUNISTIC_ALLOCATION = 0.20  # 20% total for thematic
     MIN_CASH_RESERVE = 0.05  # 5% minimum cash
 
-    # Watchlist Configuration
-    # Note: Set to None to fetch S&P 500 dynamically via get_sp500_tickers()
-    # Or provide manual list: ["NVDA", "AMD", "AAPL", "MSFT", ...]
-    WATCHLIST_TICKERS = None  # Defaults to S&P 500 screening
+
+    # Watchlist Configuration System
+    # Provides flexible watchlist screening across multiple indexes:
+    # - WatchlistIndex.SP500: S&P 500 (large cap, ~500 tickers)
+    # - WatchlistIndex.SP400: S&P MidCap 400 (mid cap, ~400 tickers)
+    # - WatchlistIndex.SP600: S&P SmallCap 600 (small cap, ~600 tickers)
+    # - WatchlistIndex.NASDAQ100: NASDAQ-100 (tech focus, ~100 tickers)
+    # - WatchlistIndex.COMBINED_SP: S&P 1500 (all three combined, ~1500 tickers)
+    # - WatchlistIndex.CUSTOM: Custom ticker list
+    #
+    # Examples:
+    #   Daily quick check (2-5 min):
+    #     WatchlistConfig(index=WatchlistIndex.SP500, limit=50)
+    #
+    #   Weekly full screening (12-17 min):
+    #     WatchlistConfig(index=WatchlistIndex.SP500)
+    #
+    #   Monthly deep dive (45-60 min):
+    #     WatchlistConfig(index=WatchlistIndex.COMBINED_SP)
+    #
+    #   Custom list:
+    #     WatchlistConfig(index=WatchlistIndex.CUSTOM,
+    #                     custom_tickers=['NVDA', 'GOOGL', 'MSFT'])
+    WATCHLIST_CONFIG = WatchlistConfig(index=WatchlistIndex.COMBINED_SP)
 
     # Active Themes for Opportunistic Screening
     ACTIVE_THEMES = [
