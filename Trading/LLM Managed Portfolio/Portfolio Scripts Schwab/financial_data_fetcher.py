@@ -358,9 +358,20 @@ def get_sp500_tickers() -> List[str]:
         List of ticker symbols
     """
     try:
+        import requests
+        from io import StringIO
+
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
-        tables = pd.read_html(url)
-        sp500_table = tables[0]
+        # Add User-Agent header to avoid 403 Forbidden error from Wikipedia
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        tables = pd.read_html(StringIO(response.text))
+        # The ticker table is the second table (index 1), first is a warning message
+        sp500_table = tables[1]
         tickers = sp500_table['Symbol'].tolist()
         logger.info(f"Fetched {len(tickers)} S&P 500 tickers")
         return tickers
@@ -380,9 +391,20 @@ def get_sp400_tickers() -> List[str]:
         List of ticker symbols
     """
     try:
+        import requests
+        from io import StringIO
+
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_400_companies'
-        tables = pd.read_html(url)
-        sp400_table = tables[0]
+        # Add User-Agent header to avoid 403 Forbidden error from Wikipedia
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        tables = pd.read_html(StringIO(response.text))
+        # Use second table (index 1) which contains the ticker list
+        sp400_table = tables[1]
         tickers = sp400_table['Symbol'].tolist()
         logger.info(f"Fetched {len(tickers)} S&P MidCap 400 tickers")
         return tickers
@@ -402,9 +424,20 @@ def get_sp600_tickers() -> List[str]:
         List of ticker symbols
     """
     try:
+        import requests
+        from io import StringIO
+
         url = 'https://en.wikipedia.org/wiki/List_of_S%26P_600_companies'
-        tables = pd.read_html(url)
-        sp600_table = tables[0]
+        # Add User-Agent header to avoid 403 Forbidden error from Wikipedia
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        tables = pd.read_html(StringIO(response.text))
+        # Use second table (index 1) which contains the ticker list
+        sp600_table = tables[1]
         tickers = sp600_table['Symbol'].tolist()
         logger.info(f"Fetched {len(tickers)} S&P SmallCap 600 tickers")
         return tickers
@@ -425,8 +458,18 @@ def get_nasdaq100_tickers() -> List[str]:
         List of ticker symbols
     """
     try:
+        import requests
+        from io import StringIO
+
         url = 'https://en.wikipedia.org/wiki/Nasdaq-100'
-        tables = pd.read_html(url)
+        # Add User-Agent header to avoid 403 Forbidden error from Wikipedia
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        tables = pd.read_html(StringIO(response.text))
         # The ticker list is typically in the 4th table (index 3)
         # It has columns including 'Ticker'
         nasdaq_table = tables[3]

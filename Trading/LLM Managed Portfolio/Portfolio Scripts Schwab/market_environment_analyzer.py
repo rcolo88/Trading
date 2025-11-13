@@ -150,14 +150,17 @@ class MarketEnvironmentAnalyzer:
         """
         Fetch S&P 500 data using Schwab API
 
+        Note: Uses SPY (SPDR S&P 500 ETF) as proxy since Schwab API
+        does not support direct index quotes. SPY tracks S&P 500 with 99.9% correlation.
+
         Returns:
             Dict with price, moving averages, and returns
         """
         try:
-            logger.info("Fetching S&P 500 data via Schwab API...")
+            logger.info("Fetching S&P 500 data via Schwab API (using SPY as proxy)...")
 
-            # Fetch 1 year of historical data for moving averages
-            sp500_ticker = "$SPX.X"  # Schwab format for S&P 500 index
+            # Use SPY ETF as S&P 500 proxy (Schwab API doesn't support direct index quotes)
+            sp500_ticker = "SPY"  # SPDR S&P 500 ETF Trust (best S&P 500 proxy)
 
             # Get historical data (252 trading days ≈ 1 year)
             response = self.schwab_fetcher.client.get_price_history_every_day(
@@ -219,58 +222,63 @@ class MarketEnvironmentAnalyzer:
 
     def fetch_vix_data(self) -> Dict:
         """
-        Fetch VIX data using Schwab API
+        Fetch VIX data using Schwab API with yfinance fallback
+
+        Note: Schwab API may not support VIX index quotes. Falls back to yfinance
+        (ticker ^VIX) for free historical VIX data. Final fallback is default 20.0.
 
         Returns:
             Dict with current level and 20-day average
         """
+        # Try Schwab API first
         try:
             logger.info("Fetching VIX data via Schwab API...")
-            vix_ticker = "$VIX.X"  # Schwab format for VIX index
+            vix_ticker_schwab = "$VIX.X"  # Schwab format for VIX index
 
-            # Get historical data (1 month for 20-day average)
             response = self.schwab_fetcher.client.get_price_history_every_day(
-                vix_ticker,
+                vix_ticker_schwab,
                 start_datetime=datetime.now() - timedelta(days=30),
                 end_datetime=datetime.now()
             )
 
-            if response.status_code != 200:
-                logger.warning(f"No VIX data available from Schwab API (Status {response.status_code}), using default 20.0")
-                return {'level': 20.0, 'ma_20': 20.0, 'quality': 'PARTIAL'}
+            if response.status_code == 200:
+                history_data = response.json()
 
-            history_data = response.json()
+                if 'candles' in history_data and history_data['candles'] and len(history_data['candles']) > 0:
+                    candles = history_data['candles']
+                    close_prices = [c['close'] for c in candles]
 
-            # Parse historical candles
-            if 'candles' not in history_data or not history_data['candles']:
-                logger.warning("No VIX historical data available, using default 20.0")
-                return {'level': 20.0, 'ma_20': 20.0, 'quality': 'PARTIAL'}
+                    current_level = close_prices[-1]
+                    ma_20 = np.mean(close_prices[-20:]) if len(close_prices) >= 20 else np.mean(close_prices)
 
-            candles = history_data['candles']
-            close_prices = [c['close'] for c in candles]
-
-            if len(close_prices) == 0:
-                logger.warning("No VIX data available, using default 20.0")
-                return {'level': 20.0, 'ma_20': 20.0, 'quality': 'PARTIAL'}
-
-            # Current level
-            current_level = close_prices[-1]
-
-            # Calculate 20-day average
-            ma_20 = np.mean(close_prices[-20:]) if len(close_prices) >= 20 else np.mean(close_prices)
-
-            result = {
-                'level': current_level,
-                'ma_20': ma_20,
-                'quality': 'COMPLETE'
-            }
-
-            logger.info(f"VIX: {current_level:.2f} (20-day avg: {ma_20:.2f}) [Schwab API]")
-            return result
+                    logger.info(f"VIX: {current_level:.2f} (20-day avg: {ma_20:.2f}) [Schwab API]")
+                    return {'level': current_level, 'ma_20': ma_20, 'quality': 'COMPLETE'}
 
         except Exception as e:
-            logger.warning(f"Failed to fetch VIX data from Schwab API: {e}, using default")
-            return {'level': 20.0, 'ma_20': 20.0, 'quality': 'PARTIAL'}
+            logger.warning(f"Schwab API VIX fetch failed: {e}")
+
+        # Fallback to yfinance (free, accurate VIX data)
+        try:
+            import yfinance as yf
+            logger.info("Fetching VIX data via yfinance fallback (^VIX)...")
+
+            vix = yf.Ticker("^VIX")
+            hist = vix.history(period="1mo")  # Last 30 days
+
+            if not hist.empty:
+                close_prices = hist['Close'].values
+                current_level = close_prices[-1]
+                ma_20 = np.mean(close_prices[-20:]) if len(close_prices) >= 20 else np.mean(close_prices)
+
+                logger.info(f"VIX: {current_level:.2f} (20-day avg: {ma_20:.2f}) [yfinance fallback]")
+                return {'level': current_level, 'ma_20': ma_20, 'quality': 'COMPLETE'}
+
+        except Exception as e:
+            logger.warning(f"yfinance VIX fetch failed: {e}")
+
+        # Final fallback to default
+        logger.warning("Using default VIX value 20.0 (no data source available)")
+        return {'level': 20.0, 'ma_20': 20.0, 'quality': 'PARTIAL'}
 
     def fetch_sector_performance(self) -> Dict[str, float]:
         """

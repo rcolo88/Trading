@@ -1,0 +1,19 @@
+{
+  "sp500_price": 0,
+  "sp500_50ma": 0,
+  "sp500_200ma": 0,
+  "sp500_1m_return": 0,
+  "sp500_ytd_return": 0,
+  "trend": "NEUTRAL",
+  "vix_level": 20.0,
+  "vix_20ma": 20.0,
+  "volatility_regime": "MODERATE",
+  "leading_sectors": [],
+  "lagging_sectors": [],
+  "sector_performance": {},
+  "market_breadth": "MODERATE",
+  "risk_appetite": "NEUTRAL",
+  "summary": "Insufficient market data available",
+  "analysis_date": "2025-11-12",
+  "data_quality": "INSUFFICIENT"
+}

@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-11-13T11:12:20.754039",
+  "holdings_count": 0,
+  "watchlist_count": 0,
+  "holdings_quality": {},
+  "watchlist_quality": {},
+  "recommendations": {
+    "sell_candidates": [],
+    "buy_alternatives": []
+  },
+  "market_cap_tiers": {},
+  "roe_persistence": {},
+  "strict_filters": {}
+}

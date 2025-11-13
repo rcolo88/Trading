@@ -192,17 +192,18 @@ The LLM Managed Portfolio system uses a **hybrid approach** combining:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │ DATA SOURCES                                                     │
-│   • Schwab API: Real-time prices (S&P 500, VIX, sectors, holdings)
-│   • yfinance: Fundamentals (balance sheets, income, cash flow)  │
+│   • Schwab API: Real-time prices (SPY proxy for S&P 500, sectors)│
+│   • yfinance: Fundamentals + VIX fallback (when Schwab unavail) │
 │   • Yahoo Finance: News articles (7-day history)                │
 │   • Wikipedia: Index lists (S&P 500, S&P 400, S&P 600)         │
+│   Note: Schwab API does NOT support direct index quotes         │
 └────────────────────────┬────────────────────────────────────────┘
                          ↓
 ┌─────────────────────────────────────────────────────────────────┐
 │ STEPS 1-7: DATA ANALYSIS (Pure Math, No AI)                     │
 │                                                                  │
-│  STEP 1: Market Environment (Schwab API)                        │
-│    → S&P 500 trend, VIX volatility, sector rotation            │
+│  STEP 1: Market Environment (Schwab API + yfinance fallback)   │
+│    → S&P 500 (SPY proxy), VIX (yfinance), sector rotation      │
 │                                                                  │
 │  STEP 2: Quality Analysis (5 Research-Backed Metrics)           │
 │    → Gross Profitability (30%) - Strongest predictor           │

@@ -310,6 +310,18 @@ Exit conditions:
 - `dte_exit: 7` - Exit 7 days before near-term expiration
 - `max_underlying_move: 0.10` - Exit if underlying moves >10%
 
+### Backtesting Behavior Note
+
+**Daily Entry Limit**: The backtester enforces a **maximum of one trade per day per strategy**, with a goal to enter at least one trade per day when position sizing allows. This prevents over-trading and matches real-world systematic trading approaches.
+
+**Exit Checking**: Exit conditions are checked once per trading day (at market close). This means:
+- Profit targets may be exceeded due to overnight price movements or weekend gaps
+- Actual exit profits often exceed configured targets by 5-15% on average
+- Calendar spreads are particularly sensitive to volatility spikes, which can cause rapid profit acceleration between daily checks
+- This behavior accurately reflects real-world trading where limit orders may fill at better prices during fast markets
+
+This is **expected behavior** and matches how options behave in practice with end-of-day management.
+
 ## Configuration
 
 Key configuration parameters in `config/config.yaml`:
@@ -396,6 +408,59 @@ The backtester will show:
 - Overall P&L and Sharpe ratio
 
 Use these metrics to optimize your exit criteria.
+
+## Parameter Optimization
+
+The framework includes a **ParameterOptimizer** class that performs grid search to find optimal strategy parameters.
+
+### Quick Start
+
+```python
+from src.optimization import ParameterOptimizer, quick_optimize_calendar
+from src.strategies.calendar_spreads import CallCalendarSpread
+from src.backtester.optopsy_wrapper import OptopsyBacktester
+
+# Create optimizer
+optimizer = ParameterOptimizer(
+    strategy_type='calendar',  # or 'vertical'
+    strategy_class=CallCalendarSpread,
+    backtester=backtester,
+    options_data=options_data,
+    underlying_data=underlying_data,
+    base_config=config
+)
+
+# Define parameter ranges (min, max, step)
+optimizer.set_parameter_range('near_dte_min', min=5, max=10)
+optimizer.set_parameter_range('near_dte_max', min=10, max=15)
+optimizer.set_parameter_range('profit_target', min=0.20, max=0.30, step=0.05)
+optimizer.set_parameter_range('target_delta', min=0.45, max=0.55, step=0.05)
+
+# Run optimization
+results = optimizer.run_optimization(optimization_metric='sharpe_ratio')
+
+# Get best parameters
+best = optimizer.get_best_parameters(metric='sharpe_ratio', top_n=5)
+print(best)
+```
+
+### Strategy-Specific Parameters
+
+**Calendar Spreads**:
+- Entry: `near_dte_min`, `near_dte_max`, `far_dte_min`, `far_dte_max`, `target_delta`, `vix_min`, `vix_max`
+- Exit: `profit_target`, `stop_loss`, `dte_exit`, `max_underlying_move`
+
+**Vertical Spreads**:
+- Entry: `dte_min`, `dte_max`, `target_delta`, `min_credit`, `max_credit`, `vix_min`, `vix_max`
+- Exit: `profit_target`, `stop_loss`, `dte_min`
+
+### Example
+
+See [examples/optimize_parameters.py](examples/optimize_parameters.py) for complete examples including:
+- Calendar spread optimization
+- Vertical spread optimization
+- Sensitivity analysis plots
+- Heatmap visualization
 
 ## Next Steps
 

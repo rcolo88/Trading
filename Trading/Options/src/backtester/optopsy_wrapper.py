@@ -118,6 +118,7 @@ class OptopsyBacktester:
         self.account_value = self.initial_capital
         self.equity_curve = []
         self.all_trades = []
+        self.daily_entry_log = []  # Track daily entry attempts for reporting
         strategy.positions = []
         strategy.closed_positions = []
 
@@ -159,8 +160,13 @@ class OptopsyBacktester:
         print(f"Initial capital: ${self.initial_capital:,.2f}")
         print(f"Trading days: {len(trading_dates)}")
 
+        # Daily trade tracking for enforcing one trade per day limit
+        trades_entered_today = 0
+
         # Main backtest loop
         for current_date in trading_dates:
+            # Reset daily trade counter at start of each day
+            trades_entered_today = 0
             # Get data for current date
             daily_options = optopsy_data[
                 optopsy_data['quote_date'] == current_date
@@ -247,10 +253,15 @@ class OptopsyBacktester:
                     self.all_trades.append(trade_record)
 
             # Check for new entry signals
+            # BACKTEST RULE: Maximum one trade per day per strategy
+            # GOAL: Try to enter at least one trade per day if position sizing allows
             max_positions = self.config.get('position_sizing', {}).get('max_positions', 5)
             current_positions = len(strategy.get_open_positions())
 
-            if current_positions < max_positions:
+            # Only attempt entry if:
+            # 1. Haven't entered a trade today (trades_entered_today < 1)
+            # 2. Have room for more positions (current_positions < max_positions)
+            if trades_entered_today < 1 and current_positions < max_positions:
                 # Get VIX for the day (if available)
                 vix = daily_options['vix'].iloc[0] if 'vix' in daily_options.columns and not daily_options.empty else None
 
@@ -330,9 +341,25 @@ class OptopsyBacktester:
 
                         strategy.positions.append(position)
 
+                        # Increment daily trade counter (enforce max one trade per day)
+                        trades_entered_today += 1
+
                         # Apply entry commission
                         commission = self._calculate_commission(contracts)
                         self.account_value -= commission
+
+            # Track daily entry attempts for reporting
+            self.daily_entry_log.append({
+                'date': current_date,
+                'trades_entered': trades_entered_today,
+                'attempted_entry': (trades_entered_today < 1 and current_positions < max_positions),
+                'entry_blocked_reason': (
+                    'max_positions_reached' if current_positions >= max_positions
+                    else 'already_entered_today' if trades_entered_today >= 1
+                    else 'no_entry_signal' if trades_entered_today == 0
+                    else 'entered'
+                )
+            })
 
             # Record equity curve
             total_unrealized = sum(
@@ -343,7 +370,8 @@ class OptopsyBacktester:
                 'account_value': self.account_value,
                 'unrealized_pnl': total_unrealized,
                 'total_value': self.account_value + total_unrealized,
-                'open_positions': len(strategy.get_open_positions())
+                'open_positions': len(strategy.get_open_positions()),
+                'trades_entered_today': trades_entered_today
             })
 
         # Close any remaining positions at end of backtest
@@ -556,6 +584,15 @@ class OptopsyBacktester:
         else:
             win_rate = avg_win = avg_loss = profit_factor = 0
 
+        # Daily entry statistics
+        daily_log_df = pd.DataFrame(self.daily_entry_log)
+        total_trading_days = len(daily_log_df)
+        days_with_entry = (daily_log_df['trades_entered'] > 0).sum()
+        days_no_entry = total_trading_days - days_with_entry
+        days_blocked_by_max_positions = (daily_log_df['entry_blocked_reason'] == 'max_positions_reached').sum()
+        days_no_signal = (daily_log_df['entry_blocked_reason'] == 'no_entry_signal').sum()
+        daily_entry_rate = (days_with_entry / total_trading_days * 100) if total_trading_days > 0 else 0
+
         results = {
             'strategy_name': strategy.name,
             'initial_capital': self.initial_capital,
@@ -570,6 +607,14 @@ class OptopsyBacktester:
             'profit_factor': profit_factor,
             'equity_curve': equity_df,
             'trades': trades_df,
+            # Daily entry statistics
+            'total_trading_days': total_trading_days,
+            'days_with_entry': days_with_entry,
+            'days_no_entry': days_no_entry,
+            'days_blocked_by_max_positions': days_blocked_by_max_positions,
+            'days_no_signal': days_no_signal,
+            'daily_entry_rate_pct': daily_entry_rate,
+            'daily_entry_log': daily_log_df,
         }
 
         return results
@@ -589,6 +634,12 @@ class OptopsyBacktester:
         print(f"Avg Win:            ${results['avg_win']:.2f}")
         print(f"Avg Loss:           ${results['avg_loss']:.2f}")
         print(f"Profit Factor:      {results['profit_factor']:.2f}")
+        print(f"\n--- Daily Entry Statistics ---")
+        print(f"Total Trading Days:       {results['total_trading_days']}")
+        print(f"Days with Entry:          {results['days_with_entry']} ({results['daily_entry_rate_pct']:.1f}%)")
+        print(f"Days No Entry:            {results['days_no_entry']}")
+        print(f"  - No entry signal:      {results['days_no_signal']}")
+        print(f"  - Max positions reached: {results['days_blocked_by_max_positions']}")
         print("="*60 + "\n")
 
     def export_trades(

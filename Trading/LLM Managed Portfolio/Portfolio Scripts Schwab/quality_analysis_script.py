@@ -22,7 +22,7 @@ sys.path.append(str(Path(__file__).parent))
 from financial_data_fetcher import FinancialDataFetcher, FinancialData
 from quality_metrics_calculator import QualityMetricsCalculator, QualityAnalysisResult
 from market_cap_classifier import MarketCapClassifier
-from quality_persistence_analyzer import ROEPersistenceAnalyzer
+from quality_persistence_analyzer import QualityPersistenceAnalyzer
 from hf_config import HFConfig
 from watchlist_config import WatchlistConfig, WatchlistIndex
 
@@ -58,7 +58,7 @@ class QualityAnalysisScript:
         self.watchlist_config = watchlist_config or HFConfig.WATCHLIST_CONFIG
         self.financial_fetcher = FinancialDataFetcher(enable_cache=True)
         self.market_cap_classifier = MarketCapClassifier()
-        self.roe_analyzer = ROEPersistenceAnalyzer()
+        self.roe_analyzer = QualityPersistenceAnalyzer()
         self.quality_calculator = QualityMetricsCalculator()
         self.results = {}
 
@@ -99,7 +99,7 @@ class QualityAnalysisScript:
             List of ticker symbols
         """
         # Legacy support: check deprecated WATCHLIST_TICKERS first
-        if HFConfig.WATCHLIST_TICKERS:
+        if hasattr(HFConfig, 'WATCHLIST_TICKERS') and HFConfig.WATCHLIST_TICKERS:
             logger.warning("WATCHLIST_TICKERS is deprecated. Use WATCHLIST_CONFIG instead.")
             watchlist = HFConfig.WATCHLIST_TICKERS[:limit] if limit else HFConfig.WATCHLIST_TICKERS
             logger.info(f"Using legacy WATCHLIST_TICKERS: {len(watchlist)} tickers")

@@ -1,0 +1,39 @@
+{
+  "sp500_price": 677.54,
+  "sp500_50ma": 668.0936,
+  "sp500_200ma": 612.8451,
+  "sp500_1m_return": 2.558125454105107,
+  "sp500_ytd_return": 13.454679415261458,
+  "trend": "STRONG_BULL",
+  "vix_level": 18.239999771118164,
+  "vix_20ma": 17.80100016593933,
+  "volatility_regime": "MODERATE",
+  "leading_sectors": [
+    "Healthcare",
+    "Energy",
+    "Technology"
+  ],
+  "lagging_sectors": [
+    "Communication Services",
+    "Consumer Staples",
+    "Utilities"
+  ],
+  "sector_performance": {
+    "Technology": 2.8702355156122286,
+    "Communication Services": -1.6886290252203526,
+    "Healthcare": 8.335675144021364,
+    "Financials": 0.49774605559729634,
+    "Energy": 5.372235729998843,
+    "Industrials": 0.019577133907596668,
+    "Consumer Staples": -2.073587052724745,
+    "Consumer Discretionary": 0.4053765735011807,
+    "Utilities": -3.020719738276986,
+    "Real Estate": -0.24213075060531314,
+    "Materials": -1.060487038491744
+  },
+  "market_breadth": "MODERATE",
+  "risk_appetite": "NEUTRAL",
+  "summary": "S&P 500 at 678 (+2.56% 1M), moderate volatility (VIX 18.2), Healthcare leadership. Strong bull environment with moderate breadth. Neutral risk environment (maintain balanced allocation).",
+  "analysis_date": "2025-11-13",
+  "data_quality": "COMPLETE"
+}

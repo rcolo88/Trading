@@ -211,14 +211,23 @@ python market_environment_analyzer.py --verbose
 ```
 
 **Key Features:**
-- **S&P 500 Analysis** - Price, 50-day MA, 200-day MA, 1-month and YTD returns
+- **S&P 500 Analysis** - Price, 50-day MA, 200-day MA, 1-month and YTD returns (via SPY proxy)
 - **Trend Classification** - STRONG_BULL, BULL, NEUTRAL, BEAR, STRONG_BEAR (golden/death cross logic)
-- **VIX Analysis** - Current level, 20-day average
+- **VIX Analysis** - Current level, 20-day average (Schwab API with yfinance fallback)
 - **Volatility Regime** - LOW (<15), MODERATE (15-20), ELEVATED (20-30), HIGH (>30)
 - **Sector Rotation** - 11 sector ETFs (XLK, XLC, XLV, XLF, XLE, XLI, XLP, XLY, XLU, XLRE, XLB)
 - **Market Breadth** - NARROW (tech/comm dominance), MODERATE, BROAD (diverse leadership)
 - **Risk Appetite** - RISK_ON (low vol + bull), NEUTRAL, RISK_OFF (high vol + bear)
 - **4-Hour Caching** - Reduces API calls for efficiency
+
+**Data Source Strategy:**
+- **S&P 500**: Schwab API using SPY (SPDR S&P 500 ETF) as proxy - 99.9% correlation
+  - Note: Schwab API does NOT support direct index quotes ($SPX.X)
+- **VIX**: Three-tier fallback for robustness
+  1. Schwab API ($VIX.X) - primary attempt
+  2. yfinance (^VIX) - fallback for accurate VIX data
+  3. Default 20.0 - final fallback if both fail
+- **Sectors**: Schwab API for all 11 sector ETFs (XLK, XLC, etc.)
 
 **Outputs:**
 - `outputs/market_environment_YYYYMMDD.json` - Structured JSON data
@@ -232,8 +241,9 @@ python market_environment_analyzer.py --verbose
 
 **Performance:**
 - Runtime: <30 seconds for complete analysis
-- Fetches data from yfinance (S&P 500, VIX, 11 sector ETFs)
+- Fetches data from Schwab API (SPY, sectors) with yfinance fallback (VIX)
 - 4-hour cache prevents redundant API calls
+- Graceful degradation: Primary Schwab API → Fallback yfinance → Default values
 
 ### 🏗️ STEP 6: Portfolio Constructor
 

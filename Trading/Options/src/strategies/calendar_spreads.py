@@ -182,20 +182,44 @@ class CalendarSpread(BaseStrategy):
 
         debug = kwargs.get('debug', False)
 
-        # Get DTE targets
-        near_dte_target = self.entry_config.get('near_dte', 30)
-        far_dte_target = self.entry_config.get('far_dte', 60)
-        dte_tolerance = self.entry_config.get('dte_tolerance', 5)
+        # Get DTE ranges - support both min/max (for optimizer) and center ± tolerance (for backward compatibility)
+        near_dte_min = self.entry_config.get('near_dte_min', None)
+        near_dte_max = self.entry_config.get('near_dte_max', None)
+        far_dte_min = self.entry_config.get('far_dte_min', None)
+        far_dte_max = self.entry_config.get('far_dte_max', None)
+
+        # If min/max not specified, fall back to center ± tolerance approach
+        if near_dte_min is None and near_dte_max is None:
+            near_dte_target = self.entry_config.get('near_dte', 30)
+            dte_tolerance = self.entry_config.get('dte_tolerance', 5)
+            near_dte_min = near_dte_target - dte_tolerance
+            near_dte_max = near_dte_target + dte_tolerance
+            if debug:
+                print(f"  Using center ± tolerance for near DTE: {near_dte_target} ± {dte_tolerance} = [{near_dte_min}, {near_dte_max}]")
+        else:
+            if debug:
+                print(f"  Using min/max for near DTE: [{near_dte_min}, {near_dte_max}]")
+
+        if far_dte_min is None and far_dte_max is None:
+            far_dte_target = self.entry_config.get('far_dte', 60)
+            dte_tolerance = self.entry_config.get('dte_tolerance', 5)
+            far_dte_min = far_dte_target - dte_tolerance
+            far_dte_max = far_dte_target + dte_tolerance
+            if debug:
+                print(f"  Using center ± tolerance for far DTE: {far_dte_target} ± {dte_tolerance} = [{far_dte_min}, {far_dte_max}]")
+        else:
+            if debug:
+                print(f"  Using min/max for far DTE: [{far_dte_min}, {far_dte_max}]")
 
         # Filter options within DTE ranges
         near_options = options_data[
-            (options_data['dte'] >= near_dte_target - dte_tolerance) &
-            (options_data['dte'] <= near_dte_target + dte_tolerance)
+            (options_data['dte'] >= near_dte_min) &
+            (options_data['dte'] <= near_dte_max)
         ].copy()
 
         far_options = options_data[
-            (options_data['dte'] >= far_dte_target - dte_tolerance) &
-            (options_data['dte'] <= far_dte_target + dte_tolerance)
+            (options_data['dte'] >= far_dte_min) &
+            (options_data['dte'] <= far_dte_max)
         ].copy()
 
         if near_options.empty or far_options.empty:
