@@ -1,0 +1,39 @@
+{
+  "sp500_price": 658.06,
+  "sp500_50ma": 668.9698,
+  "sp500_200ma": 613.77275,
+  "sp500_1m_return": -1.9708322781510257,
+  "sp500_ytd_return": 11.88642353141205,
+  "trend": "BEAR",
+  "vix_level": 25.219999313354492,
+  "vix_20ma": 18.416500043869018,
+  "volatility_regime": "ELEVATED",
+  "leading_sectors": [
+    "Healthcare",
+    "Energy",
+    "Utilities"
+  ],
+  "lagging_sectors": [
+    "Real Estate",
+    "Communication Services",
+    "Consumer Discretionary"
+  ],
+  "sector_performance": {
+    "Technology": -3.5358617578680724,
+    "Communication Services": -4.946662078458362,
+    "Healthcare": 4.993438773395965,
+    "Financials": -3.0971774957378253,
+    "Energy": 3.6022557256301018,
+    "Industrials": -2.5534132360604582,
+    "Consumer Staples": -3.025357770524726,
+    "Consumer Discretionary": -5.02158456069071,
+    "Utilities": -2.2339960672929884,
+    "Real Estate": -4.119585687382298,
+    "Materials": -4.070617339480495
+  },
+  "market_breadth": "MODERATE",
+  "risk_appetite": "RISK_OFF",
+  "summary": "S&P 500 at 658 (-1.97% 1M), elevated volatility (VIX 25.2), Healthcare leadership. Bear environment with moderate breadth. Defensive posture warranted (raise cash, trim speculative).",
+  "analysis_date": "2025-11-18",
+  "data_quality": "COMPLETE"
+}

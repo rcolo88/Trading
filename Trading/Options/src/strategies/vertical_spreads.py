@@ -125,14 +125,16 @@ class VerticalSpread(BaseStrategy):
         if valid_options.empty:
             return None
 
-        # Check VIX filters - strategy-specific first, then global fallback
-        vix = kwargs.get('vix')
-        # Use strategy-specific VIX criteria from entry config, fallback to global
-        vix_max = self.entry_config.get('vix_max', kwargs.get('vix_max', float('inf')))
-        vix_min = self.entry_config.get('vix_min', kwargs.get('vix_min', 0))
+        # Check IV Percentile filters - strategy-specific first, then global fallback
+        iv_percentile = kwargs.get('iv_percentile')
+        # Use strategy-specific IV Percentile criteria from entry config, fallback to global
+        iv_percentile_max = self.entry_config.get('iv_percentile_max', kwargs.get('iv_percentile_max', 100))
+        iv_percentile_min = self.entry_config.get('iv_percentile_min', kwargs.get('iv_percentile_min', 0))
 
-        if vix and (vix > vix_max or vix < vix_min):
-            return None  # VIX outside strategy's acceptable range
+        if iv_percentile is not None and (iv_percentile > iv_percentile_max or iv_percentile < iv_percentile_min):
+            if self.debug:
+                print(f"  ❌ IV Percentile filter failed: {iv_percentile:.1f}%, range=[{iv_percentile_min}, {iv_percentile_max}]")
+            return None  # IV Percentile outside strategy's acceptable range
 
         # Find strikes based on delta targeting
         option_type = self._get_option_type()

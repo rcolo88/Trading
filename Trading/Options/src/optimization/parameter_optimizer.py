@@ -48,13 +48,13 @@ class ParameterOptimizer:
     # Strategy-specific allowed parameters
     VERTICAL_PARAMETERS = {
         'entry': ['dte', 'target_delta', 'min_credit', 'max_credit',
-                  'vix_min', 'vix_max'],
+                  'iv_percentile'],
         'exit': ['profit_target', 'stop_loss', 'dte_min']
     }
 
     CALENDAR_PARAMETERS = {
         'entry': ['near_dte', 'far_dte', 'target_delta', 'min_debit', 'max_debit',
-                  'vix_min', 'vix_max'],
+                  'iv_percentile'],
         'exit': ['profit_target', 'stop_loss', 'dte_exit', 'max_underlying_move']
     }
 
@@ -62,10 +62,11 @@ class ParameterOptimizer:
     # Used to map single parameters to multiple config keys
     PARAMETER_EXPANSION = {
         'vertical': {
-            'dte': ['dte_min', 'dte_max']  # Single dte value sets both min and max (target DTE)
+            'dte': ['dte_min', 'dte_max'],  # Single dte value sets both min and max (target DTE)
+            'iv_percentile': ['iv_percentile_min', 'iv_percentile_max']  # Single IV percentile sets both min and max
         },
         'calendar': {
-            # Calendar spreads use single values directly, no expansion needed
+            'iv_percentile': ['iv_percentile_min', 'iv_percentile_max']  # Single IV percentile sets both min and max
         }
     }
 

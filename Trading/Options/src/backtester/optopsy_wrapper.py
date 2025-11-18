@@ -237,6 +237,9 @@ class OptopsyBacktester:
                     if hasattr(position, 'entry_dte'):
                         entry_dte = position.entry_dte
 
+                    # Get IV Percentile at exit (if available)
+                    iv_percentile_exit = daily_options['iv_percentile'].iloc[0] if 'iv_percentile' in daily_options.columns and not daily_options.empty else None
+
                     # Build detailed trade record
                     trade_record = {
                         'entry_date': position.entry_date,
@@ -246,6 +249,8 @@ class OptopsyBacktester:
                         'underlying_price_exit': underlying_price,
                         'vix_entry': getattr(position, 'vix_entry', None),
                         'vix_exit': vix if 'vix' in daily_options.columns else None,
+                        'iv_percentile_entry': getattr(position, 'iv_percentile_entry', None),
+                        'iv_percentile_exit': iv_percentile_exit,
                         'entry_dte': entry_dte,
                         'entry_price': position.entry_price,
                         'exit_price': position.exit_price,
@@ -285,14 +290,16 @@ class OptopsyBacktester:
             # 1. Haven't entered a trade today (trades_entered_today < 1)
             # 2. Have room for more positions (current_positions < max_positions)
             if trades_entered_today < 1 and current_positions < max_positions:
-                # Get VIX for the day (if available)
+                # Get VIX and IV Percentile for the day (if available)
                 vix = daily_options['vix'].iloc[0] if 'vix' in daily_options.columns and not daily_options.empty else None
+                iv_percentile = daily_options['iv_percentile'].iloc[0] if 'iv_percentile' in daily_options.columns and not daily_options.empty else None
 
                 entry_signal = strategy.generate_entry_signal(
                     date=current_date,
                     options_data=daily_options,
                     underlying_price=underlying_price,
-                    vix=vix
+                    vix=vix,
+                    iv_percentile=iv_percentile
                 )
 
                 if entry_signal:
@@ -351,6 +358,7 @@ class OptopsyBacktester:
                         # Store entry market conditions
                         position.underlying_price_entry = underlying_price
                         position.vix_entry = vix
+                        position.iv_percentile_entry = iv_percentile
 
                         # Store entry DTE for Kelly analysis
                         if hasattr(entry_signal, 'dte') and entry_signal.dte is not None:

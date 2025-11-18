@@ -8,6 +8,42 @@ All notable changes to this project will be documented in this file.
 - Documentation restructuring into focused guide files in `guides/` directory
 - Streamlined CLAUDE.md to ~25 lines with emphasis on changelog and GitHub
 
+## [2025-11-17] - IV Percentile Integration
+
+### Changed
+- **Replaced VIX Level Filtering with IV Percentile**: Complete migration from absolute VIX levels to percentile-based filtering
+  - Switched from IV Rank (range-based) to true IV Percentile (count-based): `% of days in lookback where VIX < current`
+  - Modified [src/data_fetchers/synthetic_generator.py](src/data_fetchers/synthetic_generator.py): Calculate IV Percentile using 252-day rolling window
+  - Updated [config/config.yaml](config/config.yaml): Replaced all `vix_min/vix_max` with `iv_percentile_min/iv_percentile_max`
+    - bull_put_spread: 30-80th percentile (medium-high IV for premium)
+    - bull_call_spread: 20-70th percentile (lower IV acceptable for debits)
+    - call_calendar: 10-50th percentile (low-medium IV preferred)
+  - Updated [src/strategies/vertical_spreads.py](src/strategies/vertical_spreads.py): IV Percentile filtering logic
+  - Updated [src/strategies/calendar_spreads.py](src/strategies/calendar_spreads.py): IV Percentile filtering logic
+  - Updated [src/backtester/optopsy_wrapper.py](src/backtester/optopsy_wrapper.py): Propagate IV Percentile through backtester
+  - Updated [src/optimization/parameter_optimizer.py](src/optimization/parameter_optimizer.py): Support IV Percentile optimization
+
+### Added
+- **Trade Export Fields**: New columns in XLSX/CSV exports
+  - `iv_percentile_entry`: IV Percentile at trade entry (0-100%)
+  - `iv_percentile_exit`: IV Percentile at trade exit (0-100%)
+  - Kept `vix_entry` and `vix_exit` for reference
+
+### Impact
+- More robust volatility filtering using market context instead of absolute levels
+- IV Percentile adapts to different market regimes (2020 crisis vs 2025 calm)
+- Optimizer can now test different percentile thresholds (e.g., "only enter when IV > 40th percentile")
+- Better alignment with professional options trading practices
+
+### Data Regeneration Required
+⚠️ Run `python generate_synthetic_data.py -y` to regenerate options data with `iv_percentile` column (replaces `iv_rank`)
+- Note: IV Percentile calculation is computationally intensive (~5-10 minutes for full dataset)
+- Uses rolling 252-day window to calculate true percentile for each trading day
+
+### Status
+✅ All code updated to use IV Percentile filtering
+⏳ Synthetic data regeneration pending (user can run manually)
+
 ## [2025-11-17] - Market Hours & Holiday Filtering
 
 ### Fixed

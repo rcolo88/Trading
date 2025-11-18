@@ -498,22 +498,27 @@ class QualityAnalysisScript:
         logger.info(f"Classified {len(market_cap_tiers)} tickers into market cap tiers")
 
         # Analyze ROE persistence (4-tier framework integration)
-        logger.info("Analyzing ROE persistence...")
+        # NOTE: ROE persistence analysis requires 10 years of historical data which isn't currently
+        # fetched by the financial_data_fetcher. This analysis is OPTIONAL and the system works
+        # without it. Commenting out for now until historical data fetching is implemented.
+        logger.info("Skipping ROE persistence analysis (historical data not available)")
         roe_persistence = {}
-        for ticker in quality_results.keys():
-            try:
-                persistence_result = self.roe_analyzer.analyze_ticker(ticker)
-                if persistence_result:
-                    roe_persistence[ticker] = {
-                        'persistence_years': persistence_result.persistence_years,
-                        'trend_quarters': persistence_result.trend_quarters,
-                        'incremental_roce': persistence_result.incremental_roce,
-                        'classification': persistence_result.classification.value
-                    }
-            except Exception as e:
-                logger.warning(f"Failed to analyze ROE persistence for {ticker}: {e}")
-                continue
-        logger.info(f"Analyzed ROE persistence for {len(roe_persistence)} tickers")
+        # for ticker in quality_results.keys():
+        #     try:
+        #         # Requires 10 years of historical data in specific format
+        #         # historical_data = fetch_historical_data(ticker)  # Not yet implemented
+        #         # persistence_result = self.roe_analyzer.analyze_company(historical_data, ticker=ticker)
+        #         # if persistence_result:
+        #         #     roe_persistence[ticker] = {
+        #         #         'persistence_years': persistence_result.persistence_years,
+        #         #         'trend_quarters': persistence_result.trend_quarters,
+        #         #         'incremental_roce': persistence_result.incremental_roce,
+        #         #         'classification': persistence_result.classification.value
+        #         #     }
+        #     except Exception as e:
+        #         logger.warning(f"Failed to analyze ROE persistence for {ticker}: {e}")
+        #         continue
+        logger.info(f"ROE persistence analysis skipped (0 tickers analyzed)")
 
         # Analyze small cap strict filters (4-tier framework integration)
         logger.info("Analyzing small cap strict filters...")

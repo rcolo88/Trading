@@ -1,50 +1,9 @@
 {
-  "timestamp": "2025-11-17T17:42:37.166553",
-  "total_screened": 928,
-  "watchlist_count": 237,
+  "timestamp": "2025-11-18T10:48:30.567393",
+  "total_screened": 438,
+  "watchlist_count": 138,
   "min_quality_score": 70.0,
   "watchlist": [
-    {
-      "ticker": "TDC",
-      "market_cap": 2486295040,
-      "quality_score": 100.0,
-      "tier": "Elite",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 4.33x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.6208920187793427,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.8571428571428571,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.528755868544601,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.11141075195967089,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.23287729196050777,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
     {
       "ticker": "IT",
       "market_cap": 17183692800,
@@ -87,76 +46,6 @@
       }
     },
     {
-      "ticker": "ALKS",
-      "market_cap": 4896559616,
-      "quality_score": 100.0,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.6384131482943636,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.2505636607264141,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.3239821421534788,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08284183831327828,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.2157086688542468,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "KTB",
-      "market_cap": 3928150272,
-      "quality_score": 100.0,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.7037519258860288,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.6144205171788879,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 1.0834624325750557,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08810966384536523,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.2270021028949434,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
       "ticker": "DECK",
       "market_cap": 11969825792,
       "quality_score": 100.0,
@@ -186,41 +75,6 @@
         },
         "roic": {
           "value": 0.33386619584026883,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "CALM",
-      "market_cap": 4271850496,
-      "quality_score": 100.0,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.6000368278870097,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.4764651116290404,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 1.2797159065673913,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.24895042581565102,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.474019004742594,
           "score": 10.0,
           "weighted_score": 10.0
         }
@@ -332,41 +186,6 @@
       }
     },
     {
-      "ticker": "BKE",
-      "market_cap": 2839723264,
-      "quality_score": 98.55,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.6491508180815684,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.46122264065464225,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.9486329534491273,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.07033748764612015,
-          "score": 9.033748764612014,
-          "weighted_score": 13.550623146918019
-        },
-        "roic": {
-          "value": 0.2542140368793721,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
       "ticker": "POOL",
       "market_cap": 8958561280,
       "quality_score": 97.53,
@@ -437,41 +256,6 @@
         },
         "roic": {
           "value": 0.3104979795578797,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "CPRX",
-      "market_cap": 2820839424,
-      "quality_score": 97.35,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4966919619314291,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.22523610836246893,
-          "score": 8.938690358391526,
-          "weighted_score": 22.346725895978814
-        },
-        "operating_profitability": {
-          "value": 0.31003710311471194,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08481588776887429,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.2109246599709915,
           "score": 10.0,
           "weighted_score": 10.0
         }
@@ -554,47 +338,6 @@
       }
     },
     {
-      "ticker": "FTDR",
-      "market_cap": 3623164928,
-      "quality_score": 96.62,
-      "tier": "Elite",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 5.10x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4708115804461319,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.9832635983263598,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.5662078785002373,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.06375641313339628,
-          "score": 8.375641313339628,
-          "weighted_score": 12.563461970009442
-        },
-        "roic": {
-          "value": 0.1842249657064472,
-          "score": 9.053497942386832,
-          "weighted_score": 9.053497942386832
-        }
-      }
-    },
-    {
       "ticker": "ADBE",
       "market_cap": 139349704704,
       "quality_score": 96.47,
@@ -671,41 +414,6 @@
       }
     },
     {
-      "ticker": "FIZZ",
-      "market_cap": 3075425024,
-      "quality_score": 96.31,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.6597821240674138,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.4207689656958687,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 1.4755996789822547,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.05541185321382103,
-          "score": 7.541185321382103,
-          "weighted_score": 11.311777982073155
-        },
-        "roic": {
-          "value": 0.36040364409259035,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
       "ticker": "MRK",
       "market_cap": 233517760512,
       "quality_score": 96.25,
@@ -737,47 +445,6 @@
           "value": 0.19148674242424243,
           "score": 9.489204545454545,
           "weighted_score": 9.489204545454545
-        }
-      }
-    },
-    {
-      "ticker": "GFF",
-      "market_cap": 3140861184,
-      "quality_score": 95.99,
-      "tier": "Elite",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 7.59x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4301791599499611,
-          "score": 9.405374798498833,
-          "weighted_score": 28.2161243954965
-        },
-        "roe": {
-          "value": 0.9333401515421009,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.8443360773764484,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.09833831611960855,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.1629175032904036,
-          "score": 7.775050197424217,
-          "weighted_score": 7.775050197424217
         }
       }
     },
@@ -852,72 +519,37 @@
       }
     },
     {
-      "ticker": "DFIN",
-      "market_cap": 1248675328,
-      "quality_score": 95.67,
+      "ticker": "NVR",
+      "market_cap": 19870889984,
+      "quality_score": 95.64,
       "tier": "Elite",
       "red_flags_count": 0,
       "red_flags": [],
       "metrics": {
         "gross_profitability": {
-          "value": 0.5750950570342205,
-          "score": 10.0,
-          "weighted_score": 30.0
+          "value": 0.42203840533785675,
+          "score": 9.161152160135703,
+          "weighted_score": 27.48345648040711
         },
         "roe": {
-          "value": 0.21187800963081863,
-          "score": 8.36620041274937,
-          "weighted_score": 20.915501031873426
+          "value": 0.3995010061585645,
+          "score": 10.0,
+          "weighted_score": 25.0
         },
         "operating_profitability": {
-          "value": 0.5241207224334601,
+          "value": 1.5427811492514951,
           "score": 10.0,
           "weighted_score": 20.0
         },
         "fcf_yield": {
-          "value": 0.08424928213204834,
-          "score": 10.0,
-          "weighted_score": 15.0
+          "value": 0.06769953439846894,
+          "score": 8.769953439846894,
+          "weighted_score": 13.154930159770341
         },
         "roic": {
-          "value": 0.1958926406926407,
-          "score": 9.753558441558441,
-          "weighted_score": 9.753558441558441
-        }
-      }
-    },
-    {
-      "ticker": "HRMY",
-      "market_cap": 1971523328,
-      "quality_score": 95.65,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5583656925540432,
+          "value": 0.3011526325016628,
           "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.22072653624716493,
-          "score": 8.745422982021354,
-          "weighted_score": 21.863557455053385
-        },
-        "operating_profitability": {
-          "value": 0.3479193354683747,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.11091321968877053,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.17980530067829886,
-          "score": 8.78831804069793,
-          "weighted_score": 8.78831804069793
+          "weighted_score": 10.0
         }
       }
     },
@@ -953,41 +585,6 @@
           "value": 0.12730204684288238,
           "score": 5.638122810572943,
           "weighted_score": 5.638122810572943
-        }
-      }
-    },
-    {
-      "ticker": "NVR",
-      "market_cap": 19870889984,
-      "quality_score": 95.64,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.42203840533785675,
-          "score": 9.161152160135703,
-          "weighted_score": 27.48345648040711
-        },
-        "roe": {
-          "value": 0.3995010061585645,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 1.5427811492514951,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.06769953439846894,
-          "score": 8.769953439846894,
-          "weighted_score": 13.154930159770341
-        },
-        "roic": {
-          "value": 0.3011526325016628,
-          "score": 10.0,
-          "weighted_score": 10.0
         }
       }
     },
@@ -1109,41 +706,6 @@
       }
     },
     {
-      "ticker": "SBH",
-      "market_cap": 1417878912,
-      "quality_score": 94.23,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.6655117070275602,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.24663343435653426,
-          "score": 9.85571861528004,
-          "weighted_score": 24.6392965382001
-        },
-        "operating_profitability": {
-          "value": 0.7378666544065402,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.12179178245652617,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.10986461324646091,
-          "score": 4.591876794787654,
-          "weighted_score": 4.591876794787655
-        }
-      }
-    },
-    {
       "ticker": "ZTS",
       "market_cap": 52759887872,
       "quality_score": 94.05,
@@ -1173,41 +735,6 @@
         },
         "roic": {
           "value": 0.23273232586416537,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "IPAR",
-      "market_cap": 2728387584,
-      "quality_score": 93.94,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.6571009898239943,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.22065297212537474,
-          "score": 8.742270233944632,
-          "weighted_score": 21.85567558486158
-        },
-        "operating_profitability": {
-          "value": 0.5695509193551016,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.060581568751193964,
-          "score": 8.058156875119396,
-          "weighted_score": 12.087235312679095
-        },
-        "roic": {
-          "value": 0.23504537038519208,
           "score": 10.0,
           "weighted_score": 10.0
         }
@@ -1290,41 +817,6 @@
       }
     },
     {
-      "ticker": "YOU",
-      "market_cap": 4778287104,
-      "quality_score": 93.25,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.40951116883638566,
-          "score": 8.78533506509157,
-          "weighted_score": 26.356005195274705
-        },
-        "roe": {
-          "value": 0.8554244200995196,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.33837992454800775,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.05929949244004238,
-          "score": 7.929949244004238,
-          "weighted_score": 11.894923866006357
-        },
-        "roic": {
-          "value": 0.3045007947235363,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
       "ticker": "RL",
       "market_cap": 19793414144,
       "quality_score": 92.65,
@@ -1356,82 +848,6 @@
           "value": 0.14876935661834645,
           "score": 6.926161397100787,
           "weighted_score": 6.926161397100787
-        }
-      }
-    },
-    {
-      "ticker": "VSCO",
-      "market_cap": 2828603904,
-      "quality_score": 92.4,
-      "tier": "Elite",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 4.22x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5039717563989409,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.2578125,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.93909973521624,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08732222975818957,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.07336728579988017,
-          "score": 2.40203714799281,
-          "weighted_score": 2.40203714799281
-        }
-      }
-    },
-    {
-      "ticker": "META",
-      "market_cap": 1517382795264,
-      "quality_score": 92.27,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4866439174944033,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.34144231453648494,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.3605852478138335,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.03563504223770532,
-          "score": 4.845256335655798,
-          "weighted_score": 7.267884503483697
-        },
-        "roic": {
-          "value": 0.23655981734765663,
-          "score": 10.0,
-          "weighted_score": 10.0
         }
       }
     },
@@ -1471,6 +887,41 @@
       }
     },
     {
+      "ticker": "META",
+      "market_cap": 1517382795264,
+      "quality_score": 92.27,
+      "tier": "Elite",
+      "red_flags_count": 0,
+      "red_flags": [],
+      "metrics": {
+        "gross_profitability": {
+          "value": 0.4866439174944033,
+          "score": 10.0,
+          "weighted_score": 30.0
+        },
+        "roe": {
+          "value": 0.34144231453648494,
+          "score": 10.0,
+          "weighted_score": 25.0
+        },
+        "operating_profitability": {
+          "value": 0.3605852478138335,
+          "score": 10.0,
+          "weighted_score": 20.0
+        },
+        "fcf_yield": {
+          "value": 0.03563504223770532,
+          "score": 4.845256335655798,
+          "weighted_score": 7.267884503483697
+        },
+        "roic": {
+          "value": 0.23655981734765663,
+          "score": 10.0,
+          "weighted_score": 10.0
+        }
+      }
+    },
+    {
       "ticker": "GWW",
       "market_cap": 44171640832,
       "quality_score": 92.25,
@@ -1500,82 +951,6 @@
         },
         "roic": {
           "value": 0.31848799877694545,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "EAT",
-      "market_cap": 5348407808,
-      "quality_score": 92.11,
-      "tier": "Elite",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 4.57x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.36675875457328455,
-          "score": 7.502762637198537,
-          "weighted_score": 22.508287911595612
-        },
-        "roe": {
-          "value": 1.03289296306282,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 1.8500709325767193,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.07735012266289773,
-          "score": 9.735012266289772,
-          "weighted_score": 14.602518399434656
-        },
-        "roic": {
-          "value": 0.21192695214105794,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "SLVM",
-      "market_cap": 1843410944,
-      "quality_score": 91.99,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.36098310291858676,
-          "score": 7.329493087557603,
-          "weighted_score": 21.988479262672808
-        },
-        "roe": {
-          "value": 0.3565525383707202,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 1.2584485407066053,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.13453321453211467,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.21245305875227136,
           "score": 10.0,
           "weighted_score": 10.0
         }
@@ -1654,146 +1029,6 @@
           "value": 0.19860978147762748,
           "score": 9.916586888657648,
           "weighted_score": 9.916586888657648
-        }
-      }
-    },
-    {
-      "ticker": "IBP",
-      "market_cap": 6656953344,
-      "quality_score": 91.65,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4827904267197437,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.36381681553948675,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 1.1331618039710665,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.03776502357893046,
-          "score": 5.164753536839569,
-          "weighted_score": 7.747130305259354
-        },
-        "roic": {
-          "value": 0.18178070800665241,
-          "score": 8.906842480399146,
-          "weighted_score": 8.906842480399146
-        }
-      }
-    },
-    {
-      "ticker": "SHOO",
-      "market_cap": 2686890496,
-      "quality_score": 91.51,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.663657207861615,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.1998185719560373,
-          "score": 7.849367369544456,
-          "weighted_score": 19.62341842386114
-        },
-        "operating_profitability": {
-          "value": 1.1219886228007234,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.06408337081705916,
-          "score": 8.408337081705916,
-          "weighted_score": 12.612505622558874
-        },
-        "roic": {
-          "value": 0.1878840060077525,
-          "score": 9.273040360465151,
-          "weighted_score": 9.273040360465151
-        }
-      }
-    },
-    {
-      "ticker": "WDFC",
-      "market_cap": 2668665856,
-      "quality_score": 91.28,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.7173950051386165,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.3393373907336138,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.8037573900451652,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.03125044666513693,
-          "score": 4.1875669997705405,
-          "weighted_score": 6.28135049965581
-        },
-        "roic": {
-          "value": 0.22412470069864315,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "CRI",
-      "market_cap": 1115304832,
-      "quality_score": 91.27,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5610654755715493,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.2170807969462719,
-          "score": 8.58917701198308,
-          "weighted_score": 21.472942529957702
-        },
-        "operating_profitability": {
-          "value": 0.7248429721428903,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.21753873294435794,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.11333137171521336,
-          "score": 4.799882302912802,
-          "weighted_score": 4.799882302912802
         }
       }
     },
@@ -1909,41 +1144,6 @@
         },
         "roic": {
           "value": 0.5725999758852136,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "ADMA",
-      "market_cap": 3679685632,
-      "quality_score": 90.92,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4492794846504242,
-          "score": 9.978384539512726,
-          "weighted_score": 29.93515361853818
-        },
-        "roe": {
-          "value": 0.5663690697900968,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.7077953171618121,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.029920219010709227,
-          "score": 3.9880328516063845,
-          "weighted_score": 5.982049277409577
-        },
-        "roic": {
-          "value": 0.25466924436486105,
           "score": 10.0,
           "weighted_score": 10.0
         }
@@ -2139,41 +1339,6 @@
           "value": 0.16204099128419247,
           "score": 7.722459477051548,
           "weighted_score": 7.722459477051549
-        }
-      }
-    },
-    {
-      "ticker": "GOLF",
-      "market_cap": 4647150592,
-      "quality_score": 89.94,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5447774201153469,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.2800376871781268,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.7217785842255273,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.03668570592342879,
-          "score": 5.002855888514318,
-          "weighted_score": 7.504283832771478
-        },
-        "roic": {
-          "value": 0.1571837615500814,
-          "score": 7.431025693004885,
-          "weighted_score": 7.431025693004885
         }
       }
     },
@@ -2604,111 +1769,6 @@
       }
     },
     {
-      "ticker": "LRN",
-      "market_cap": 2750888704,
-      "quality_score": 88.4,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.41148032724211725,
-          "score": 8.844409817263518,
-          "weighted_score": 26.533229451790554
-        },
-        "roe": {
-          "value": 0.19460482732379078,
-          "score": 7.6259211710196055,
-          "weighted_score": 19.064802927549014
-        },
-        "operating_profitability": {
-          "value": 0.8199667038512894,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.1355220221951953,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.1633316792969672,
-          "score": 7.799900757818032,
-          "weighted_score": 7.799900757818032
-        }
-      }
-    },
-    {
-      "ticker": "APAM",
-      "market_cap": 2897055232,
-      "quality_score": 88.28,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.3197992779640662,
-          "score": 6.093978338921986,
-          "weighted_score": 18.281935016765956
-        },
-        "roe": {
-          "value": 0.667863130071685,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.593513784659331,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.12705522350220763,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.4199882400878151,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "YELP",
-      "market_cap": 1753086208,
-      "quality_score": 88.18,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 1.309905680040099,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.17856926834317022,
-          "score": 6.928463417158511,
-          "weighted_score": 17.321158542896278
-        },
-        "operating_profitability": {
-          "value": 0.27931904994779205,
-          "score": 9.379571498433762,
-          "weighted_score": 18.759142996867524
-        },
-        "fcf_yield": {
-          "value": 0.1417317635984733,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.1515980450199335,
-          "score": 7.095882701196009,
-          "weighted_score": 7.09588270119601
-        }
-      }
-    },
-    {
       "ticker": "LRCX",
       "market_cap": 185535692800,
       "quality_score": 88.17,
@@ -2740,41 +1800,6 @@
           "value": 0.3249494232727948,
           "score": 10.0,
           "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "RHI",
-      "market_cap": 2661483520,
-      "quality_score": 87.88,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.7872849157705372,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.18258160541014787,
-          "score": 7.1106402318634805,
-          "weighted_score": 17.7766005796587
-        },
-        "operating_profitability": {
-          "value": 1.3278007150351825,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.13306526128705842,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.11837533710368212,
-          "score": 5.102520226220927,
-          "weighted_score": 5.102520226220927
         }
       }
     },
@@ -2820,41 +1845,6 @@
       }
     },
     {
-      "ticker": "AEO",
-      "market_cap": 3054718976,
-      "quality_score": 87.75,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5453029739413043,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.18642110863339484,
-          "score": 7.275190370002636,
-          "weighted_score": 18.18797592500659
-        },
-        "operating_profitability": {
-          "value": 0.9618374871925394,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08323515256154286,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.10937497004534434,
-          "score": 4.56249820272066,
-          "weighted_score": 4.56249820272066
-        }
-      }
-    },
-    {
       "ticker": "EXPE",
       "market_cap": 30206398464,
       "quality_score": 87.7,
@@ -2892,47 +1882,6 @@
           "value": 0.16311819980217607,
           "score": 7.787091988130564,
           "weighted_score": 7.787091988130564
-        }
-      }
-    },
-    {
-      "ticker": "CAKE",
-      "market_cap": 2203501056,
-      "quality_score": 87.64,
-      "tier": "Elite",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 4.30x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.49684919257272103,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.35354883810082194,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.7536067934353795,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.04851688167287178,
-          "score": 6.777532250930767,
-          "weighted_score": 10.16629837639615
-        },
-        "roic": {
-          "value": 0.0745390073033051,
-          "score": 2.472340438198305,
-          "weighted_score": 2.472340438198305
         }
       }
     },
@@ -3007,47 +1956,6 @@
       }
     },
     {
-      "ticker": "KR",
-      "market_cap": 43750014976,
-      "quality_score": 86.86,
-      "tier": "Elite",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 3.03x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.634844914094572,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.32166566083283044,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 2.2344724038315342,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.04061712895355147,
-          "score": 5.592569343032721,
-          "weighted_score": 8.38885401454908
-        },
-        "roic": {
-          "value": 0.09112925944795756,
-          "score": 3.467755566877454,
-          "weighted_score": 3.467755566877454
-        }
-      }
-    },
-    {
       "ticker": "APP",
       "market_cap": 180848689152,
       "quality_score": 86.86,
@@ -3085,6 +1993,47 @@
           "value": 0.3185453238038725,
           "score": 10.0,
           "weighted_score": 10.0
+        }
+      }
+    },
+    {
+      "ticker": "KR",
+      "market_cap": 43750014976,
+      "quality_score": 86.86,
+      "tier": "Elite",
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "High Leverage",
+          "severity": "HIGH",
+          "description": "Debt-to-Equity ratio at 3.03x (threshold: 2.0x). High leverage increases financial risk and interest burden."
+        }
+      ],
+      "metrics": {
+        "gross_profitability": {
+          "value": 0.634844914094572,
+          "score": 10.0,
+          "weighted_score": 30.0
+        },
+        "roe": {
+          "value": 0.32166566083283044,
+          "score": 10.0,
+          "weighted_score": 25.0
+        },
+        "operating_profitability": {
+          "value": 2.2344724038315342,
+          "score": 10.0,
+          "weighted_score": 20.0
+        },
+        "fcf_yield": {
+          "value": 0.04061712895355147,
+          "score": 5.592569343032721,
+          "weighted_score": 8.38885401454908
+        },
+        "roic": {
+          "value": 0.09112925944795756,
+          "score": 3.467755566877454,
+          "weighted_score": 3.467755566877454
         }
       }
     },
@@ -3159,41 +2108,6 @@
       }
     },
     {
-      "ticker": "ASO",
-      "market_cap": 2918193920,
-      "quality_score": 86.76,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.41042138045114807,
-          "score": 8.812641413534442,
-          "weighted_score": 26.437924240603326
-        },
-        "roe": {
-          "value": 0.2088022414778185,
-          "score": 8.234381777620793,
-          "weighted_score": 20.585954444051985
-        },
-        "operating_profitability": {
-          "value": 0.9101535759400754,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.11230302337138719,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.1122582295258072,
-          "score": 4.735493771548432,
-          "weighted_score": 4.735493771548432
-        }
-      }
-    },
-    {
       "ticker": "NKE",
       "market_cap": 92978864128,
       "quality_score": 86.72,
@@ -3225,41 +2139,6 @@
           "value": 0.12069580289711526,
           "score": 5.241748173826916,
           "weighted_score": 5.241748173826916
-        }
-      }
-    },
-    {
-      "ticker": "XPEL",
-      "market_cap": 1108943104,
-      "quality_score": 86.41,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.620993182940194,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.20176531902153422,
-          "score": 7.932799386637181,
-          "weighted_score": 19.831998466592953
-        },
-        "operating_profitability": {
-          "value": 1.0580517984503182,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.03538053472579239,
-          "score": 4.807080208868858,
-          "weighted_score": 7.210620313303288
-        },
-        "roic": {
-          "value": 0.1895283504841019,
-          "score": 9.371701029046115,
-          "weighted_score": 9.371701029046115
         }
       }
     },
@@ -3301,82 +2180,6 @@
           "value": 0.1506670728293537,
           "score": 7.040024369761223,
           "weighted_score": 7.040024369761224
-        }
-      }
-    },
-    {
-      "ticker": "HNI",
-      "market_cap": 1779193472,
-      "quality_score": 86.3,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5511172737454002,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.16605166051660517,
-          "score": 6.302583025830258,
-          "weighted_score": 15.756457564575646
-        },
-        "operating_profitability": {
-          "value": 0.9096581515652499,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.09768471092951492,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.1256885331737602,
-          "score": 5.541311990425612,
-          "weighted_score": 5.541311990425612
-        }
-      }
-    },
-    {
-      "ticker": "CSGS",
-      "market_cap": 2231133440,
-      "quality_score": 86.07,
-      "tier": "Elite",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "MEDIUM",
-          "description": "Debt-to-Equity ratio at 2.03x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.38834547110756606,
-          "score": 8.150364133226983,
-          "weighted_score": 24.451092399680945
-        },
-        "roe": {
-          "value": 0.307365634588366,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.5058476551072942,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.05077957148094199,
-          "score": 7.077957148094199,
-          "weighted_score": 10.6169357221413
-        },
-        "roic": {
-          "value": 0.13332303567741116,
-          "score": 5.99938214064467,
-          "weighted_score": 5.99938214064467
         }
       }
     },
@@ -3447,117 +2250,6 @@
           "value": 0.19546999621096148,
           "score": 9.728199772657689,
           "weighted_score": 9.728199772657689
-        }
-      }
-    },
-    {
-      "ticker": "ATEN",
-      "market_cap": 1218621568,
-      "quality_score": 85.79,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4858357496852004,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.2162801030069577,
-          "score": 8.554861557441045,
-          "weighted_score": 21.387153893602612
-        },
-        "operating_profitability": {
-          "value": 0.220387463465915,
-          "score": 7.61162390397745,
-          "weighted_score": 15.2232478079549
-        },
-        "fcf_yield": {
-          "value": 0.06419055927951539,
-          "score": 8.41905592795154,
-          "weighted_score": 12.62858389192731
-        },
-        "roic": {
-          "value": 0.14249147751746544,
-          "score": 6.549488651047927,
-          "weighted_score": 6.549488651047928
-        }
-      }
-    },
-    {
-      "ticker": "CNK",
-      "market_cap": 3479636480,
-      "quality_score": 85.77,
-      "tier": "Elite",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 5.81x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.3877047562660351,
-          "score": 8.131142687981054,
-          "weighted_score": 24.393428063943162
-        },
-        "roe": {
-          "value": 0.5210296096904441,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.2856522597197553,
-          "score": 9.56956779159266,
-          "weighted_score": 19.13913558318532
-        },
-        "fcf_yield": {
-          "value": 0.0905841750457795,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.07068164424145167,
-          "score": 2.2408986544870997,
-          "weighted_score": 2.2408986544870997
-        }
-      }
-    },
-    {
-      "ticker": "PBI",
-      "market_cap": 1552549504,
-      "quality_score": 85.72,
-      "tier": "Elite",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.31266960920861003,
-          "score": 5.880088276258301,
-          "weighted_score": 17.640264828774903
-        },
-        "roe": {
-          "value": 0.3519802639199354,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.375788370091561,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.10097391393711076,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.16803010365618307,
-          "score": 8.081806219370984,
-          "weighted_score": 8.081806219370984
         }
       }
     },
@@ -3784,111 +2476,6 @@
       }
     },
     {
-      "ticker": "PJT",
-      "market_cap": 6313000960,
-      "quality_score": 84.88,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.2819650297737343,
-          "score": 4.9589508932120285,
-          "weighted_score": 14.876852679636086
-        },
-        "roe": {
-          "value": 0.7186291862063066,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.8163537234595502,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08358180259171068,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.4419368533404243,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "CNR",
-      "market_cap": 4102794752,
-      "quality_score": 84.64,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5734055716480011,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.18262748151279742,
-          "score": 7.112606350548461,
-          "weighted_score": 17.781515876371152
-        },
-        "operating_profitability": {
-          "value": 0.2648955059882766,
-          "score": 8.946865179648299,
-          "weighted_score": 17.893730359296597
-        },
-        "fcf_yield": {
-          "value": 0.07273139848259219,
-          "score": 9.27313984825922,
-          "weighted_score": 13.90970977238883
-        },
-        "roic": {
-          "value": 0.11758160567098246,
-          "score": 5.0548963402589475,
-          "weighted_score": 5.0548963402589475
-        }
-      }
-    },
-    {
-      "ticker": "PRDO",
-      "market_cap": 1957045248,
-      "quality_score": 84.62,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.45302150143003345,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.15381392673125344,
-          "score": 5.690696336562672,
-          "weighted_score": 14.22674084140668
-        },
-        "operating_profitability": {
-          "value": 0.26942266744487214,
-          "score": 9.082680023346164,
-          "weighted_score": 18.165360046692328
-        },
-        "fcf_yield": {
-          "value": 0.08020713887960142,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.1538079945154907,
-          "score": 7.228479670929443,
-          "weighted_score": 7.228479670929443
-        }
-      }
-    },
-    {
       "ticker": "EBAY",
       "market_cap": 37597388800,
       "quality_score": 84.25,
@@ -3994,47 +2581,6 @@
       }
     },
     {
-      "ticker": "UPBD",
-      "market_cap": 969341952,
-      "quality_score": 83.99,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "MEDIUM",
-          "description": "Debt-to-Equity ratio at 2.52x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.7851382553699302,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.19631341973722702,
-          "score": 7.699146560166873,
-          "weighted_score": 19.24786640041718
-        },
-        "operating_profitability": {
-          "value": 0.9555347059360779,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.04997823513162051,
-          "score": 6.996735269743076,
-          "weighted_score": 10.495102904614612
-        },
-        "roic": {
-          "value": 0.10417356707842301,
-          "score": 4.25041402470538,
-          "weighted_score": 4.25041402470538
-        }
-      }
-    },
-    {
       "ticker": "WAT",
       "market_cap": 22694940672,
       "quality_score": 83.89,
@@ -4066,222 +2612,6 @@
           "value": 0.18747830620907324,
           "score": 9.248698372544395,
           "weighted_score": 9.248698372544395
-        }
-      }
-    },
-    {
-      "ticker": "CRVL",
-      "market_cap": 3768664832,
-      "quality_score": 83.79,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.3841341011326505,
-          "score": 8.024023033979516,
-          "weighted_score": 24.072069101938546
-        },
-        "roe": {
-          "value": 0.295555410622168,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 1.4775100004395798,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.024295076394843487,
-          "score": 3.1442614592265232,
-          "weighted_score": 4.716392188839785
-        },
-        "roic": {
-          "value": 0.2726656116275217,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "BCC",
-      "market_cap": 2512812032,
-      "quality_score": 83.62,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.39493491835152017,
-          "score": 8.348047550545605,
-          "weighted_score": 25.044142651636815
-        },
-        "roe": {
-          "value": 0.17494470718281352,
-          "score": 6.747235359140676,
-          "weighted_score": 16.86808839785169
-        },
-        "operating_profitability": {
-          "value": 1.7461642086993376,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08307465792968632,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.14508438619260444,
-          "score": 6.705063171556267,
-          "weighted_score": 6.705063171556267
-        }
-      }
-    },
-    {
-      "ticker": "TILE",
-      "market_cap": 1506477824,
-      "quality_score": 83.56,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4124883841696731,
-          "score": 8.874651525090194,
-          "weighted_score": 26.62395457527058
-        },
-        "roe": {
-          "value": 0.17774988347085136,
-          "score": 6.887494173542568,
-          "weighted_score": 17.21873543385642
-        },
-        "operating_profitability": {
-          "value": 0.8260187766480813,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.07609936115461863,
-          "score": 9.609936115461863,
-          "weighted_score": 14.414904173192795
-        },
-        "roic": {
-          "value": 0.12172600261609344,
-          "score": 5.303560156965606,
-          "weighted_score": 5.303560156965607
-        }
-      }
-    },
-    {
-      "ticker": "IDCC",
-      "market_cap": 8904136704,
-      "quality_score": 83.31,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.38096755758149287,
-          "score": 7.9290267274447865,
-          "weighted_score": 23.787080182334357
-        },
-        "roe": {
-          "value": 0.4183477890610874,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.3316488053307793,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.0234206871404296,
-          "score": 3.0131030710644406,
-          "weighted_score": 4.519654606596661
-        },
-        "roic": {
-          "value": 0.25819829426685376,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "MC",
-      "market_cap": 4536132096,
-      "quality_score": 83.28,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.2642573694500687,
-          "score": 4.427721083502062,
-          "weighted_score": 13.283163250506187
-        },
-        "roe": {
-          "value": 0.3080121194005516,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.7274420277663358,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.09157427323739031,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.20550259385326716,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "BOX",
-      "market_cap": 4539272192,
-      "quality_score": 83.16,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 3.66x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5169503214354251,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 1.2399937143899917,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.1845489109575897,
-          "score": 6.536467328727691,
-          "weighted_score": 13.072934657455384
-        },
-        "fcf_yield": {
-          "value": 0.06654172458138417,
-          "score": 8.654172458138417,
-          "weighted_score": 12.981258687207625
-        },
-        "roic": {
-          "value": 0.06848618320211802,
-          "score": 2.109170992127081,
-          "weighted_score": 2.109170992127081
         }
       }
     },
@@ -4397,41 +2727,6 @@
       }
     },
     {
-      "ticker": "EPAC",
-      "market_cap": 2052854784,
-      "quality_score": 82.45,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.37666557550910956,
-          "score": 7.799967265273287,
-          "weighted_score": 23.399901795819858
-        },
-        "roe": {
-          "value": 0.21385815805614097,
-          "score": 8.451063916691757,
-          "weighted_score": 21.127659791729393
-        },
-        "operating_profitability": {
-          "value": 0.5368048249296082,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.04478836044157325,
-          "score": 6.218254066235987,
-          "weighted_score": 9.32738109935398
-        },
-        "roic": {
-          "value": 0.17657969205694285,
-          "score": 8.594781523416572,
-          "weighted_score": 8.594781523416572
-        }
-      }
-    },
-    {
       "ticker": "ADSK",
       "market_cap": 62508179456,
       "quality_score": 82.45,
@@ -4502,117 +2797,6 @@
       }
     },
     {
-      "ticker": "OXM",
-      "market_cap": 504966208,
-      "quality_score": 81.93,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.7400893933579107,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.1493398226676947,
-          "score": 5.4669911333847345,
-          "weighted_score": 13.667477833461836
-        },
-        "operating_profitability": {
-          "value": 0.5280379592263947,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.11842574622339877,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.08774354275562589,
-          "score": 3.2646125653375533,
-          "weighted_score": 3.2646125653375533
-        }
-      }
-    },
-    {
-      "ticker": "WWW",
-      "market_cap": 1207387008,
-      "quality_score": 81.85,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "MEDIUM",
-          "description": "Debt-to-Equity ratio at 2.60x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.46830057526366253,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.155873739017247,
-          "score": 5.79368695086235,
-          "weighted_score": 14.484217377155876
-        },
-        "operating_profitability": {
-          "value": 0.6443552253116012,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.13243475285100964,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.07278009049773755,
-          "score": 2.366805429864253,
-          "weighted_score": 2.366805429864253
-        }
-      }
-    },
-    {
-      "ticker": "BMI",
-      "market_cap": 5143214080,
-      "quality_score": 81.56,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.40320769022541286,
-          "score": 8.596230706762386,
-          "weighted_score": 25.788692120287156
-        },
-        "roe": {
-          "value": 0.206096016046662,
-          "score": 8.118400687714086,
-          "weighted_score": 20.296001719285215
-        },
-        "operating_profitability": {
-          "value": 0.8026697272091454,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.027651191995492437,
-          "score": 3.6476787993238657,
-          "weighted_score": 5.471518198985798
-        },
-        "roic": {
-          "value": 0.2058113725438446,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
       "ticker": "UHS",
       "market_cap": 14475893760,
       "quality_score": 81.47,
@@ -4644,47 +2828,6 @@
           "value": 0.11432409860367336,
           "score": 4.859445916220402,
           "weighted_score": 4.859445916220402
-        }
-      }
-    },
-    {
-      "ticker": "AAMI",
-      "market_cap": 1521200512,
-      "quality_score": 81.15,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 17.08x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.34015927189988626,
-          "score": 6.704778156996588,
-          "weighted_score": 20.114334470989764
-        },
-        "roe": {
-          "value": 4.25,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.5715301478953356,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.030173537043879196,
-          "score": 4.02603055658188,
-          "weighted_score": 6.0390458348728195
-        },
-        "roic": {
-          "value": 0.29603152654867254,
-          "score": 10.0,
-          "weighted_score": 10.0
         }
       }
     },
@@ -4790,47 +2933,6 @@
           "value": 0.09372469946614434,
           "score": 3.62348196796866,
           "weighted_score": 3.6234819679686603
-        }
-      }
-    },
-    {
-      "ticker": "OGN",
-      "market_cap": 1988869248,
-      "quality_score": 80.55,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 18.81x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.2835661399893138,
-          "score": 5.0069841996794135,
-          "weighted_score": 15.020952599038239
-        },
-        "roe": {
-          "value": 1.8305084745762712,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.31860163346309445,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.2956453776895041,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.12552822925577417,
-          "score": 5.53169375534645,
-          "weighted_score": 5.531693755346451
         }
       }
     },
@@ -4946,41 +3048,6 @@
       }
     },
     {
-      "ticker": "GIII",
-      "market_cap": 1173154432,
-      "quality_score": 79.79,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5229172925306274,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.11525346223029614,
-          "score": 3.7965769527269777,
-          "weighted_score": 9.491442381817444
-        },
-        "operating_profitability": {
-          "value": 0.8793130248699881,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.23280140495603566,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.12160614971144487,
-          "score": 5.296368982686692,
-          "weighted_score": 5.296368982686692
-        }
-      }
-    },
-    {
       "ticker": "FDS",
       "market_cap": 10137060352,
       "quality_score": 79.7,
@@ -5012,76 +3079,6 @@
           "value": 0.1578562570862624,
           "score": 7.471375425175745,
           "weighted_score": 7.471375425175745
-        }
-      }
-    },
-    {
-      "ticker": "URBN",
-      "market_cap": 5423135744,
-      "quality_score": 79.37,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.42630346854062856,
-          "score": 9.289104056218857,
-          "weighted_score": 27.86731216865657
-        },
-        "roe": {
-          "value": 0.16284092601104427,
-          "score": 6.142046300552214,
-          "weighted_score": 15.355115751380534
-        },
-        "operating_profitability": {
-          "value": 0.9066883800791241,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.05905310416659192,
-          "score": 7.9053104166591925,
-          "weighted_score": 11.85796562498879
-        },
-        "roic": {
-          "value": 0.1048425849514631,
-          "score": 4.290555097087786,
-          "weighted_score": 4.290555097087786
-        }
-      }
-    },
-    {
-      "ticker": "BRC",
-      "market_cap": 3494966272,
-      "quality_score": 79.27,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.43870300354100583,
-          "score": 9.661090106230175,
-          "weighted_score": 28.983270318690522
-        },
-        "roe": {
-          "value": 0.15874371231266948,
-          "score": 5.937185615633474,
-          "weighted_score": 14.842964039083686
-        },
-        "operating_profitability": {
-          "value": 0.5705171044824486,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.04395435836698112,
-          "score": 6.093153755047167,
-          "weighted_score": 9.13973063257075
-        },
-        "roic": {
-          "value": 0.1383974989191398,
-          "score": 6.3038499351483885,
-          "weighted_score": 6.3038499351483885
         }
       }
     },
@@ -5152,76 +3149,6 @@
           "value": 0.1589829367868519,
           "score": 7.538976207211115,
           "weighted_score": 7.538976207211116
-        }
-      }
-    },
-    {
-      "ticker": "CNS",
-      "market_cap": 3091056896,
-      "quality_score": 78.93,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.3220765024631755,
-          "score": 6.162295073895265,
-          "weighted_score": 18.486885221685796
-        },
-        "roe": {
-          "value": 0.29560630902990165,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.575280107734691,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.027510978562071735,
-          "score": 3.6266467843107604,
-          "weighted_score": 5.43997017646614
-        },
-        "roic": {
-          "value": 0.23261112455692634,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "ATGE",
-      "market_cap": 3441476352,
-      "quality_score": 78.83,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.36945129111392727,
-          "score": 7.583538733417819,
-          "weighted_score": 22.750616200253457
-        },
-        "roe": {
-          "value": 0.16536053710000873,
-          "score": 6.2680268550004365,
-          "weighted_score": 15.670067137501091
-        },
-        "operating_profitability": {
-          "value": 0.40557530432154026,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08356064972896841,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.12340693731951759,
-          "score": 5.404416239171056,
-          "weighted_score": 5.404416239171056
         }
       }
     },
@@ -5327,76 +3254,6 @@
           "value": 0.12998889342001105,
           "score": 5.799333605200663,
           "weighted_score": 5.799333605200663
-        }
-      }
-    },
-    {
-      "ticker": "DXPE",
-      "market_cap": 1364522112,
-      "quality_score": 78.19,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.41221154002907756,
-          "score": 8.866346200872327,
-          "weighted_score": 26.59903860261698
-        },
-        "roe": {
-          "value": 0.16672422112264304,
-          "score": 6.336211056132152,
-          "weighted_score": 15.840527640330379
-        },
-        "operating_profitability": {
-          "value": 1.0308641609373588,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.056534811214550694,
-          "score": 7.653481121455069,
-          "weighted_score": 11.480221682182602
-        },
-        "roic": {
-          "value": 0.10449173768385848,
-          "score": 4.269504261031509,
-          "weighted_score": 4.269504261031509
-        }
-      }
-    },
-    {
-      "ticker": "PGNY",
-      "market_cap": 2280298240,
-      "quality_score": 77.82,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4173318486844056,
-          "score": 9.019955460532168,
-          "weighted_score": 27.059866381596503
-        },
-        "roe": {
-          "value": 0.12873937952243983,
-          "score": 4.4369689761219915,
-          "weighted_score": 11.09242244030498
-        },
-        "operating_profitability": {
-          "value": 1.616389008766237,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.0761742464003305,
-          "score": 9.61742464003305,
-          "weighted_score": 14.426136960049575
-        },
-        "roic": {
-          "value": 0.12074630551917595,
-          "score": 5.244778331150557,
-          "weighted_score": 5.244778331150557
         }
       }
     },
@@ -5541,41 +3398,6 @@
       }
     },
     {
-      "ticker": "LQDT",
-      "market_cap": 712670784,
-      "quality_score": 77.51,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5337918867184798,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.10950372480280456,
-          "score": 3.55015963440591,
-          "weighted_score": 8.875399086014774
-        },
-        "operating_profitability": {
-          "value": 0.5810405664076013,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.0860341147364896,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.09394659688524173,
-          "score": 3.636795813114504,
-          "weighted_score": 3.636795813114504
-        }
-      }
-    },
-    {
       "ticker": "ALGN",
       "market_cap": 9755215872,
       "quality_score": 77.46,
@@ -5607,41 +3429,6 @@
           "value": 0.13363347973515724,
           "score": 6.018008784109434,
           "weighted_score": 6.018008784109434
-        }
-      }
-    },
-    {
-      "ticker": "ACLS",
-      "market_cap": 2547755264,
-      "quality_score": 77.35,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.33708511611595954,
-          "score": 6.612553483478787,
-          "weighted_score": 19.83766045043636
-        },
-        "roe": {
-          "value": 0.19845377620237167,
-          "score": 7.790876122958786,
-          "weighted_score": 19.477190307396967
-        },
-        "operating_profitability": {
-          "value": 0.5738552070350932,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.050490328414841024,
-          "score": 7.049032841484102,
-          "weighted_score": 10.573549262226154
-        },
-        "roic": {
-          "value": 0.15762700858713596,
-          "score": 7.457620515228158,
-          "weighted_score": 7.457620515228158
         }
       }
     },
@@ -5722,41 +3509,6 @@
       }
     },
     {
-      "ticker": "TNC",
-      "market_cap": 1305767296,
-      "quality_score": 76.89,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.46214603814805477,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.13482603092783504,
-          "score": 4.741301546391752,
-          "weighted_score": 11.853253865979381
-        },
-        "operating_profitability": {
-          "value": 0.7150659608436266,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.05230641034526262,
-          "score": 7.230641034526262,
-          "weighted_score": 10.845961551789394
-        },
-        "roic": {
-          "value": 0.10318477888241344,
-          "score": 4.191086732944806,
-          "weighted_score": 4.191086732944806
-        }
-      }
-    },
-    {
       "ticker": "CDNS",
       "market_cap": 84823408640,
       "quality_score": 76.67,
@@ -5788,111 +3540,6 @@
           "value": 0.14959758654979283,
           "score": 6.97585519298757,
           "weighted_score": 6.97585519298757
-        }
-      }
-    },
-    {
-      "ticker": "ETD",
-      "market_cap": 565035968,
-      "quality_score": 76.47,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5048453464188664,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.10696686050730271,
-          "score": 3.441436878884402,
-          "weighted_score": 8.603592197211006
-        },
-        "operating_profitability": {
-          "value": 0.4135930180342125,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08924741583884443,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.08116136018631606,
-          "score": 2.8696816111789634,
-          "weighted_score": 2.8696816111789634
-        }
-      }
-    },
-    {
-      "ticker": "ACAD",
-      "market_cap": 4092508416,
-      "quality_score": 76.37,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.7374881709711423,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.3090245130616695,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.1398603753632901,
-          "score": 5.195811260898703,
-          "weighted_score": 10.391622521797405
-        },
-        "fcf_yield": {
-          "value": 0.03841067238504122,
-          "score": 5.261600857756183,
-          "weighted_score": 7.892401286634274
-        },
-        "roic": {
-          "value": 0.08483872077554702,
-          "score": 3.090323246532821,
-          "weighted_score": 3.0903232465328214
-        }
-      }
-    },
-    {
-      "ticker": "VCTR",
-      "market_cap": 4182976768,
-      "quality_score": 76.28,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.20795096230124852,
-          "score": 2.738528869037456,
-          "weighted_score": 8.215586607112368
-        },
-        "roe": {
-          "value": 0.25753786652901073,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.3166155791883391,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08097128403654572,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.1677747915486893,
-          "score": 8.066487492921357,
-          "weighted_score": 8.066487492921357
         }
       }
     },
@@ -5932,76 +3579,6 @@
       }
     },
     {
-      "ticker": "POWL",
-      "market_cap": 3754645760,
-      "quality_score": 76.01,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.29421879376845006,
-          "score": 5.326563813053502,
-          "weighted_score": 15.979691439160506
-        },
-        "roe": {
-          "value": 0.31019742357780294,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.9890764722359887,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.025682316299261213,
-          "score": 3.3523474448891823,
-          "weighted_score": 5.028521167333774
-        },
-        "roic": {
-          "value": 0.291624773637229,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "MCRI",
-      "market_cap": 1749108480,
-      "quality_score": 75.86,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4060481532946877,
-          "score": 8.681444598840631,
-          "weighted_score": 26.044333796521894
-        },
-        "roe": {
-          "value": 0.14054907020403748,
-          "score": 5.027453510201874,
-          "weighted_score": 12.568633775504685
-        },
-        "operating_profitability": {
-          "value": 0.48276634908608224,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.05332945387126589,
-          "score": 7.332945387126589,
-          "weighted_score": 10.999418080689882
-        },
-        "roic": {
-          "value": 0.13741203658435688,
-          "score": 6.244722195061414,
-          "weighted_score": 6.244722195061414
-        }
-      }
-    },
-    {
       "ticker": "GRMN",
       "market_cap": 36742283264,
       "quality_score": 75.83,
@@ -6033,82 +3610,6 @@
           "value": 0.15773649791238795,
           "score": 7.464189874743277,
           "weighted_score": 7.464189874743278
-        }
-      }
-    },
-    {
-      "ticker": "SEE",
-      "market_cap": 6176968192,
-      "quality_score": 75.81,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 7.22x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.23142649634724655,
-          "score": 3.4427948904173964,
-          "weighted_score": 10.328384671252188
-        },
-        "roe": {
-          "value": 0.42385908726981586,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.6518562823087111,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08220861500592944,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.12465097703052855,
-          "score": 5.479058621831713,
-          "weighted_score": 5.479058621831713
-        }
-      }
-    },
-    {
-      "ticker": "LZB",
-      "market_cap": 1226739456,
-      "quality_score": 75.5,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.48196666045837966,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.09754434301402183,
-          "score": 3.0376147006009355,
-          "weighted_score": 7.594036751502339
-        },
-        "operating_profitability": {
-          "value": 0.6967191110842894,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.09210676272566226,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.08175445258951491,
-          "score": 2.9052671553708946,
-          "weighted_score": 2.9052671553708946
         }
       }
     },
@@ -6148,41 +3649,6 @@
       }
     },
     {
-      "ticker": "CORT",
-      "market_cap": 7990864896,
-      "quality_score": 75.25,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.7901441075101748,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.20778588234947887,
-          "score": 8.19082352926338,
-          "weighted_score": 20.47705882315845
-        },
-        "operating_profitability": {
-          "value": 0.1758758817112068,
-          "score": 6.276276451336203,
-          "weighted_score": 12.552552902672407
-        },
-        "fcf_yield": {
-          "value": 0.024514868233857824,
-          "score": 3.177230235078674,
-          "weighted_score": 4.765845352618011
-        },
-        "roic": {
-          "value": 0.15759264411347002,
-          "score": 7.455558646808201,
-          "weighted_score": 7.455558646808202
-        }
-      }
-    },
-    {
       "ticker": "INTU",
       "market_cap": 180194181120,
       "quality_score": 75.23,
@@ -6218,47 +3684,6 @@
       }
     },
     {
-      "ticker": "ENR",
-      "market_cap": 1721796992,
-      "quality_score": 75.13,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 24.36x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.25430637435519526,
-          "score": 4.129191230655858,
-          "weighted_score": 12.387573691967573
-        },
-        "roe": {
-          "value": 0.280559646539028,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.48986735445836405,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.19264756620041767,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.07902064399988386,
-          "score": 2.741238639993031,
-          "weighted_score": 2.741238639993031
-        }
-      }
-    },
-    {
       "ticker": "NXPI",
       "market_cap": 48307044352,
       "quality_score": 75.12,
@@ -6290,76 +3715,6 @@
           "value": 0.13689075210859908,
           "score": 6.2134451265159445,
           "weighted_score": 6.213445126515945
-        }
-      }
-    },
-    {
-      "ticker": "AWI",
-      "market_cap": 7893585408,
-      "quality_score": 74.94,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.31562381288326913,
-          "score": 5.968714386498075,
-          "weighted_score": 17.906143159494224
-        },
-        "roe": {
-          "value": 0.34988772949412233,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.6171378954794595,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.023310066400690294,
-          "score": 2.9965099601035448,
-          "weighted_score": 4.494764940155317
-        },
-        "roic": {
-          "value": 0.15898968312453943,
-          "score": 7.539380987472366,
-          "weighted_score": 7.5393809874723665
-        }
-      }
-    },
-    {
-      "ticker": "FELE",
-      "market_cap": 4121216000,
-      "quality_score": 74.79,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.39397870818837244,
-          "score": 8.319361245651173,
-          "weighted_score": 24.95808373695352
-        },
-        "roe": {
-          "value": 0.14241303405183955,
-          "score": 5.120651702591978,
-          "weighted_score": 12.801629256479945
-        },
-        "operating_profitability": {
-          "value": 0.8520267427438996,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.05330247189179116,
-          "score": 7.330247189179116,
-          "weighted_score": 10.995370783768674
-        },
-        "roic": {
-          "value": 0.13393804147169855,
-          "score": 6.036282488301913,
-          "weighted_score": 6.036282488301913
         }
       }
     },
@@ -6510,41 +3865,6 @@
       }
     },
     {
-      "ticker": "PI",
-      "market_cap": 4253065472,
-      "quality_score": 74.39,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.386143371227611,
-          "score": 8.08430113682833,
-          "weighted_score": 24.252903410484986
-        },
-        "roe": {
-          "value": 0.2725004003629958,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.35162959025108365,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.0261453769597648,
-          "score": 3.42180654396472,
-          "weighted_score": 5.13270981594708
-        },
-        "roic": {
-          "value": -0.00938188020286221,
-          "score": 0.0,
-          "weighted_score": 0.0
-        }
-      }
-    },
-    {
       "ticker": "MTCH",
       "market_cap": 7627722240,
       "quality_score": 74.24,
@@ -6582,82 +3902,6 @@
           "value": 0.18730622002238118,
           "score": 9.23837320134287,
           "weighted_score": 9.23837320134287
-        }
-      }
-    },
-    {
-      "ticker": "WLY",
-      "market_cap": 1844531328,
-      "quality_score": 74.09,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.46302981349197797,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.11188557389863947,
-          "score": 3.652238881370263,
-          "weighted_score": 9.130597203425658
-        },
-        "operating_profitability": {
-          "value": 0.2520373655100975,
-          "score": 8.561120965302925,
-          "weighted_score": 17.12224193060585
-        },
-        "fcf_yield": {
-          "value": 0.06495796421626296,
-          "score": 8.495796421626295,
-          "weighted_score": 12.743694632439443
-        },
-        "roic": {
-          "value": 0.11814563962201882,
-          "score": 5.088738377321129,
-          "weighted_score": 5.088738377321129
-        }
-      }
-    },
-    {
-      "ticker": "ETSY",
-      "market_cap": 5383577600,
-      "quality_score": 74.06,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "Negative Return on Equity",
-          "severity": "HIGH",
-          "description": "ROE at -40.0%. Company is destroying shareholder value."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.8411750935361418,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": -0.39965026763618344,
-          "score": 0.0,
-          "weighted_score": 0.0
-        },
-        "operating_profitability": {
-          "value": 0.4776121254935308,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.13169142393340816,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.18440302864541605,
-          "score": 9.064181718724964,
-          "weighted_score": 9.064181718724964
         }
       }
     },
@@ -6738,117 +3982,6 @@
       }
     },
     {
-      "ticker": "EZPW",
-      "market_cap": 1093999104,
-      "quality_score": 73.77,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4569087157631374,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.10327864166120827,
-          "score": 3.283370356908926,
-          "weighted_score": 8.208425892272315
-        },
-        "operating_profitability": {
-          "value": 0.3964012410622024,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.07114813870999295,
-          "score": 9.114813870999296,
-          "weighted_score": 13.672220806498942
-        },
-        "roic": {
-          "value": 0.06485369077799481,
-          "score": 1.8912214466796886,
-          "weighted_score": 1.8912214466796886
-        }
-      }
-    },
-    {
-      "ticker": "WHD",
-      "market_cap": 2824854528,
-      "quality_score": 73.72,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.25089747304706184,
-          "score": 4.026924191411855,
-          "weighted_score": 12.080772574235565
-        },
-        "roe": {
-          "value": 0.17309686990310116,
-          "score": 6.654843495155058,
-          "weighted_score": 16.637108737887644
-        },
-        "operating_profitability": {
-          "value": 0.5745621297420613,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.09803584476828678,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.2171803765704288,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    {
-      "ticker": "CBRL",
-      "market_cap": 625750336,
-      "quality_score": 73.63,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "MEDIUM",
-          "description": "Debt-to-Equity ratio at 2.55x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.5310123022326823,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.10045506823857618,
-          "score": 3.1623600673675507,
-          "weighted_score": 7.905900168418877
-        },
-        "operating_profitability": {
-          "value": 1.1151315241705846,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.0954933566348097,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.03614183408497421,
-          "score": 0.7228366816994842,
-          "weighted_score": 0.7228366816994842
-        }
-      }
-    },
-    {
       "ticker": "DG",
       "market_cap": 22703937536,
       "quality_score": 73.62,
@@ -6925,111 +4058,6 @@
       }
     },
     {
-      "ticker": "KFY",
-      "market_cap": 3329446912,
-      "quality_score": 73.58,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.6332222631994414,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.13183380695821387,
-          "score": 4.591690347910694,
-          "weighted_score": 11.479225869776734
-        },
-        "operating_profitability": {
-          "value": 0.17204052393748717,
-          "score": 6.161215718124615,
-          "weighted_score": 12.32243143624923
-        },
-        "fcf_yield": {
-          "value": 0.09066911351310954,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.11299486922921784,
-          "score": 4.77969215375307,
-          "weighted_score": 4.77969215375307
-        }
-      }
-    },
-    {
-      "ticker": "APOG",
-      "market_cap": 733081856,
-      "quality_score": 73.52,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.30622180964528123,
-          "score": 5.686654289358437,
-          "weighted_score": 17.05996286807531
-        },
-        "roe": {
-          "value": 0.1743233216778917,
-          "score": 6.716166083894585,
-          "weighted_score": 16.790415209736462
-        },
-        "operating_profitability": {
-          "value": 0.9523019836309815,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.12218144435974146,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.11110345073944417,
-          "score": 4.66620704436665,
-          "weighted_score": 4.666207044366651
-        }
-      }
-    },
-    {
-      "ticker": "MGY",
-      "market_cap": 4297143808,
-      "quality_score": 73.45,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.24130656348208954,
-          "score": 3.7391969044626863,
-          "weighted_score": 11.21759071338806
-        },
-        "roe": {
-          "value": 0.19127875044615353,
-          "score": 7.4833750191208654,
-          "weighted_score": 18.708437547802163
-        },
-        "operating_profitability": {
-          "value": 0.40668383652358253,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.10102547631563928,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.17539218730215447,
-          "score": 8.523531238129268,
-          "weighted_score": 8.523531238129268
-        }
-      }
-    },
-    {
       "ticker": "JNJ",
       "market_cap": 480847134720,
       "quality_score": 73.39,
@@ -7061,123 +4089,6 @@
           "value": 0.1618300284858126,
           "score": 7.709801709148756,
           "weighted_score": 7.709801709148757
-        }
-      }
-    },
-    {
-      "ticker": "MKTX",
-      "market_cap": 6501483520,
-      "quality_score": 73.22,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.2745269436445907,
-          "score": 4.73580830933772,
-          "weighted_score": 14.207424928013161
-        },
-        "roe": {
-          "value": 0.1974428585830945,
-          "score": 7.747551082132621,
-          "weighted_score": 19.368877705331553
-        },
-        "operating_profitability": {
-          "value": 0.37266545794359096,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.0505533850834094,
-          "score": 7.055338508340939,
-          "weighted_score": 10.583007762511407
-        },
-        "roic": {
-          "value": 0.18427750640861582,
-          "score": 9.05665038451695,
-          "weighted_score": 9.05665038451695
-        }
-      }
-    },
-    {
-      "ticker": "WU",
-      "market_cap": 2874408704,
-      "quality_score": 72.98,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 3.23x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.18985723672421,
-          "score": 2.1957171017263004,
-          "weighted_score": 6.587151305178901
-        },
-        "roe": {
-          "value": 0.964186190525338,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.39977301236485274,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.09591537891474462,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.13981857641005632,
-          "score": 6.38911458460338,
-          "weighted_score": 6.38911458460338
-        }
-      }
-    },
-    {
-      "ticker": "EVTC",
-      "market_cap": 1807223552,
-      "quality_score": 72.98,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "MEDIUM",
-          "description": "Debt-to-Equity ratio at 2.05x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.23636272610358142,
-          "score": 3.5908817831074424,
-          "weighted_score": 10.772645349322328
-        },
-        "roe": {
-          "value": 0.23833710033776062,
-          "score": 9.500161443046885,
-          "weighted_score": 23.750403607617212
-        },
-        "operating_profitability": {
-          "value": 0.307966522592728,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.0949694351924869,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.090942668573406,
-          "score": 3.4565601144043594,
-          "weighted_score": 3.4565601144043594
         }
       }
     },
@@ -7223,76 +4134,6 @@
       }
     },
     {
-      "ticker": "ECG",
-      "market_cap": 4540605440,
-      "quality_score": 72.62,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.2634542086191066,
-          "score": 4.4036262585731984,
-          "weighted_score": 13.210878775719594
-        },
-        "roe": {
-          "value": 0.33936802551749595,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 2.095629443763616,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.025348822204644145,
-          "score": 3.3023233306966224,
-          "weighted_score": 4.953484996044933
-        },
-        "roic": {
-          "value": 0.1909186270542393,
-          "score": 9.455117623254356,
-          "weighted_score": 9.455117623254356
-        }
-      }
-    },
-    {
-      "ticker": "SIG",
-      "market_cap": 3933550848,
-      "quality_score": 72.52,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4584919498480774,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.03304892536991036,
-          "score": 0.6609785073982072,
-          "weighted_score": 1.652446268495518
-        },
-        "operating_profitability": {
-          "value": 0.7999860301051235,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.11132435220016253,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.13107167595738364,
-          "score": 5.864300557443018,
-          "weighted_score": 5.864300557443018
-        }
-      }
-    },
-    {
       "ticker": "BR",
       "market_cap": 26407274496,
       "quality_score": 72.47,
@@ -7328,41 +4169,6 @@
       }
     },
     {
-      "ticker": "AMPH",
-      "market_cap": 1213056640,
-      "quality_score": 72.42,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.23699658313628785,
-          "score": 3.6098974940886355,
-          "weighted_score": 10.829692482265907
-        },
-        "roe": {
-          "value": 0.21783345031667437,
-          "score": 8.62143358500033,
-          "weighted_score": 21.553583962500827
-        },
-        "operating_profitability": {
-          "value": 0.3572372216270357,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.1420749817584775,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.11735283079039113,
-          "score": 5.041169847423468,
-          "weighted_score": 5.041169847423469
-        }
-      }
-    },
-    {
       "ticker": "CTSH",
       "market_cap": 34759139328,
       "quality_score": 72.4,
@@ -7394,47 +4200,6 @@
           "value": 0.15046198388721047,
           "score": 7.0277190332326285,
           "weighted_score": 7.0277190332326285
-        }
-      }
-    },
-    {
-      "ticker": "COLL",
-      "market_cap": 1433241600,
-      "quality_score": 72.38,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 3.75x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.22682498282330213,
-          "score": 3.304749484699064,
-          "weighted_score": 9.914248454097192
-        },
-        "roe": {
-          "value": 0.3023483451464329,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.25311870525868435,
-          "score": 8.593561157760531,
-          "weighted_score": 17.187122315521066
-        },
-        "fcf_yield": {
-          "value": 0.14186582359875682,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.12122979579833477,
-          "score": 5.273787747900086,
-          "weighted_score": 5.273787747900086
         }
       }
     },
@@ -7585,41 +4350,6 @@
       }
     },
     {
-      "ticker": "GPI",
-      "market_cap": 4940086784,
-      "quality_score": 72.03,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.32990981453960627,
-          "score": 6.397294436188188,
-          "weighted_score": 19.191883308564563
-        },
-        "roe": {
-          "value": 0.16751286103359,
-          "score": 6.3756430516795,
-          "weighted_score": 15.93910762919875
-        },
-        "operating_profitability": {
-          "value": 1.7967977036298122,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.06906761255795785,
-          "score": 8.906761255795784,
-          "weighted_score": 13.360141883693675
-        },
-        "roic": {
-          "value": 0.09223545601792651,
-          "score": 3.5341273610755906,
-          "weighted_score": 3.5341273610755906
-        }
-      }
-    },
-    {
       "ticker": "CMCSA",
       "market_cap": 101000306688,
       "quality_score": 71.88,
@@ -7655,76 +4385,6 @@
       }
     },
     {
-      "ticker": "GRBK",
-      "market_cap": 2683610112,
-      "quality_score": 71.69,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.31267683380489014,
-          "score": 5.880305014146705,
-          "weighted_score": 17.640915042440113
-        },
-        "roe": {
-          "value": 0.23476035350971905,
-          "score": 9.346872293273673,
-          "weighted_score": 23.367180733184185
-        },
-        "operating_profitability": {
-          "value": 0.8321697746749547,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.008029109706976689,
-          "score": 0.8029109706976688,
-          "weighted_score": 1.204366456046503
-        },
-        "roic": {
-          "value": 0.19123088424270845,
-          "score": 9.473853054562507,
-          "weighted_score": 9.473853054562507
-        }
-      }
-    },
-    {
-      "ticker": "HLIT",
-      "market_cap": 1066495488,
-      "quality_score": 71.64,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.45940771318734575,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.08429086657295522,
-          "score": 2.4696085674123665,
-          "weighted_score": 6.174021418530916
-        },
-        "operating_profitability": {
-          "value": 0.5079974287701536,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.049443247152303,
-          "score": 6.916487072845449,
-          "weighted_score": 10.374730609268173
-        },
-        "roic": {
-          "value": 0.1182245307404335,
-          "score": 5.09347184442601,
-          "weighted_score": 5.093471844426011
-        }
-      }
-    },
-    {
       "ticker": "UNH",
       "market_cap": 291571335168,
       "quality_score": 71.58,
@@ -7756,82 +4416,6 @@
           "value": 0.15042715938712684,
           "score": 7.025629563227611,
           "weighted_score": 7.025629563227611
-        }
-      }
-    },
-    {
-      "ticker": "NATL",
-      "market_cap": 2540092416,
-      "quality_score": 71.54,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "HIGH",
-          "description": "Debt-to-Equity ratio at 11.72x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.18605907780979827,
-          "score": 2.0817723342939485,
-          "weighted_score": 6.245317002881845
-        },
-        "roe": {
-          "value": 0.35,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.6831772334293948,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.08070572499988914,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.1216303690260133,
-          "score": 5.297822141560799,
-          "weighted_score": 5.297822141560799
-        }
-      }
-    },
-    {
-      "ticker": "CXM",
-      "market_cap": 1722246528,
-      "quality_score": 71.52,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.48498267605360246,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.19868706325982782,
-          "score": 7.800874139706907,
-          "weighted_score": 19.50218534926727
-        },
-        "operating_profitability": {
-          "value": 0.20777588901865313,
-          "score": 7.233276670559594,
-          "weighted_score": 14.466553341119187
-        },
-        "fcf_yield": {
-          "value": 0.03434874104156127,
-          "score": 4.652311156234191,
-          "weighted_score": 6.9784667343512865
-        },
-        "roic": {
-          "value": 0.028658016126688945,
-          "score": 0.5731603225337789,
-          "weighted_score": 0.5731603225337789
         }
       }
     },
@@ -8058,41 +4642,6 @@
       }
     },
     {
-      "ticker": "CNXN",
-      "market_cap": 1446919424,
-      "quality_score": 70.94,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4000403277320884,
-          "score": 8.501209831962653,
-          "weighted_score": 25.503629495887957
-        },
-        "roe": {
-          "value": 0.09560478161121418,
-          "score": 2.954490640480608,
-          "weighted_score": 7.386226601201519
-        },
-        "operating_profitability": {
-          "value": 1.8315393649459655,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.1149289982853945,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.08423526298002837,
-          "score": 3.0541157788017017,
-          "weighted_score": 3.054115778801702
-        }
-      }
-    },
-    {
       "ticker": "CSCO",
       "market_cap": 307716849664,
       "quality_score": 70.83,
@@ -8169,41 +4718,6 @@
       }
     },
     {
-      "ticker": "STRL",
-      "market_cap": 10224021504,
-      "quality_score": 70.59,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.21128941567076925,
-          "score": 2.8386824701230777,
-          "weighted_score": 8.516047410369232
-        },
-        "roe": {
-          "value": 0.3186079118306209,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 0.9692092420866195,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.04070316165094013,
-          "score": 5.60547424764102,
-          "weighted_score": 8.40821137146153
-        },
-        "roic": {
-          "value": 0.1778426812643595,
-          "score": 8.67056087586157,
-          "weighted_score": 8.67056087586157
-        }
-      }
-    },
-    {
       "ticker": "KO",
       "market_cap": 306657787904,
       "quality_score": 70.53,
@@ -8274,41 +4788,6 @@
       }
     },
     {
-      "ticker": "CF",
-      "market_cap": 13129527296,
-      "quality_score": 70.49,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.15268082578345463,
-          "score": 1.080424773503639,
-          "weighted_score": 3.2412743205109167
-        },
-        "roe": {
-          "value": 0.24433299899699099,
-          "score": 9.757128528442472,
-          "weighted_score": 24.39282132110618
-        },
-        "operating_profitability": {
-          "value": 0.41519382147631073,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.13328735761364002,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.1642194144089418,
-          "score": 7.853164864536509,
-          "weighted_score": 7.8531648645365095
-        }
-      }
-    },
-    {
       "ticker": "ABBV",
       "market_cap": 413532651520,
       "quality_score": 70.49,
@@ -8350,154 +4829,37 @@
       }
     },
     {
-      "ticker": "PRKS",
-      "market_cap": 1718143488,
-      "quality_score": 70.44,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "Negative Return on Equity",
-          "severity": "HIGH",
-          "description": "ROE at -49.3%. Company is destroying shareholder value."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.6193299756214888,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": -0.49290852363825455,
-          "score": 0.0,
-          "weighted_score": 0.0
-        },
-        "operating_profitability": {
-          "value": 0.23130249015184307,
-          "score": 7.939074704555292,
-          "weighted_score": 15.878149409110584
-        },
-        "fcf_yield": {
-          "value": 0.13486009848322983,
-          "score": 10.0,
-          "weighted_score": 15.0
-        },
-        "roic": {
-          "value": 0.19268635126786113,
-          "score": 9.561181076071668,
-          "weighted_score": 9.561181076071668
-        }
-      }
-    },
-    {
-      "ticker": "SCVL",
-      "market_cap": 462600672,
-      "quality_score": 70.4,
+      "ticker": "CF",
+      "market_cap": 13129527296,
+      "quality_score": 70.49,
       "tier": "Strong",
       "red_flags_count": 0,
       "red_flags": [],
       "metrics": {
         "gross_profitability": {
-          "value": 0.3814441885435264,
-          "score": 7.943325656305793,
-          "weighted_score": 23.82997696891738
+          "value": 0.15268082578345463,
+          "score": 1.080424773503639,
+          "weighted_score": 3.2412743205109167
         },
         "roe": {
-          "value": 0.11366171748362086,
-          "score": 3.7283593207266086,
-          "weighted_score": 9.320898301816522
+          "value": 0.24433299899699099,
+          "score": 9.757128528442472,
+          "weighted_score": 24.39282132110618
         },
         "operating_profitability": {
-          "value": 0.7696980695344768,
+          "value": 0.41519382147631073,
           "score": 10.0,
           "weighted_score": 20.0
         },
         "fcf_yield": {
-          "value": 0.15018784927316317,
+          "value": 0.13328735761364002,
           "score": 10.0,
           "weighted_score": 15.0
         },
         "roic": {
-          "value": 0.07080755528853482,
-          "score": 2.2484533173120886,
-          "weighted_score": 2.2484533173120886
-        }
-      }
-    },
-    {
-      "ticker": "GES",
-      "market_cap": 882407360,
-      "quality_score": 70.38,
-      "tier": "Strong",
-      "red_flags_count": 1,
-      "red_flags": [
-        {
-          "category": "High Leverage",
-          "severity": "MEDIUM",
-          "description": "Debt-to-Equity ratio at 2.81x (threshold: 2.0x). High leverage increases financial risk and interest burden."
-        }
-      ],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.4702354231320016,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.11964784646549453,
-          "score": 3.9849077056640514,
-          "weighted_score": 9.962269264160128
-        },
-        "operating_profitability": {
-          "value": 0.6725141125927918,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.04033057929163238,
-          "score": 5.549586893744857,
-          "weighted_score": 8.324380340617285
-        },
-        "roic": {
-          "value": 0.06823599326436736,
-          "score": 2.094159595862041,
-          "weighted_score": 2.094159595862041
-        }
-      }
-    },
-    {
-      "ticker": "A",
-      "market_cap": 41183703040,
-      "quality_score": 70.33,
-      "tier": "Strong",
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.2984129664021611,
-          "score": 5.452388992064833,
-          "weighted_score": 16.3571669761945
-        },
-        "roe": {
-          "value": 0.21854866056290267,
-          "score": 8.652085452695829,
-          "weighted_score": 21.630213631739572
-        },
-        "operating_profitability": {
-          "value": 0.37675164612527434,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.03333842997717963,
-          "score": 4.500764496576945,
-          "weighted_score": 6.751146744865418
-        },
-        "roic": {
-          "value": 0.12656330749354006,
-          "score": 5.593798449612404,
-          "weighted_score": 5.593798449612404
+          "value": 0.1642194144089418,
+          "score": 7.853164864536509,
+          "weighted_score": 7.8531648645365095
         }
       }
     },
@@ -8574,6 +4936,41 @@
           "value": 0.19495835088211896,
           "score": 9.697501052927137,
           "weighted_score": 9.697501052927137
+        }
+      }
+    },
+    {
+      "ticker": "A",
+      "market_cap": 41183703040,
+      "quality_score": 70.33,
+      "tier": "Strong",
+      "red_flags_count": 0,
+      "red_flags": [],
+      "metrics": {
+        "gross_profitability": {
+          "value": 0.2984129664021611,
+          "score": 5.452388992064833,
+          "weighted_score": 16.3571669761945
+        },
+        "roe": {
+          "value": 0.21854866056290267,
+          "score": 8.652085452695829,
+          "weighted_score": 21.630213631739572
+        },
+        "operating_profitability": {
+          "value": 0.37675164612527434,
+          "score": 10.0,
+          "weighted_score": 20.0
+        },
+        "fcf_yield": {
+          "value": 0.03333842997717963,
+          "score": 4.500764496576945,
+          "weighted_score": 6.751146744865418
+        },
+        "roic": {
+          "value": 0.12656330749354006,
+          "score": 5.593798449612404,
+          "weighted_score": 5.593798449612404
         }
       }
     },
@@ -8655,9 +5052,9 @@
     }
   ],
   "statistics": {
-    "elite_count": 102,
-    "strong_count": 135,
-    "average_quality_score": 82.83983122362878,
+    "elite_count": 66,
+    "strong_count": 72,
+    "average_quality_score": 83.2772463768116,
     "top_quality_score": 100.0
   }
 }

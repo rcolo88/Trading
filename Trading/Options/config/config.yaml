@@ -33,8 +33,8 @@ strategies:
       dte_max: 45
       short_delta: 0.30     # Sell put with ~30 delta
       long_delta: 0.10      # Buy put with ~20 delta
-      vix_min: 15           # Don't enter if VIX < 15 (need decent premium)
-      vix_max: 50           # Don't enter if VIX > 50 (too risky)
+      iv_percentile_min: 30 # Enter when IV is above 30th percentile (higher premium)
+      iv_percentile_max: 80 # Don't enter if IV > 80th percentile (too risky)
     exit:
       profit_target: 0.50   # Close at 50% of max profit
       stop_loss: 0.50       # Stop at 50% of max loss
@@ -47,8 +47,8 @@ strategies:
       dte_max: 60
       long_delta: 0.60      # Buy call with ~60 delta
       short_delta: 0.40     # Sell call with ~40 delta
-      vix_min: 10           # Can enter in lower volatility (cheaper debit)
-      vix_max: 40           # Don't enter if VIX > 40 (too expensive)
+      iv_percentile_min: 20 # Can enter in lower IV percentile (cheaper debit)
+      iv_percentile_max: 70 # Don't enter if IV > 70th percentile (too expensive)
     exit:
       profit_target: 0.75   # Target 75% of max profit
       stop_loss: 0.50       # Stop at 50% of max loss
@@ -76,8 +76,8 @@ strategies:
       moneyness: 0.0         # Used if strike_selection = "moneyness" (0.0 = ATM)
       min_debit: 0.5         # Minimum debit to enter (optional)
       max_debit: 20.0        # Maximum debit to enter (increased for SPY ~$530)
-      vix_min: 5             # Prefer low IV environment
-      vix_max: 30            # Don't enter if VIX too high (defeats calendar purpose)
+      iv_percentile_min: 10  # Calendars prefer low IV environment (10th percentile+)
+      iv_percentile_max: 50  # Don't enter if IV > 50th percentile (defeats calendar purpose)
     exit:
       profit_target: 0.25    # Close at 25% profit
       stop_loss: -0.50       # Stop at 50% loss
@@ -100,11 +100,10 @@ position_sizing:
     bull_call_spread: 0.04   # Example: 4% (Half Kelly of 8%)
     call_calendar: 0.05      # Example: 5% (Half Kelly of 10%)
 
-# Market filters (global fallback - each strategy has its own VIX criteria in entry section)
+# Market filters (global fallback - each strategy has its own IV Percentile criteria in entry section)
 market_filters:
-  vix_max: 40  # Global fallback: Don't enter if VIX > 40
-  vix_min: 12  # Global fallback: Don't enter if VIX < 12
-  iv_rank_min: 30  # Prefer IV rank > 30 (not yet implemented)
+  iv_percentile_max: 75  # Global fallback: Don't enter if IV Percentile > 75
+  iv_percentile_min: 25  # Global fallback: Don't enter if IV Percentile < 25
 
 # Analysis and reporting
 analysis:

@@ -531,17 +531,20 @@ class STEPSOrchestrator:
             if result.returncode != 0:
                 logger.warning(f"Watchlist generator had issues: {result.stderr}")
 
-            # Load watchlist output (fixed filename)
-            watchlist_file = self.outputs_dir / "quality_watchlist.csv"
-            if not watchlist_file.exists():
-                logger.warning(f"No watchlist output found at {watchlist_file} - using empty list")
+            # Load watchlist output from quality_analysis.json (consolidated)
+            analysis_file = self.outputs_dir / "quality_analysis.json"
+            if not analysis_file.exists():
+                logger.warning(f"No quality analysis found at {analysis_file} - using empty list")
                 return []
 
-            logger.info(f"Loading watchlist from: {watchlist_file}")
+            logger.info(f"Loading watchlist from: {analysis_file}")
 
-            import pandas as pd
-            df = pd.read_csv(watchlist_file)
-            watchlist = df['ticker'].tolist() if 'ticker' in df.columns else []
+            import json
+            with open(analysis_file, 'r') as f:
+                analysis_data = json.load(f)
+
+            # Extract watchlist tickers from quality_analysis.json
+            watchlist = list(analysis_data.get('watchlist_quality', {}).keys())
 
             logger.info(f"✅ STEP 3A Complete: Found {len(watchlist)} quality candidates")
             for ticker in watchlist[:10]:  # Show first 10

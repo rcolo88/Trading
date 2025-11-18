@@ -1,502 +1,94 @@
 {
-  "timestamp": "2025-11-17T17:42:35.000002",
-  "holdings_count": 2,
-  "watchlist_count": 42,
+  "timestamp": "2025-11-18T11:28:41.015745",
+  "holdings_count": 1,
+  "watchlist_count": 3,
   "holdings_quality": {
-    "GOOGL": {
-      "composite_score": 88.95,
-      "tier": "Elite",
-      "market_cap": 3482266370048,
+    "GSL": {
+      "composite_score": 69.07,
+      "tier": "Moderate",
+      "market_cap": 1241599360,
       "red_flags_count": 0,
       "red_flags": [],
       "metrics": {
         "gross_profitability": {
-          "value": 0.4524359475498383,
-          "score": 10.0,
-          "weighted_score": 30.0
+          "value": 0.1646458751624885,
+          "score": 1.439376254874655,
+          "weighted_score": 4.318128764623965
         },
         "roe": {
-          "value": 0.30797578472025694,
-          "score": 10.0,
-          "weighted_score": 25.0
+          "value": 0.24163484185992165,
+          "score": 9.641493222568071,
+          "weighted_score": 24.10373305642018
         },
         "operating_profitability": {
-          "value": 0.5745531431008137,
-          "score": 10.0,
-          "weighted_score": 20.0
+          "value": 0.2900657117153939,
+          "score": 9.701971351461818,
+          "weighted_score": 19.403942702923636
         },
         "fcf_yield": {
-          "value": 0.0208955870308672,
-          "score": 2.6343380546300805,
-          "weighted_score": 3.951507081945121
+          "value": 0.15113732017387638,
+          "score": 10.0,
+          "weighted_score": 15.0
         },
         "roic": {
-          "value": 0.25328588341011854,
-          "score": 10.0,
-          "weighted_score": 10.0
-        }
-      }
-    },
-    "NVDA": {
-      "composite_score": 87.27,
-      "tier": "Elite",
-      "market_cap": 4534866280448,
-      "red_flags_count": 0,
-      "red_flags": [],
-      "metrics": {
-        "gross_profitability": {
-          "value": 0.876855942151056,
-          "score": 10.0,
-          "weighted_score": 30.0
-        },
-        "roe": {
-          "value": 0.9187288060811577,
-          "score": 10.0,
-          "weighted_score": 25.0
-        },
-        "operating_profitability": {
-          "value": 1.0223205885251925,
-          "score": 10.0,
-          "weighted_score": 20.0
-        },
-        "fcf_yield": {
-          "value": 0.013418918273812547,
-          "score": 1.5128377410718823,
-          "weighted_score": 2.2692566116078234
-        },
-        "roic": {
-          "value": 0.7181922385794167,
-          "score": 10.0,
-          "weighted_score": 10.0
+          "value": 0.137438438807602,
+          "score": 6.246306328456121,
+          "weighted_score": 6.2463063284561215
         }
       }
     }
   },
   "watchlist_quality": {
-    "ADP": {
-      "composite_score": 69.41,
+    "MMM": {
+      "composite_score": 68.44,
       "tier": "Moderate",
-      "market_cap": 101908373504,
-      "red_flags_count": 0
-    },
-    "BTSG": {
-      "composite_score": 34.34,
-      "tier": "Weak",
-      "market_cap": 5738630144,
-      "red_flags_count": 2
-    },
-    "ES": {
-      "composite_score": 16.47,
-      "tier": "Weak",
-      "market_cap": 27623301120,
+      "market_cap": 88517730304,
       "red_flags_count": 1
     },
-    "CENX": {
-      "composite_score": 49.61,
-      "tier": "Weak",
-      "market_cap": 2617308928,
-      "red_flags_count": 1
-    },
-    "QCOM": {
-      "composite_score": 98.69,
+    "AOS": {
+      "composite_score": 95.82,
       "tier": "Elite",
-      "market_cap": 179923255296,
+      "market_cap": 9027849216,
       "red_flags_count": 0
     },
-    "MCD": {
-      "composite_score": 49.3,
-      "tier": "Weak",
-      "market_cap": 217742114816,
-      "red_flags_count": 1
-    },
-    "COLL": {
-      "composite_score": 72.38,
-      "tier": "Strong",
-      "market_cap": 1433241600,
-      "red_flags_count": 1
-    },
-    "FIZZ": {
-      "composite_score": 96.31,
-      "tier": "Elite",
-      "market_cap": 3075425024,
-      "red_flags_count": 0
-    },
-    "GLW": {
-      "composite_score": 29.12,
-      "tier": "Weak",
-      "market_cap": 69060378624,
-      "red_flags_count": 0
-    },
-    "BCPC": {
-      "composite_score": 47.96,
-      "tier": "Weak",
-      "market_cap": 5058304000,
-      "red_flags_count": 0
-    },
-    "DRI": {
-      "composite_score": 70.02,
-      "tier": "Strong",
-      "market_cap": 20114954240,
-      "red_flags_count": 1
-    },
-    "MTCH": {
-      "composite_score": 74.24,
-      "tier": "Strong",
-      "market_cap": 7627722240,
-      "red_flags_count": 1
-    },
-    "JKHY": {
-      "composite_score": 77.62,
-      "tier": "Strong",
-      "market_cap": 11919272960,
-      "red_flags_count": 0
-    },
-    "APTV": {
-      "composite_score": 62.17,
+    "ABT": {
+      "composite_score": 68.88,
       "tier": "Moderate",
-      "market_cap": 16734840832,
+      "market_cap": 227843489792,
       "red_flags_count": 0
-    },
-    "TGT": {
-      "composite_score": 95.64,
-      "tier": "Elite",
-      "market_cap": 40321105920,
-      "red_flags_count": 0
-    },
-    "EW": {
-      "composite_score": 63.57,
-      "tier": "Moderate",
-      "market_cap": 49750855680,
-      "red_flags_count": 0
-    },
-    "LMAT": {
-      "composite_score": 46.81,
-      "tier": "Weak",
-      "market_cap": 1983436416,
-      "red_flags_count": 0
-    },
-    "INN": {
-      "composite_score": 33.21,
-      "tier": "Weak",
-      "market_cap": 564173568,
-      "red_flags_count": 0
-    },
-    "NPK": {
-      "composite_score": 38.0,
-      "tier": "Weak",
-      "market_cap": 673426816,
-      "red_flags_count": 1
-    },
-    "VRRM": {
-      "composite_score": 67.35,
-      "tier": "Moderate",
-      "market_cap": 3590200064,
-      "red_flags_count": 1
-    },
-    "DFIN": {
-      "composite_score": 95.67,
-      "tier": "Elite",
-      "market_cap": 1248675328,
-      "red_flags_count": 0
-    },
-    "BHE": {
-      "composite_score": 42.47,
-      "tier": "Weak",
-      "market_cap": 1529795968,
-      "red_flags_count": 0
-    },
-    "LUMN": {
-      "composite_score": 36.98,
-      "tier": "Weak",
-      "market_cap": 8270696448,
-      "red_flags_count": 2
-    },
-    "GIII": {
-      "composite_score": 79.79,
-      "tier": "Strong",
-      "market_cap": 1173154432,
-      "red_flags_count": 0
-    },
-    "KRYS": {
-      "composite_score": 35.6,
-      "tier": "Weak",
-      "market_cap": 6059502080,
-      "red_flags_count": 0
-    },
-    "SAFE": {
-      "composite_score": 13.79,
-      "tier": "Weak",
-      "market_cap": 961534848,
-      "red_flags_count": 0
-    },
-    "BJRI": {
-      "composite_score": 35.4,
-      "tier": "Weak",
-      "market_cap": 802001536,
-      "red_flags_count": 0
-    },
-    "SNCY": {
-      "composite_score": 47.41,
-      "tier": "Weak",
-      "market_cap": 626734016,
-      "red_flags_count": 0
-    },
-    "SLG": {
-      "composite_score": 11.84,
-      "tier": "Weak",
-      "market_cap": 3389365504,
-      "red_flags_count": 0
-    },
-    "ESI": {
-      "composite_score": 48.71,
-      "tier": "Weak",
-      "market_cap": 6086298112,
-      "red_flags_count": 0
-    },
-    "TTMI": {
-      "composite_score": 26.65,
-      "tier": "Weak",
-      "market_cap": 6834810880,
-      "red_flags_count": 0
-    },
-    "COST": {
-      "composite_score": 88.6,
-      "tier": "Elite",
-      "market_cap": 405205024768,
-      "red_flags_count": 0
-    },
-    "CTAS": {
-      "composite_score": 89.57,
-      "tier": "Elite",
-      "market_cap": 74298032128,
-      "red_flags_count": 0
-    },
-    "TR": {
-      "composite_score": 49.3,
-      "tier": "Weak",
-      "market_cap": 2868374528,
-      "red_flags_count": 0
-    },
-    "CVCO": {
-      "composite_score": 68.01,
-      "tier": "Moderate",
-      "market_cap": 4329764864,
-      "red_flags_count": 0
-    },
-    "NEOG": {
-      "composite_score": 12.66,
-      "tier": "Weak",
-      "market_cap": 1397230080,
-      "red_flags_count": 2
-    },
-    "CALX": {
-      "composite_score": 52.19,
-      "tier": "Moderate",
-      "market_cap": 3859278848,
-      "red_flags_count": 1
-    },
-    "HAS": {
-      "composite_score": 89.99,
-      "tier": "Elite",
-      "market_cap": 10811564032,
-      "red_flags_count": 1
-    },
-    "SXT": {
-      "composite_score": 49.96,
-      "tier": "Weak",
-      "market_cap": 3958893312,
-      "red_flags_count": 0
-    },
-    "CHRW": {
-      "composite_score": 68.57,
-      "tier": "Moderate",
-      "market_cap": 18014738432,
-      "red_flags_count": 0
-    },
-    "PDFS": {
-      "composite_score": 38.64,
-      "tier": "Weak",
-      "market_cap": 987824000,
-      "red_flags_count": 1
-    },
-    "FRPT": {
-      "composite_score": 34.76,
-      "tier": "Weak",
-      "market_cap": 2589770496,
-      "red_flags_count": 1
     }
   },
   "recommendations": {
-    "sell_candidates": [],
+    "sell_candidates": [
+      {
+        "ticker": "GSL",
+        "quality_score": 69.07,
+        "tier": "Moderate",
+        "red_flags": 0,
+        "reason": "Quality score 69.1 below minimum threshold 70"
+      }
+    ],
     "buy_alternatives": [
       {
-        "ticker": "QCOM",
-        "quality_score": 98.69,
+        "ticker": "AOS",
+        "quality_score": 95.82,
         "tier": "Elite",
         "red_flags": 0,
-        "reason": "Elite quality score 98.7 (>=85)"
-      },
-      {
-        "ticker": "FIZZ",
-        "quality_score": 96.31,
-        "tier": "Elite",
-        "red_flags": 0,
-        "reason": "Elite quality score 96.3 (>=85)"
-      },
-      {
-        "ticker": "DFIN",
-        "quality_score": 95.67,
-        "tier": "Elite",
-        "red_flags": 0,
-        "reason": "Elite quality score 95.7 (>=85)"
-      },
-      {
-        "ticker": "TGT",
-        "quality_score": 95.64,
-        "tier": "Elite",
-        "red_flags": 0,
-        "reason": "Elite quality score 95.6 (>=85)"
-      },
-      {
-        "ticker": "HAS",
-        "quality_score": 89.99,
-        "tier": "Elite",
-        "red_flags": 1,
-        "reason": "Elite quality score 90.0 (>=85)"
-      },
-      {
-        "ticker": "CTAS",
-        "quality_score": 89.57,
-        "tier": "Elite",
-        "red_flags": 0,
-        "reason": "Elite quality score 89.6 (>=85)"
-      },
-      {
-        "ticker": "COST",
-        "quality_score": 88.6,
-        "tier": "Elite",
-        "red_flags": 0,
-        "reason": "Elite quality score 88.6 (>=85)"
+        "reason": "Elite quality score 95.8 (>=85)"
       }
     ]
   },
   "market_cap_tiers": {
-    "ADP": "Large Cap",
-    "BTSG": "Mid Cap",
-    "ES": "Mid Cap",
-    "CENX": "Mid Cap",
-    "QCOM": "Large Cap",
-    "MCD": "Large Cap",
-    "COLL": "Small Cap",
-    "FIZZ": "Mid Cap",
-    "GLW": "Large Cap",
-    "BCPC": "Mid Cap",
-    "DRI": "Mid Cap",
-    "MTCH": "Mid Cap",
-    "JKHY": "Mid Cap",
-    "APTV": "Mid Cap",
-    "GOOGL": "Large Cap",
-    "TGT": "Mid Cap",
-    "EW": "Mid Cap",
-    "LMAT": "Small Cap",
-    "INN": "Small Cap",
-    "NPK": "Small Cap",
-    "VRRM": "Mid Cap",
-    "DFIN": "Small Cap",
-    "BHE": "Small Cap",
-    "LUMN": "Mid Cap",
-    "GIII": "Small Cap",
-    "KRYS": "Mid Cap",
-    "SAFE": "Small Cap",
-    "BJRI": "Small Cap",
-    "SNCY": "Small Cap",
-    "SLG": "Mid Cap",
-    "ESI": "Mid Cap",
-    "TTMI": "Mid Cap",
-    "NVDA": "Large Cap",
-    "COST": "Large Cap",
-    "CTAS": "Large Cap",
-    "TR": "Mid Cap",
-    "CVCO": "Mid Cap",
-    "NEOG": "Small Cap",
-    "CALX": "Mid Cap",
-    "HAS": "Mid Cap",
-    "SXT": "Mid Cap",
-    "CHRW": "Mid Cap",
-    "PDFS": "Small Cap",
-    "FRPT": "Mid Cap"
+    "MMM": "Large Cap",
+    "AOS": "Mid Cap",
+    "GSL": "Small Cap",
+    "ABT": "Large Cap"
   },
   "roe_persistence": {},
   "strict_filters": {
-    "COLL": {
-      "passed": false,
-      "fcf_positive": true,
-      "debt_to_equity_ok": false,
-      "gross_margin_ok": true
-    },
-    "LMAT": {
+    "GSL": {
       "passed": true,
       "fcf_positive": true,
-      "debt_to_equity_ok": true,
-      "gross_margin_ok": true
-    },
-    "INN": {
-      "passed": false,
-      "fcf_positive": true,
-      "debt_to_equity_ok": false,
-      "gross_margin_ok": true
-    },
-    "NPK": {
-      "passed": false,
-      "fcf_positive": false,
-      "debt_to_equity_ok": true,
-      "gross_margin_ok": false
-    },
-    "DFIN": {
-      "passed": true,
-      "fcf_positive": true,
-      "debt_to_equity_ok": true,
-      "gross_margin_ok": true
-    },
-    "BHE": {
-      "passed": false,
-      "fcf_positive": true,
-      "debt_to_equity_ok": true,
-      "gross_margin_ok": false
-    },
-    "GIII": {
-      "passed": true,
-      "fcf_positive": true,
-      "debt_to_equity_ok": true,
-      "gross_margin_ok": true
-    },
-    "SAFE": {
-      "passed": false,
-      "fcf_positive": true,
-      "debt_to_equity_ok": false,
-      "gross_margin_ok": true
-    },
-    "BJRI": {
-      "passed": false,
-      "fcf_positive": true,
-      "debt_to_equity_ok": false,
-      "gross_margin_ok": false
-    },
-    "SNCY": {
-      "passed": false,
-      "fcf_positive": true,
-      "debt_to_equity_ok": false,
-      "gross_margin_ok": false
-    },
-    "NEOG": {
-      "passed": false,
-      "fcf_positive": false,
-      "debt_to_equity_ok": true,
-      "gross_margin_ok": true
-    },
-    "PDFS": {
-      "passed": false,
-      "fcf_positive": false,
       "debt_to_equity_ok": true,
       "gross_margin_ok": true
     }

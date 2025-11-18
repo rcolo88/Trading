@@ -280,8 +280,8 @@ def main():
             # Create STEPS orchestrator
             orchestrator = STEPSOrchestrator(
                 skip_thematic=False,
-                skip_competitive=True,  # Optional step
-                skip_valuation=True,    # Optional step
+                skip_competitive=False,  # Optional step
+                skip_valuation=False,    # Optional step
                 dry_run=False  # Generate output files
             )
 

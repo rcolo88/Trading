@@ -108,32 +108,44 @@ class SyntheticOptionsGenerator:
             # Forward fill any missing VIX values (for holidays/weekends)
             data['vix'] = data['vix'].ffill()
 
-            # Calculate IV Rank using 52-week (252 trading days) lookback
-            # IV Rank = (Current IV - 52w Low) / (52w High - 52w Low) * 100
+            # Calculate IV Percentile using 52-week (252 trading days) lookback
+            # IV Percentile = % of days in lookback period where VIX was below current level
+            # This is the TRUE percentile calculation, not range-based IV Rank
             lookback_period = 252  # ~1 year of trading days
 
-            data['vix_52w_high'] = data['vix'].rolling(window=lookback_period, min_periods=30).max()
-            data['vix_52w_low'] = data['vix'].rolling(window=lookback_period, min_periods=30).min()
+            def calculate_iv_percentile(series, window):
+                """
+                Calculate IV Percentile: % of days where IV was below current level.
 
-            # Calculate IV Rank
-            data['iv_rank'] = (
-                (data['vix'] - data['vix_52w_low']) /
-                (data['vix_52w_high'] - data['vix_52w_low']) * 100
-            )
+                Args:
+                    series: VIX time series
+                    window: Lookback period (e.g., 252 for 1 year)
 
-            # Handle edge cases (when high = low)
-            data['iv_rank'] = data['iv_rank'].fillna(50.0)  # Use 50 as neutral default
+                Returns:
+                    Series with IV Percentile values (0-100%)
+                """
+                def percentile_calc(x):
+                    if len(x) < 2:
+                        return 50.0  # Neutral default
+                    # Count how many days in window had VIX below current day
+                    current = x.iloc[-1]
+                    below_current = (x[:-1] < current).sum()
+                    return (below_current / (len(x) - 1)) * 100
 
-            # Drop intermediate calculation columns
-            data = data.drop(columns=['vix_52w_high', 'vix_52w_low'])
+                return series.rolling(window=window, min_periods=30).apply(percentile_calc, raw=False)
+
+            data['iv_percentile'] = calculate_iv_percentile(data['vix'], lookback_period)
+
+            # Handle edge cases (not enough data)
+            data['iv_percentile'] = data['iv_percentile'].fillna(50.0)  # Use 50 as neutral default
 
             print(f"✓ VIX data merged")
             print(f"  VIX range: {data['vix'].min():.2f} - {data['vix'].max():.2f}")
-            print(f"  IV Rank range: {data['iv_rank'].min():.1f} - {data['iv_rank'].max():.1f}")
+            print(f"  IV Percentile range: {data['iv_percentile'].min():.1f}% - {data['iv_percentile'].max():.1f}%")
         else:
             print(f"⚠️  Warning: Could not fetch VIX data")
             data['vix'] = np.nan
-            data['iv_rank'] = 50.0  # Default to neutral
+            data['iv_percentile'] = 50.0  # Default to neutral
 
         # Calculate returns
         data['returns'] = data['close'].pct_change()
@@ -255,7 +267,7 @@ class SyntheticOptionsGenerator:
         spot_price: float,
         volatility: float,
         vix: float = None,
-        iv_rank: float = None,
+        iv_percentile: float = None,
         num_strikes: int = 40,
         strike_interval: float = 5.0,
         add_spread: bool = True,
@@ -269,6 +281,8 @@ class SyntheticOptionsGenerator:
             expiration_date: Option expiration date
             spot_price: Current underlying price
             volatility: Current volatility estimate
+            vix: VIX level (for reference)
+            iv_percentile: IV Percentile (0-100%)
             num_strikes: Number of strikes to generate
             strike_interval: Dollar spacing between strikes
             add_spread: Add bid-ask spread to prices
@@ -325,7 +339,7 @@ class SyntheticOptionsGenerator:
                 'underlying_symbol': self.symbol,
                 'underlying_price': spot_price,
                 'vix': vix if vix is not None else np.nan,
-                'iv_rank': iv_rank if iv_rank is not None else np.nan,
+                'iv_percentile': iv_percentile if iv_percentile is not None else np.nan,
                 'expiration': expiration_date,
                 'dte': dte,
                 'strike': strike,
@@ -356,7 +370,7 @@ class SyntheticOptionsGenerator:
                 'underlying_symbol': self.symbol,
                 'underlying_price': spot_price,
                 'vix': vix if vix is not None else np.nan,
-                'iv_rank': iv_rank if iv_rank is not None else np.nan,
+                'iv_percentile': iv_percentile if iv_percentile is not None else np.nan,
                 'expiration': expiration_date,
                 'dte': dte,
                 'strike': strike,
@@ -437,9 +451,9 @@ class SyntheticOptionsGenerator:
             spot_price = self.underlying_data.loc[quote_date, 'close']
             vol = self.underlying_data.loc[quote_date, 'volatility']
 
-            # Get VIX and IV Rank if available
+            # Get VIX and IV Percentile if available
             vix = self.underlying_data.loc[quote_date, 'vix'] if 'vix' in self.underlying_data.columns else None
-            iv_rank = self.underlying_data.loc[quote_date, 'iv_rank'] if 'iv_rank' in self.underlying_data.columns else None
+            iv_percentile = self.underlying_data.loc[quote_date, 'iv_percentile'] if 'iv_percentile' in self.underlying_data.columns else None
 
             # Determine which volatility to use for pricing
             if self.use_vix_for_iv and vix is not None and not np.isnan(vix):
@@ -463,7 +477,7 @@ class SyntheticOptionsGenerator:
                     spot_price=spot_price,
                     volatility=pricing_vol,  # Use VIX-based IV instead of historical vol
                     vix=vix,
-                    iv_rank=iv_rank
+                    iv_percentile=iv_percentile
                 )
 
                 if not chain.empty:
