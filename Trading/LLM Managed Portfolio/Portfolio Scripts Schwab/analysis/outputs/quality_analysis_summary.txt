@@ -1,0 +1,93 @@
+============================================================
+QUALITY METRICS ANALYSIS SUMMARY
+============================================================
+Generated: 2025-11-17 17:42:35
+Holdings Analyzed: 2
+Watchlist Analyzed: 42
+============================================================
+
+CURRENT HOLDINGS QUALITY:
+------------------------------------------------------------
+GOOGL:
+  Market Cap: $3482.27B
+  Quality Score: 89.0/100
+  Tier: Elite
+  Red Flags: 0
+
+NVDA:
+  Market Cap: $4534.87B
+  Quality Score: 87.3/100
+  Tier: Elite
+  Red Flags: 0
+
+
+============================================================
+SELL CANDIDATES (Quality <70):
+------------------------------------------------------------
+No sell candidates identified.
+
+
+============================================================
+BUY ALTERNATIVES (Top 10):
+------------------------------------------------------------
+QCOM:
+  Quality Score: 98.7
+  Tier: Elite
+  Reason: Elite quality score 98.7 (>=85)
+
+FIZZ:
+  Quality Score: 96.3
+  Tier: Elite
+  Reason: Elite quality score 96.3 (>=85)
+
+DFIN:
+  Quality Score: 95.7
+  Tier: Elite
+  Reason: Elite quality score 95.7 (>=85)
+
+TGT:
+  Quality Score: 95.6
+  Tier: Elite
+  Reason: Elite quality score 95.6 (>=85)
+
+HAS:
+  Quality Score: 90.0
+  Tier: Elite
+  Reason: Elite quality score 90.0 (>=85)
+
+CTAS:
+  Quality Score: 89.6
+  Tier: Elite
+  Reason: Elite quality score 89.6 (>=85)
+
+COST:
+  Quality Score: 88.6
+  Tier: Elite
+  Reason: Elite quality score 88.6 (>=85)
+
+
+================================================================================
+TOP 20 WATCHLIST STOCKS BY QUALITY:
+--------------------------------------------------------------------------------
+Ticker   Market Cap   Score    Tier         Red Flags 
+--------------------------------------------------------------------------------
+QCOM     $179.92B      98.7    Elite        0         
+FIZZ     $3.08B        96.3    Elite        0         
+DFIN     $1.25B        95.7    Elite        0         
+TGT      $40.32B       95.6    Elite        0         
+HAS      $10.81B       90.0    Elite        1         
+CTAS     $74.30B       89.6    Elite        0         
+COST     $405.21B      88.6    Elite        0         
+GIII     $1.17B        79.8    Strong       0         
+JKHY     $11.92B       77.6    Strong       0         
+MTCH     $7.63B        74.2    Strong       1         
+COLL     $1.43B        72.4    Strong       1         
+DRI      $20.11B       70.0    Strong       1         
+ADP      $101.91B      69.4    Moderate     0         
+CHRW     $18.01B       68.6    Moderate     0         
+CVCO     $4.33B        68.0    Moderate     0         
+VRRM     $3.59B        67.3    Moderate     1         
+EW       $49.75B       63.6    Moderate     0         
+APTV     $16.73B       62.2    Moderate     0         
+CALX     $3.86B        52.2    Moderate     1         
+SXT      $3.96B        50.0    Weak         0         

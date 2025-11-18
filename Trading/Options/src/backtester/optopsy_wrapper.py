@@ -11,6 +11,8 @@ from typing import Dict, List, Optional, Tuple
 import pandas as pd
 import numpy as np
 import optopsy as op  # Will be imported once data is ready
+from pandas.tseries.holiday import USFederalHolidayCalendar
+from pandas.tseries.offsets import CustomBusinessDay
 
 from ..strategies.base_strategy import BaseStrategy, Position, Signal
 
@@ -83,6 +85,14 @@ class OptopsyBacktester:
         optopsy_data['expiration'] = pd.to_datetime(optopsy_data['expiration'])
         optopsy_data['quote_date'] = pd.to_datetime(optopsy_data['quote_date'])
 
+        # Normalize all timestamps to 12:00 PM (noon) ET for consistent market hour timing
+        optopsy_data['quote_date'] = optopsy_data['quote_date'].apply(
+            lambda x: x.replace(hour=12, minute=0, second=0, microsecond=0)
+        )
+        optopsy_data['expiration'] = optopsy_data['expiration'].apply(
+            lambda x: x.replace(hour=12, minute=0, second=0, microsecond=0)
+        )
+
         # Calculate DTE if not present
         if 'dte' not in optopsy_data.columns:
             optopsy_data['dte'] = (
@@ -135,6 +145,13 @@ class OptopsyBacktester:
             underlying_end = underlying_end.tz_localize(None)
             underlying_data.index = underlying_data.index.tz_localize(None)
 
+        # Normalize all timestamps to 12:00 PM (noon) ET for consistent market hour timing
+        underlying_data.index = underlying_data.index.map(
+            lambda x: x.replace(hour=12, minute=0, second=0, microsecond=0)
+        )
+        underlying_start = underlying_start.replace(hour=12, minute=0, second=0, microsecond=0)
+        underlying_end = underlying_end.replace(hour=12, minute=0, second=0, microsecond=0)
+
         # Use the overlapping period
         actual_start = max(self.start_date, options_start, underlying_start)
         actual_end = min(self.end_date, options_end, underlying_end)
@@ -147,12 +164,18 @@ class OptopsyBacktester:
                 f"Underlying data: {underlying_start.date()} to {underlying_end.date()}"
             )
 
-        # Get trading dates
+        # Get trading dates with US market holiday filtering and 12pm ET timestamps
+        us_calendar = USFederalHolidayCalendar()
+        us_bd = CustomBusinessDay(calendar=us_calendar)
+
         trading_dates = pd.date_range(
             start=actual_start,
             end=actual_end,
-            freq='B'  # Business days
+            freq=us_bd  # US business days (excludes federal holidays)
         )
+
+        # Set all timestamps to 12:00 PM (noon) ET - market midday
+        trading_dates = trading_dates.map(lambda x: x.replace(hour=12, minute=0, second=0, microsecond=0))
 
         print(f"Running backtest for {strategy.name}")
         print(f"Config period: {self.start_date.date()} to {self.end_date.date()}")

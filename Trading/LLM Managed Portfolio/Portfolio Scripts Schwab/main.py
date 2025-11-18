@@ -16,6 +16,7 @@ This orchestrates all the modular components:
 Usage:
     # Read-Only Operations (Available 24/7)
     python main.py --report-only                      # Generate portfolio report
+    python main.py --steps                            # Run STEPS 10-step analysis (Quality/News/Thematic/Reasoning agents)
     python main.py --generate-hf-recommendations      # Generate HF AI trading recommendations
     python main.py --account-status --dry-run         # Display Schwab account summary
     python main.py --risk-summary --dry-run           # Show portfolio risk analysis
@@ -36,15 +37,16 @@ Market Hours: Trading operations require market to be open (Mon-Fri 9:30AM-4PM E
 import argparse
 import pytz
 from datetime import datetime
-from market_hours import enforce_market_hours, is_market_open
-from portfolio_manager import PortfolioManager
-from schwab_data_fetcher import SchwabDataFetcher
-from schwab_account_manager import SchwabAccountManager
-from schwab_trade_executor import SchwabTradeExecutor
-from schwab_safety_validator import SafetyValidator
-from trade_executor import TradeExecutor
-from report_generator import ReportGenerator
-from hf_recommendation_generator import HFRecommendationGenerator
+from core.market_hours import enforce_market_hours, is_market_open
+from core.portfolio_manager import PortfolioManager
+from schwab_integration.schwab_data_fetcher import SchwabDataFetcher
+from schwab_integration.schwab_account_manager import SchwabAccountManager
+from schwab_integration.schwab_trade_executor import SchwabTradeExecutor
+from validators.schwab_safety_validator import SafetyValidator
+from core.trade_executor import TradeExecutor
+from core.report_generator import ReportGenerator
+from config.hf_recommendation_generator import HFRecommendationGenerator
+from analysis.steps_orchestrator import STEPSOrchestrator
 
 
 class LLMManagedPortfolio:
@@ -175,6 +177,8 @@ def main():
                       help='Display portfolio risk analysis')
     parser.add_argument('--generate-hf-recommendations', action='store_true',
                       help='Generate trading recommendations using HuggingFace agents (creates markdown document)')
+    parser.add_argument('--steps', action='store_true',
+                      help='Run complete STEPS analysis (10-step methodology with quality, news, thematic, and reasoning agents)')
     args = parser.parse_args()
     
     # Conditional market hours validation
@@ -193,7 +197,8 @@ def main():
         args.load_previous_day or
         args.sync_schwab_account or  # Syncing just reads from Schwab and updates local state
         args.dry_run or  # Dry-run is safe for testing anytime
-        args.generate_hf_recommendations  # HF analysis and document generation (no trading)
+        args.generate_hf_recommendations or  # HF analysis and document generation (no trading)
+        args.steps  # STEPS analysis generates recommendations only (no trading)
     )
 
     # Define operations that actually place trades and require market hours
@@ -251,6 +256,8 @@ def main():
         print("🛡️  LLM MANAGED PORTFOLIO - RISK ANALYSIS MODE")
     elif args.generate_hf_recommendations:
         print("🤖 LLM MANAGED PORTFOLIO - HF RECOMMENDATION GENERATION MODE")
+    elif args.steps:
+        print("📊 LLM MANAGED PORTFOLIO - STEPS ANALYSIS MODE (10-STEP METHODOLOGY)")
     elif args.live_trading:
         print("🚀 LLM MANAGED PORTFOLIO - LIVE TRADING MODE")
     elif args.dry_run:
@@ -259,6 +266,45 @@ def main():
         print("🚀 LLM MANAGED PORTFOLIO - FULL EXECUTION MODE (SCHWAB API)")
     print("=" * 60)
     
+    # Handle --steps mode early (doesn't need portfolio system)
+    if args.steps:
+        try:
+            # Run complete STEPS analysis (10-step methodology)
+            print("📊 Running STEPS analysis (10-step methodology)...")
+            print("   ✅ Quality Agent - Fundamental quality metrics")
+            print("   ✅ News Agent - Sentiment analysis")
+            print("   ✅ Thematic Agent - Thematic opportunity scoring")
+            print("   ✅ Reasoning Agent - Decision synthesis (BUY/SELL/HOLD)")
+            print()
+
+            # Create STEPS orchestrator
+            orchestrator = STEPSOrchestrator(
+                skip_thematic=False,
+                skip_competitive=True,  # Optional step
+                skip_valuation=True,    # Optional step
+                dry_run=False  # Generate output files
+            )
+
+            # Run complete 10-step analysis
+            output_path = orchestrator.run_full_analysis()
+
+            print("\n" + "=" * 60)
+            print("✅ STEPS ANALYSIS COMPLETE")
+            print("=" * 60)
+            print(f"\n📄 Trading recommendations: {output_path}")
+            print("\n📋 Next steps:")
+            print("   1. Review the generated recommendations")
+            print("   2. Edit Portfolio Scripts Schwab/manual_trades_override.json")
+            print("   3. Set 'enabled': true in manual_trades_override.json")
+            print("   4. Execute trades with: python main.py (during market hours)")
+            return  # Exit after STEPS analysis
+
+        except Exception as e:
+            print(f"\n❌ Error running STEPS analysis: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
+
     # Determine trading mode
     enable_live = args.live_trading or args.dry_run or args.sync_schwab_account or args.account_status or args.risk_summary
     dry_run_mode = not args.live_trading or args.dry_run  # Default to dry-run unless explicitly live

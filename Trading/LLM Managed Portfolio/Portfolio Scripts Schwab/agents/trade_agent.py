@@ -12,7 +12,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from trading_models import TradeOrder, OrderType, OrderPriority
+from core.trading_models import TradeOrder, OrderType, OrderPriority
 from .news_agent import NewsAnalysis
 from .market_agent import MarketAnalysis
 from .risk_agent import RiskAnalysis

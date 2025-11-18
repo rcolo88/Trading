@@ -20,13 +20,13 @@ try:
 except ImportError:
     from base_agent import AgentResult
 
-from quality_metrics_calculator import (
+from quality.quality_metrics_calculator import (
     QualityMetricsCalculator,
     QualityAnalysisResult,
     QualityTier,
     RedFlag
 )
-from quality_llm_prompts import (
+from quality.quality_llm_prompts import (
     QualityLLMPromptGenerator,
     LLMAnalysisResponse
 )
@@ -446,7 +446,7 @@ class QualityAgent:
         )
 
         # Create minimal quality result
-        from quality_metrics_calculator import QualityAnalysisResult, QualityTier
+        from quality.quality_metrics_calculator import QualityAnalysisResult, QualityTier
 
         quality_result = QualityAnalysisResult(
             ticker=ticker,

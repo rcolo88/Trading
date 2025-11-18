@@ -49,7 +49,7 @@ def main():
     # Configuration
     symbol = "SPY"
     start_date = "2021-01-01"
-    end_date = "2025-6-30"
+    end_date = "2025-10-30"
 
     print(f"\nConfiguration:")
     print(f"  Symbol: {symbol}")

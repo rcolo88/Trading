@@ -34,9 +34,9 @@ class ParameterOptimizer:
             base_config=config
         )
 
-        # Define parameter ranges
-        optimizer.set_parameter_range('near_dte_min', min=3, max=10)
-        optimizer.set_parameter_range('near_dte_max', min=10, max=20)
+        # Define parameter ranges (simplified syntax)
+        optimizer.set_parameter_range('near_dte', min=20, max=35, step=5)
+        optimizer.set_parameter_range('far_dte', min=45, max=75, step=10)
         optimizer.set_parameter_range('profit_target', min=0.15, max=0.35, step=0.05)
         optimizer.set_parameter_range('target_delta', min=0.40, max=0.60, step=0.05)
 
@@ -47,15 +47,26 @@ class ParameterOptimizer:
 
     # Strategy-specific allowed parameters
     VERTICAL_PARAMETERS = {
-        'entry': ['dte_min', 'dte_max', 'target_delta', 'min_credit', 'max_credit',
+        'entry': ['dte', 'target_delta', 'min_credit', 'max_credit',
                   'vix_min', 'vix_max'],
         'exit': ['profit_target', 'stop_loss', 'dte_min']
     }
 
     CALENDAR_PARAMETERS = {
-        'entry': ['near_dte_min', 'near_dte_max', 'far_dte_min', 'far_dte_max',
-                  'target_delta', 'min_debit', 'max_debit', 'vix_min', 'vix_max'],
+        'entry': ['near_dte', 'far_dte', 'target_delta', 'min_debit', 'max_debit',
+                  'vix_min', 'vix_max'],
         'exit': ['profit_target', 'stop_loss', 'dte_exit', 'max_underlying_move']
+    }
+
+    # Mapping of simplified parameters to their expanded forms
+    # Used to map single parameters to multiple config keys
+    PARAMETER_EXPANSION = {
+        'vertical': {
+            'dte': ['dte_min', 'dte_max']  # Single dte value sets both min and max (target DTE)
+        },
+        'calendar': {
+            # Calendar spreads use single values directly, no expansion needed
+        }
     }
 
     def __init__(
@@ -321,7 +332,15 @@ class ParameterOptimizer:
             if section not in config['strategies'][config_key]:
                 config['strategies'][config_key][section] = {}
 
-            config['strategies'][config_key][section][key] = param_value
+            # Check if this parameter needs to be expanded
+            expansion_map = self.PARAMETER_EXPANSION.get(self.strategy_type, {})
+            if key in expansion_map:
+                # Expand to multiple config keys (e.g., 'dte' -> 'dte_min' and 'dte_max')
+                for expanded_key in expansion_map[key]:
+                    config['strategies'][config_key][section][expanded_key] = param_value
+            else:
+                # Use parameter as-is
+                config['strategies'][config_key][section][key] = param_value
 
         # Create strategy instance with updated config
         strategy = self.strategy_class(config)
@@ -506,8 +525,8 @@ def quick_optimize_vertical(
         base_config=config
     )
 
-    optimizer.set_parameter_range('dte_min', min=dte_range[0], max=dte_range[1])
-    optimizer.set_parameter_range('dte_max', min=dte_range[0], max=dte_range[1])
+    # Simplified parameter syntax - 'dte' sets both dte_min and dte_max
+    optimizer.set_parameter_range('dte', min=dte_range[0], max=dte_range[1], step=5)
     optimizer.set_parameter_range('target_delta', min=delta_range[0], max=delta_range[1], step=0.05)
     optimizer.set_parameter_range('profit_target', min=profit_target_range[0], max=profit_target_range[1], step=0.05)
 
@@ -522,10 +541,10 @@ def quick_optimize_calendar(
     options_data: pd.DataFrame,
     underlying_data: pd.DataFrame,
     config: Dict,
-    near_dte_range: Tuple[int, int] = (5, 15),
-    far_dte_range: Tuple[int, int] = (30, 45),
+    near_dte_range: Tuple[int, int] = (20, 35),
+    far_dte_range: Tuple[int, int] = (45, 75),
     delta_range: Tuple[float, float] = (0.40, 0.60),
-    profit_target_range: Tuple[float, float] = (0.20, 0.30)
+    profit_target_range: Tuple[float, float] = (0.15, 0.35)
 ) -> pd.DataFrame:
     """
     Quick optimization for calendar spreads with common parameters.
@@ -536,8 +555,8 @@ def quick_optimize_calendar(
         options_data: Options data
         underlying_data: Underlying data
         config: Base config
-        near_dte_range: (min, max) for near-term DTE
-        far_dte_range: (min, max) for far-term DTE
+        near_dte_range: (min, max) for near-term DTE target
+        far_dte_range: (min, max) for far-term DTE target
         delta_range: (min, max) for target delta
         profit_target_range: (min, max) for profit target
 
@@ -553,10 +572,9 @@ def quick_optimize_calendar(
         base_config=config
     )
 
-    optimizer.set_parameter_range('near_dte_min', min=near_dte_range[0], max=near_dte_range[1])
-    optimizer.set_parameter_range('near_dte_max', min=near_dte_range[0], max=near_dte_range[1])
-    optimizer.set_parameter_range('far_dte_min', min=far_dte_range[0], max=far_dte_range[1])
-    optimizer.set_parameter_range('far_dte_max', min=far_dte_range[0], max=far_dte_range[1])
+    # Simplified parameter syntax - single values for near_dte and far_dte
+    optimizer.set_parameter_range('near_dte', min=near_dte_range[0], max=near_dte_range[1], step=5)
+    optimizer.set_parameter_range('far_dte', min=far_dte_range[0], max=far_dte_range[1], step=10)
     optimizer.set_parameter_range('target_delta', min=delta_range[0], max=delta_range[1], step=0.05)
     optimizer.set_parameter_range('profit_target', min=profit_target_range[0], max=profit_target_range[1], step=0.05)
 

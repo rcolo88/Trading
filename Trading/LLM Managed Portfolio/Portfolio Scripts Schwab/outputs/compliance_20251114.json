@@ -1,0 +1,54 @@
+{
+  "portfolio_value": 345.05,
+  "compliance_score": 34.0,
+  "violations": [
+    {
+      "severity": "CRITICAL",
+      "category": "ALLOCATION",
+      "ticker": null,
+      "message": "Large cap allocation 16.1% far below minimum 62.5% (critical underweight)",
+      "current_value": 16.102014200840458,
+      "expected_value": 62.5
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "ALLOCATION",
+      "ticker": null,
+      "message": "Mid cap allocation 0.0% far below minimum 12.5%",
+      "current_value": 0.0,
+      "expected_value": 12.5
+    },
+    {
+      "severity": "WARNING",
+      "category": "ALLOCATION",
+      "ticker": null,
+      "message": "Small cap allocation 0.0% below minimum 7.5%",
+      "current_value": 0.0,
+      "expected_value": 7.5
+    },
+    {
+      "severity": "INFO",
+      "category": "ALLOCATION",
+      "ticker": null,
+      "message": "Thematic allocation 0.0% below minimum 2.5% (consider increasing)",
+      "current_value": 0.0,
+      "expected_value": 2.5
+    },
+    {
+      "severity": "CRITICAL",
+      "category": "POSITION_SIZE",
+      "ticker": "GSL",
+      "message": "GSL large cap position 16.1% exceeds maximum 15%",
+      "current_value": 16.102014200840458,
+      "expected_value": 15.0
+    }
+  ],
+  "allocation_large_cap_pct": 16.102014200840458,
+  "allocation_mid_cap_pct": 0.0,
+  "allocation_small_cap_pct": 0.0,
+  "allocation_thematic_pct": 0.0,
+  "allocation_cash_pct": 83.89798579915954,
+  "tier_eligibility_issues": [],
+  "framework_compliant": false,
+  "validation_date": "2025-11-14"
+}

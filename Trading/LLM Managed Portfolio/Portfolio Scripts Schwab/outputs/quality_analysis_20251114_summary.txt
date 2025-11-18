@@ -1,0 +1,50 @@
+============================================================
+QUALITY METRICS ANALYSIS SUMMARY
+============================================================
+Generated: 2025-11-14 08:05:23
+Holdings Analyzed: 1
+Watchlist Analyzed: 5
+============================================================
+
+CURRENT HOLDINGS QUALITY:
+------------------------------------------------------------
+GSL:
+  Market Cap: $1.23B
+  Quality Score: 69.1/100
+  Tier: Moderate
+  Red Flags: 0
+
+
+============================================================
+SELL CANDIDATES (Quality <70):
+------------------------------------------------------------
+GSL:
+  Quality Score: 69.1
+  Reason: Quality score 69.1 below minimum threshold 70
+  Red Flags: 0
+
+
+============================================================
+BUY ALTERNATIVES (Top 10):
+------------------------------------------------------------
+AOS:
+  Quality Score: 95.6
+  Tier: Elite
+  Reason: Elite quality score 95.6 (>=85)
+
+ACN:
+  Quality Score: 88.3
+  Tier: Elite
+  Reason: Elite quality score 88.3 (>=85)
+
+
+================================================================================
+TOP 20 WATCHLIST STOCKS BY QUALITY:
+--------------------------------------------------------------------------------
+Ticker   Market Cap   Score    Tier         Red Flags 
+--------------------------------------------------------------------------------
+AOS      $9.31B        95.6    Elite        0         
+ACN      $153.82B      88.3    Elite        0         
+ABBV     $421.18B      70.3    Strong       1         
+ABT      $224.51B      69.0    Moderate     0         
+MMM      $90.60B       68.4    Moderate     1         

@@ -1,0 +1,53 @@
+{
+  "GSL": {
+    "ticker": "GSL",
+    "overall_quality": "INSUFFICIENT",
+    "quality_score": 2.0,
+    "metrics": [
+      {
+        "metric_name": "revenue",
+        "value": 752409024,
+        "source": "yfinance",
+        "fetch_date": "2025-11-14",
+        "confidence": "HIGH"
+      },
+      {
+        "metric_name": "net_income",
+        "value": 396878016,
+        "source": "yfinance",
+        "fetch_date": "2025-11-14",
+        "confidence": "HIGH"
+      },
+      {
+        "metric_name": "operating_cash_flow",
+        "value": 440336992,
+        "source": "yfinance",
+        "fetch_date": "2025-11-14",
+        "confidence": "HIGH"
+      },
+      {
+        "metric_name": "total_debt",
+        "value": 725350016,
+        "source": "yfinance",
+        "fetch_date": "2025-11-14",
+        "confidence": "HIGH"
+      },
+      {
+        "metric_name": "market_cap",
+        "value": 1229258496,
+        "source": "yfinance",
+        "fetch_date": "2025-11-14",
+        "confidence": "HIGH"
+      }
+    ],
+    "missing_metrics": [
+      "cogs",
+      "total_assets",
+      "shareholder_equity",
+      "operating_income"
+    ],
+    "stale_metrics": [],
+    "warnings": [],
+    "validation_date": "2025-11-14"
+  }
+}

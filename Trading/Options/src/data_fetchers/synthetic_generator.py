@@ -84,8 +84,9 @@ class SyntheticOptionsGenerator:
         if data.empty:
             raise ValueError(f"No data found for {self.symbol}")
 
-        # Remove timezone info to avoid datetime arithmetic issues
+        # Remove timezone info and normalize to 12:00 PM (noon) ET for market midday
         data.index = data.index.tz_localize(None)
+        data.index = data.index.map(lambda x: x.replace(hour=12, minute=0, second=0, microsecond=0))
 
         # Standardize column names
         data.columns = [col.lower() for col in data.columns]
@@ -96,8 +97,9 @@ class SyntheticOptionsGenerator:
         vix_data = vix_ticker.history(start=start_date, end=end_date)
 
         if not vix_data.empty:
-            # Remove timezone and get close prices
+            # Remove timezone and normalize to 12:00 PM (noon) ET
             vix_data.index = vix_data.index.tz_localize(None)
+            vix_data.index = vix_data.index.map(lambda x: x.replace(hour=12, minute=0, second=0, microsecond=0))
             vix_close = vix_data['Close'].rename('vix')
 
             # Merge VIX data with underlying data

@@ -77,7 +77,7 @@ strategies:
       min_debit: 0.5         # Minimum debit to enter (optional)
       max_debit: 20.0        # Maximum debit to enter (increased for SPY ~$530)
       vix_min: 5             # Prefer low IV environment
-      vix_max: 60            # Don't enter if VIX too high (defeats calendar purpose)
+      vix_max: 30            # Don't enter if VIX too high (defeats calendar purpose)
     exit:
       profit_target: 0.25    # Close at 25% profit
       stop_loss: -0.50       # Stop at 50% loss

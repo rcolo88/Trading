@@ -18,7 +18,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from hf_config import HFConfig, ModelConfig
+from config.hf_config import HFConfig, ModelConfig
 
 
 class SimpleCache:

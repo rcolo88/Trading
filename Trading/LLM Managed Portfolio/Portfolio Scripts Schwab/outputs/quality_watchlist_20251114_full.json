@@ -1,0 +1,195 @@
+{
+  "timestamp": "2025-11-14T08:11:23.926378",
+  "total_screened": 9,
+  "watchlist_count": 5,
+  "min_quality_score": 70.0,
+  "watchlist": [
+    {
+      "ticker": "ADBE",
+      "market_cap": 139740151808,
+      "quality_score": 96.45,
+      "tier": "Elite",
+      "red_flags_count": 0,
+      "red_flags": [],
+      "metrics": {
+        "gross_profitability": {
+          "value": 0.6333774396295071,
+          "score": 10.0,
+          "weighted_score": 30.0
+        },
+        "roe": {
+          "value": 0.3941864587025877,
+          "score": 10.0,
+          "weighted_score": 25.0
+        },
+        "operating_profitability": {
+          "value": 0.3340721137942441,
+          "score": 10.0,
+          "weighted_score": 20.0
+        },
+        "fcf_yield": {
+          "value": 0.05634028515166732,
+          "score": 7.634028515166732,
+          "weighted_score": 11.451042772750098
+        },
+        "roic": {
+          "value": 0.3033277119190516,
+          "score": 10.0,
+          "weighted_score": 10.0
+        }
+      }
+    },
+    {
+      "ticker": "AOS",
+      "market_cap": 9309441024,
+      "quality_score": 95.58,
+      "tier": "Elite",
+      "red_flags_count": 0,
+      "red_flags": [],
+      "metrics": {
+        "gross_profitability": {
+          "value": 0.4494135802469136,
+          "score": 9.982407407407408,
+          "weighted_score": 29.947222222222223
+        },
+        "roe": {
+          "value": 0.28330236262277675,
+          "score": 10.0,
+          "weighted_score": 25.0
+        },
+        "operating_profitability": {
+          "value": 0.9502469135802469,
+          "score": 10.0,
+          "weighted_score": 20.0
+        },
+        "fcf_yield": {
+          "value": 0.05089457023021364,
+          "score": 7.089457023021364,
+          "weighted_score": 10.634185534532046
+        },
+        "roic": {
+          "value": 0.26962765450909437,
+          "score": 10.0,
+          "weighted_score": 10.0
+        }
+      }
+    },
+    {
+      "ticker": "ACN",
+      "market_cap": 153815154688,
+      "quality_score": 88.29,
+      "tier": "Elite",
+      "red_flags_count": 0,
+      "red_flags": [],
+      "metrics": {
+        "gross_profitability": {
+          "value": 0.3400173716918615,
+          "score": 6.700521150755846,
+          "weighted_score": 20.101563452267538
+        },
+        "roe": {
+          "value": 0.24613954870207658,
+          "score": 9.834552087231852,
+          "weighted_score": 24.586380218079633
+        },
+        "operating_profitability": {
+          "value": 0.8817697197382236,
+          "score": 10.0,
+          "weighted_score": 20.0
+        },
+        "fcf_yield": {
+          "value": 0.07069758517655589,
+          "score": 9.06975851765559,
+          "weighted_score": 13.604637776483383
+        },
+        "roic": {
+          "value": 0.20514527285984224,
+          "score": 10.0,
+          "weighted_score": 10.0
+        }
+      }
+    },
+    {
+      "ticker": "ABBV",
+      "market_cap": 421176573952,
+      "quality_score": 70.32,
+      "tier": "Strong",
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "High Leverage",
+          "severity": "HIGH",
+          "description": "Debt-to-Equity ratio at 20.19x (threshold: 2.0x). High leverage increases financial risk and interest burden."
+        }
+      ],
+      "metrics": {
+        "gross_profitability": {
+          "value": 0.2917261636122846,
+          "score": 5.251784908368538,
+          "weighted_score": 15.755354725105615
+        },
+        "roe": {
+          "value": 1.2866165413533834,
+          "score": 10.0,
+          "weighted_score": 25.0
+        },
+        "operating_profitability": {
+          "value": 0.21306441947011343,
+          "score": 7.391932584103403,
+          "weighted_score": 14.783865168206807
+        },
+        "fcf_yield": {
+          "value": 0.04233853709544693,
+          "score": 5.85078056431704,
+          "weighted_score": 8.776170846475559
+        },
+        "roic": {
+          "value": 0.13333891498389364,
+          "score": 6.000334899033618,
+          "weighted_score": 6.000334899033618
+        }
+      }
+    },
+    {
+      "ticker": "A",
+      "market_cap": 42669645824,
+      "quality_score": 70.07,
+      "tier": "Strong",
+      "red_flags_count": 0,
+      "red_flags": [],
+      "metrics": {
+        "gross_profitability": {
+          "value": 0.2984129664021611,
+          "score": 5.452388992064833,
+          "weighted_score": 16.3571669761945
+        },
+        "roe": {
+          "value": 0.21854866056290267,
+          "score": 8.652085452695829,
+          "weighted_score": 21.630213631739572
+        },
+        "operating_profitability": {
+          "value": 0.37675164612527434,
+          "score": 10.0,
+          "weighted_score": 20.0
+        },
+        "fcf_yield": {
+          "value": 0.032177440742377605,
+          "score": 4.326616111356641,
+          "weighted_score": 6.48992416703496
+        },
+        "roic": {
+          "value": 0.12656330749354006,
+          "score": 5.593798449612404,
+          "weighted_score": 5.593798449612404
+        }
+      }
+    }
+  ],
+  "statistics": {
+    "elite_count": 3,
+    "strong_count": 2,
+    "average_quality_score": 84.142,
+    "top_quality_score": 96.45
+  }
+}

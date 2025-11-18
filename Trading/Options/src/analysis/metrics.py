@@ -368,3 +368,29 @@ class PerformanceAnalyzer:
         report.append("\n" + "="*70 + "\n")
 
         return "\n".join(report)
+
+
+def calculate_performance_metrics(backtest_results: Dict) -> Dict:
+    """
+    Calculate performance metrics from backtest results.
+
+    This is a convenience wrapper around PerformanceAnalyzer for use
+    in optimization and other automated workflows.
+
+    Args:
+        backtest_results: Dictionary containing:
+            - equity_curve: DataFrame with daily equity values
+            - trades: DataFrame with individual trade results
+            - initial_capital: Starting capital
+
+    Returns:
+        Dictionary with all performance metrics
+    """
+    equity_curve = backtest_results['equity_curve']
+    trades = backtest_results['trades']
+    initial_capital = backtest_results['initial_capital']
+
+    analyzer = PerformanceAnalyzer(equity_curve, trades)
+    metrics = analyzer.calculate_all_metrics(initial_capital)
+
+    return metrics

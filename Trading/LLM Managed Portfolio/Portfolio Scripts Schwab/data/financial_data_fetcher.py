@@ -1,0 +1,597 @@
+"""
+Financial Data Fetcher Module
+Fetches fundamental financial data from yfinance for quality analysis
+"""
+
+import yfinance as yf
+import logging
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional, Any
+import pickle
+import os
+from dataclasses import dataclass, asdict
+import json
+import pandas as pd
+import numpy as np
+import time  # For rate limit delays
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class FinancialData:
+    """Structured financial data for quality analysis"""
+    ticker: str
+    # Basic info
+    market_cap: Optional[float] = None
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    current_price: Optional[float] = None
+    pe_ratio: Optional[float] = None
+
+    # Income statement
+    revenue: Optional[float] = None
+    cogs: Optional[float] = None  # Cost of goods sold
+    sga: Optional[float] = None  # Selling, general & administrative
+    operating_income: Optional[float] = None
+    net_income: Optional[float] = None
+
+    # Balance sheet
+    total_assets: Optional[float] = None
+    shareholder_equity: Optional[float] = None
+    total_debt: Optional[float] = None
+
+    # Cash flow
+    free_cash_flow: Optional[float] = None
+
+    # Calculated metrics
+    nopat: Optional[float] = None  # Net operating profit after tax
+
+    # Metadata
+    fetch_time: Optional[str] = None
+    data_quality: str = "complete"  # complete, partial, insufficient
+
+    def to_dict(self) -> Dict:
+        """Convert to dictionary"""
+        return asdict(self)
+
+    def validate(self) -> bool:
+        """Check if data is sufficient for quality analysis"""
+        required = [
+            self.revenue, self.cogs, self.total_assets,
+            self.net_income, self.shareholder_equity, self.free_cash_flow
+        ]
+        return all(x is not None for x in required)
+
+
+class FinancialDataCache:
+    """Simple file-based cache for financial data"""
+
+    def __init__(self, cache_file: str = "financial_cache.pkl", cache_hours: int = 48):
+        self.cache_file = cache_file
+        self.cache_hours = cache_hours  # Extended to 48 hours (fundamental data changes quarterly)
+        self.cache = self._load_cache()
+
+    def _load_cache(self) -> Dict:
+        """Load cache from file"""
+        if os.path.exists(self.cache_file):
+            try:
+                with open(self.cache_file, 'rb') as f:
+                    cache = pickle.load(f)
+                    logger.debug(f"Loaded financial cache with {len(cache)} entries")
+                    return cache
+            except Exception as e:
+                logger.warning(f"Failed to load financial cache: {e}")
+        return {}
+
+    def _save_cache(self):
+        """Save cache to file"""
+        try:
+            with open(self.cache_file, 'wb') as f:
+                pickle.dump(self.cache, f)
+            logger.debug(f"Saved financial cache with {len(self.cache)} entries")
+        except Exception as e:
+            logger.error(f"Failed to save financial cache: {e}")
+
+    def get(self, ticker: str) -> Optional[FinancialData]:
+        """Get cached financial data if available and fresh"""
+        if ticker in self.cache:
+            data, timestamp = self.cache[ticker]
+            # Financial data changes slowly - 24 hour cache
+            if datetime.now() - timestamp < timedelta(hours=self.cache_hours):
+                logger.debug(f"Financial cache HIT for {ticker}")
+                return data
+            else:
+                logger.debug(f"Financial cache EXPIRED for {ticker}")
+                del self.cache[ticker]
+        return None
+
+    def set(self, ticker: str, data: FinancialData):
+        """Cache financial data"""
+        self.cache[ticker] = (data, datetime.now())
+        self._save_cache()
+        logger.debug(f"Cached financial data for {ticker}")
+
+    def clear(self):
+        """Clear entire cache"""
+        self.cache = {}
+        self._save_cache()
+        logger.info("Financial cache cleared")
+
+
+class FinancialDataFetcher:
+    """
+    Fetch fundamental financial data from yfinance
+
+    Features:
+    - Comprehensive fundamental data (income, balance sheet, cash flow)
+    - 24-hour caching (financials don't change daily)
+    - Data validation and quality checks
+    - Graceful error handling
+    - Free and unlimited (yfinance)
+    """
+
+    def __init__(self, enable_cache: bool = True):
+        """
+        Initialize financial data fetcher
+
+        Args:
+            enable_cache: Enable 24-hour caching (default: True)
+        """
+        self.cache = FinancialDataCache() if enable_cache else None
+        logger.info("FinancialDataFetcher initialized with yfinance")
+
+    def _fetch_with_retry(self, ticker: str, max_retries: int = 3) -> Optional[FinancialData]:
+        """
+        Fetch with exponential backoff retry for rate limits
+
+        Args:
+            ticker: Stock ticker symbol
+            max_retries: Maximum retry attempts (default: 3)
+
+        Returns:
+            FinancialData or None if all retries failed
+        """
+        for attempt in range(max_retries):
+            try:
+                return self._fetch_financial_data_internal(ticker)
+
+            except Exception as e:
+                # Check if it's a rate limit error (429 or "Too Many Requests")
+                error_str = str(e).lower()
+                is_rate_limit = '429' in error_str or 'too many requests' in error_str
+
+                if is_rate_limit and attempt < max_retries - 1:
+                    delay = 2 ** attempt  # Exponential backoff: 1s, 2s, 4s...
+                    logger.warning(f"⚠️  Rate limit hit for {ticker}, retrying in {delay}s (attempt {attempt+1}/{max_retries})")
+                    time.sleep(delay)
+                elif is_rate_limit:
+                    logger.error(f"❌ Rate limit persists after {max_retries} retries: {ticker}")
+                    return None
+                else:
+                    # Non-rate-limit error, don't retry
+                    logger.error(f"Error fetching {ticker}: {e}")
+                    return None
+
+        return None
+
+    def fetch_financial_data(self, ticker: str) -> Optional[FinancialData]:
+        """
+        Fetch financial data for a ticker with caching and retry logic
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            FinancialData object or None if fetch failed
+        """
+        # Check cache first
+        if self.cache:
+            cached = self.cache.get(ticker)
+            if cached is not None:
+                logger.debug(f"Using cached data for {ticker}")
+                return cached
+
+        # Fetch with retry logic for rate limits
+        return self._fetch_with_retry(ticker)
+
+    def _fetch_financial_data_internal(self, ticker: str) -> Optional[FinancialData]:
+        """
+        Internal method to fetch financial data (called by retry wrapper)
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            FinancialData object or None if fetch failed
+        """
+        # Note: Cache check is done in fetch_financial_data(), not here
+
+        try:
+            logger.info(f"Fetching financial data for {ticker}")
+
+            # Create yfinance Ticker object
+            stock = yf.Ticker(ticker)
+
+            # Get basic info
+            info = stock.info
+
+            # Get financial statements
+            financials = stock.financials
+            balance_sheet = stock.balance_sheet
+            cashflow = stock.cashflow
+
+            # Extract data (most recent period is first column)
+            data = FinancialData(ticker=ticker)
+
+            # Basic info
+            data.market_cap = info.get('marketCap')
+            data.sector = info.get('sector')
+            data.industry = info.get('industry')
+            data.current_price = info.get('currentPrice')
+            data.pe_ratio = info.get('trailingPE')
+
+            # Income statement
+            if not financials.empty:
+                try:
+                    data.revenue = self._safe_get(financials, 'Total Revenue', 0)
+                    data.cogs = self._safe_get(financials, 'Cost Of Revenue', 0)
+                    data.operating_income = self._safe_get(financials, 'Operating Income', 0)
+                    data.net_income = self._safe_get(financials, 'Net Income', 0)
+
+                    # Calculate SG&A (Operating Expense - COGS)
+                    operating_expense = self._safe_get(financials, 'Operating Expense', 0)
+                    if operating_expense and data.cogs:
+                        data.sga = operating_expense - data.cogs
+                except Exception as e:
+                    logger.warning(f"Error extracting income statement for {ticker}: {e}")
+
+            # Balance sheet
+            if not balance_sheet.empty:
+                try:
+                    data.total_assets = self._safe_get(balance_sheet, 'Total Assets', 0)
+                    data.shareholder_equity = self._safe_get(balance_sheet, 'Stockholders Equity', 0)
+
+                    # Try to get total debt
+                    total_debt = self._safe_get(balance_sheet, 'Total Debt', 0)
+                    if total_debt is None:
+                        # Try alternative: Long Term Debt + Current Debt
+                        long_term_debt = self._safe_get(balance_sheet, 'Long Term Debt', 0) or 0
+                        current_debt = self._safe_get(balance_sheet, 'Current Debt', 0) or 0
+                        total_debt = long_term_debt + current_debt
+                    data.total_debt = total_debt
+                except Exception as e:
+                    logger.warning(f"Error extracting balance sheet for {ticker}: {e}")
+
+            # Cash flow
+            if not cashflow.empty:
+                try:
+                    data.free_cash_flow = self._safe_get(cashflow, 'Free Cash Flow', 0)
+                except Exception as e:
+                    logger.warning(f"Error extracting cash flow for {ticker}: {e}")
+
+            # Calculate NOPAT (approximate: operating income * (1 - tax rate))
+            # Use 21% federal corporate tax rate as approximation
+            if data.operating_income:
+                data.nopat = data.operating_income * 0.79
+
+            # Metadata
+            data.fetch_time = datetime.now().isoformat()
+
+            # Data quality assessment
+            if data.validate():
+                data.data_quality = "complete"
+                logger.info(f"Successfully fetched complete financial data for {ticker}")
+            elif any([data.revenue, data.total_assets, data.net_income]):
+                data.data_quality = "partial"
+                logger.warning(f"Partial financial data for {ticker}")
+            else:
+                data.data_quality = "insufficient"
+                logger.warning(f"Insufficient financial data for {ticker}")
+
+            # Cache results
+            if self.cache:
+                self.cache.set(ticker, data)
+
+            return data
+
+        except Exception as e:
+            logger.error(f"Failed to fetch financial data for {ticker}: {e}")
+            return None
+
+    def _safe_get(self, df: pd.DataFrame, key: str, col: int = 0) -> Optional[float]:
+        """Safely get value from DataFrame"""
+        try:
+            if key in df.index:
+                value = df.loc[key].iloc[col]
+                # Validate value is reasonable (not NaN, not inf, not negative for certain fields)
+                if pd.notna(value) and not np.isinf(value):
+                    return float(value)
+        except Exception as e:
+            logger.debug(f"Failed to get {key}: {e}")
+        return None
+
+    def batch_fetch(self, tickers: List[str], delay: float = 2.0) -> Dict[str, Optional[FinancialData]]:
+        """
+        Fetch financial data for multiple tickers with rate limit protection
+
+        Args:
+            tickers: List of ticker symbols
+            delay: Seconds to wait between requests (default 2.0 to avoid rate limits)
+
+        Returns:
+            Dict mapping ticker -> FinancialData (or None if failed)
+        """
+        results = {}
+
+        for i, ticker in enumerate(tickers):
+            logger.info(f"Fetching financials {i+1}/{len(tickers)}: {ticker}")
+            data = self.fetch_financial_data(ticker)
+            results[ticker] = data
+
+            # Add delay between requests (except for last ticker)
+            if i < len(tickers) - 1 and delay > 0:
+                time.sleep(delay)
+                logger.debug(f"Rate limit protection: waiting {delay}s before next request")
+
+        success_count = sum(1 for v in results.values() if v and v.data_quality != "insufficient")
+        logger.info(f"Batch fetch complete: {success_count}/{len(tickers)} tickers with usable data")
+
+        return results
+
+    def export_to_json(self, ticker: str, output_file: str):
+        """
+        Fetch financial data and export to JSON
+
+        Args:
+            ticker: Stock ticker symbol
+            output_file: Output JSON file path
+        """
+        data = self.fetch_financial_data(ticker)
+
+        if data:
+            with open(output_file, 'w') as f:
+                json.dump(data.to_dict(), f, indent=2)
+            logger.info(f"Exported financial data for {ticker} to {output_file}")
+        else:
+            logger.error(f"No data to export for {ticker}")
+
+    def get_earnings_dates(self, ticker: str) -> Optional[pd.DataFrame]:
+        """
+        Get upcoming and historical earnings dates
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            DataFrame with earnings dates or None
+        """
+        try:
+            stock = yf.Ticker(ticker)
+            earnings_dates = stock.earnings_dates
+            logger.info(f"Fetched earnings dates for {ticker}")
+            return earnings_dates
+        except Exception as e:
+            logger.error(f"Failed to fetch earnings dates for {ticker}: {e}")
+            return None
+
+    def get_analyst_info(self, ticker: str) -> Optional[Dict]:
+        """
+        Get analyst recommendations and target prices
+
+        Args:
+            ticker: Stock ticker symbol
+
+        Returns:
+            Dict with analyst info or None
+        """
+        try:
+            stock = yf.Ticker(ticker)
+            info = stock.info
+
+            analyst_info = {
+                'target_mean_price': info.get('targetMeanPrice'),
+                'target_high_price': info.get('targetHighPrice'),
+                'target_low_price': info.get('targetLowPrice'),
+                'recommendation_mean': info.get('recommendationMean'),  # 1=Strong Buy, 5=Sell
+                'recommendation_key': info.get('recommendationKey'),
+                'number_of_analyst_opinions': info.get('numberOfAnalystOpinions')
+            }
+
+            logger.info(f"Fetched analyst info for {ticker}")
+            return analyst_info
+
+        except Exception as e:
+            logger.error(f"Failed to fetch analyst info for {ticker}: {e}")
+            return None
+
+
+def get_sp500_tickers() -> List[str]:
+    """
+    Get S&P 500 ticker list from Wikipedia
+
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        import requests
+        from io import StringIO
+
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_500_companies'
+        # Add User-Agent header to avoid 403 Forbidden error from Wikipedia
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        tables = pd.read_html(StringIO(response.text))
+        # The ticker table is the second table (index 1), first is a warning message
+        sp500_table = tables[1]
+        tickers = sp500_table['Symbol'].tolist()
+        logger.info(f"Fetched {len(tickers)} S&P 500 tickers")
+        return tickers
+    except Exception as e:
+        logger.error(f"Failed to fetch S&P 500 tickers: {e}")
+        return []
+
+
+def get_sp400_tickers() -> List[str]:
+    """
+    Get S&P MidCap 400 ticker list from Wikipedia
+
+    The S&P MidCap 400 covers mid-cap companies with market caps
+    typically between $2B and $50B.
+
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        import requests
+        from io import StringIO
+
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_400_companies'
+        # Add User-Agent header to avoid 403 Forbidden error from Wikipedia
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        tables = pd.read_html(StringIO(response.text))
+        # Use second table (index 1) which contains the ticker list
+        sp400_table = tables[1]
+        tickers = sp400_table['Symbol'].tolist()
+        logger.info(f"Fetched {len(tickers)} S&P MidCap 400 tickers")
+        return tickers
+    except Exception as e:
+        logger.error(f"Failed to fetch S&P 400 tickers: {e}")
+        return []
+
+
+def get_sp600_tickers() -> List[str]:
+    """
+    Get S&P SmallCap 600 ticker list from Wikipedia
+
+    The S&P SmallCap 600 covers small-cap companies with market caps
+    typically between $500M and $2B.
+
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        import requests
+        from io import StringIO
+
+        url = 'https://en.wikipedia.org/wiki/List_of_S%26P_600_companies'
+        # Add User-Agent header to avoid 403 Forbidden error from Wikipedia
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        tables = pd.read_html(StringIO(response.text))
+        # Use second table (index 1) which contains the ticker list
+        sp600_table = tables[1]
+        tickers = sp600_table['Symbol'].tolist()
+        logger.info(f"Fetched {len(tickers)} S&P SmallCap 600 tickers")
+        return tickers
+    except Exception as e:
+        logger.error(f"Failed to fetch S&P 600 tickers: {e}")
+        return []
+
+
+def get_nasdaq100_tickers() -> List[str]:
+    """
+    Get NASDAQ-100 ticker list from Wikipedia
+
+    The NASDAQ-100 includes the 100 largest non-financial companies
+    listed on the NASDAQ stock exchange, heavily weighted toward
+    technology companies.
+
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        import requests
+        from io import StringIO
+
+        url = 'https://en.wikipedia.org/wiki/Nasdaq-100'
+        # Add User-Agent header to avoid 403 Forbidden error from Wikipedia
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        tables = pd.read_html(StringIO(response.text))
+        # The ticker list is typically in the 4th table (index 3)
+        # It has columns including 'Ticker'
+        nasdaq_table = tables[3]
+        tickers = nasdaq_table['Ticker'].tolist()
+        logger.info(f"Fetched {len(tickers)} NASDAQ-100 tickers")
+        return tickers
+    except Exception as e:
+        logger.error(f"Failed to fetch NASDAQ-100 tickers: {e}")
+        return []
+
+
+# Example usage
+if __name__ == "__main__":
+    # Initialize fetcher
+    fetcher = FinancialDataFetcher()
+
+    # Example 1: Fetch data for a single ticker
+    print("\n" + "="*60)
+    print("Example 1: Fetch financial data for NVDA")
+    print("="*60)
+    nvda_data = fetcher.fetch_financial_data("NVDA")
+    if nvda_data:
+        print(f"Ticker: {nvda_data.ticker}")
+        print(f"Market Cap: ${nvda_data.market_cap:,.0f}" if nvda_data.market_cap else "N/A")
+        print(f"Sector: {nvda_data.sector}")
+        print(f"Revenue: ${nvda_data.revenue:,.0f}" if nvda_data.revenue else "N/A")
+        print(f"Net Income: ${nvda_data.net_income:,.0f}" if nvda_data.net_income else "N/A")
+        print(f"Total Assets: ${nvda_data.total_assets:,.0f}" if nvda_data.total_assets else "N/A")
+        print(f"FCF: ${nvda_data.free_cash_flow:,.0f}" if nvda_data.free_cash_flow else "N/A")
+        print(f"Data Quality: {nvda_data.data_quality}")
+
+    # Example 2: Batch fetch
+    print("\n" + "="*60)
+    print("Example 2: Batch fetch for multiple tickers")
+    print("="*60)
+    tickers = ["AAPL", "MSFT", "GOOGL"]
+    batch_results = fetcher.batch_fetch(tickers)
+    for ticker, data in batch_results.items():
+        if data:
+            print(f"  {ticker}: {data.data_quality} data (Market Cap: ${data.market_cap:,.0f})" if data.market_cap else f"  {ticker}: {data.data_quality}")
+        else:
+            print(f"  {ticker}: FAILED")
+
+    # Example 3: Get earnings dates
+    print("\n" + "="*60)
+    print("Example 3: Get earnings dates for AAPL")
+    print("="*60)
+    earnings = fetcher.get_earnings_dates("AAPL")
+    if earnings is not None and not earnings.empty:
+        print(earnings.head())
+
+    # Example 4: Get analyst info
+    print("\n" + "="*60)
+    print("Example 4: Get analyst info for AAPL")
+    print("="*60)
+    analyst_info = fetcher.get_analyst_info("AAPL")
+    if analyst_info:
+        print(f"Target Mean Price: ${analyst_info.get('target_mean_price')}")
+        print(f"Recommendation: {analyst_info.get('recommendation_key')}")
+        print(f"Number of Analysts: {analyst_info.get('number_of_analyst_opinions')}")
+
+    # Example 5: Export to JSON
+    print("\n" + "="*60)
+    print("Example 5: Export to JSON")
+    print("="*60)
+    fetcher.export_to_json("AAPL", "financials_aapl.json")
+    print("Exported to financials_aapl.json")
