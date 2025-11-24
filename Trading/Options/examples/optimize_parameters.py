@@ -150,11 +150,11 @@ def example_vertical_spread_optimization():
     print("Setting parameter ranges...\n")
 
     # Entry parameters
-    optimizer.set_parameter_range('dte_min', min=30, max=45)
-    optimizer.set_parameter_range('dte_max', min=45, max=60)
+    optimizer.set_parameter_range('dte', min=30, max=45, step=5)
 
-    # Target delta for short strike
-    optimizer.set_parameter_range('target_delta', min=0.25, max=0.40, step=0.05)
+    # Delta for both legs
+    optimizer.set_parameter_range('short_delta', min=0.25, max=0.40, step=0.05)
+    optimizer.set_parameter_range('long_delta', min=0.10, max=0.25, step=0.05)
 
     # Exit parameters
     optimizer.set_parameter_range('profit_target', min=0.40, max=0.60, step=0.10)
@@ -220,7 +220,8 @@ def example_quick_optimization():
         underlying_data=underlying_data,
         config=config,
         dte_range=(30, 45),
-        delta_range=(0.25, 0.40),
+        short_delta_range=(0.25, 0.40),
+        long_delta_range=(0.10, 0.25),
         profit_target_range=(0.40, 0.60)
     )
 

@@ -32,6 +32,7 @@ class VerticalSpread(BaseStrategy):
         self.spread_type = spread_type
         self.entry_config = config.get('entry', {})
         self.exit_config = config.get('exit', {})
+        self.debug = config.get('debug', False)
 
     def _find_strike_by_delta(
         self,

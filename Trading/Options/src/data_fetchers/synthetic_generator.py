@@ -65,14 +65,14 @@ class SyntheticOptionsGenerator:
     ) -> pd.DataFrame:
         """
         Fetch historical underlying price data and VIX from Yahoo Finance.
-        Calculates IV Rank based on VIX data.
+        Calculates IV Percentile based on SPY's implied volatility over 252 trading days.
 
         Args:
             start_date: Start date (YYYY-MM-DD)
             end_date: End date (YYYY-MM-DD)
 
         Returns:
-            DataFrame with OHLCV data, VIX, and IV Rank
+            DataFrame with OHLCV data, VIX, SPY IV, and IV Percentile
         """
         print(f"Fetching {self.symbol} price data from Yahoo Finance...")
         print(f"Date range: {start_date} to {end_date}")
@@ -91,7 +91,18 @@ class SyntheticOptionsGenerator:
         # Standardize column names
         data.columns = [col.lower() for col in data.columns]
 
-        # Fetch VIX data (implied volatility index)
+        # Calculate returns first (needed for volatility calculation)
+        data['returns'] = data['close'].pct_change()
+
+        # Calculate rolling volatility (annualized)
+        data['volatility'] = data['returns'].rolling(
+            window=self.volatility_window
+        ).std() * np.sqrt(252)
+
+        # Forward fill any NaN volatility values
+        data['volatility'] = data['volatility'].bfill()
+
+        # Fetch VIX data (implied volatility index for reference)
         print(f"Fetching VIX data from Yahoo Finance...")
         vix_ticker = yf.Ticker("^VIX")
         vix_data = vix_ticker.history(start=start_date, end=end_date)
@@ -108,55 +119,59 @@ class SyntheticOptionsGenerator:
             # Forward fill any missing VIX values (for holidays/weekends)
             data['vix'] = data['vix'].ffill()
 
-            # Calculate IV Percentile using 52-week (252 trading days) lookback
-            # IV Percentile = % of days in lookback period where VIX was below current level
-            # This is the TRUE percentile calculation, not range-based IV Rank
-            lookback_period = 252  # ~1 year of trading days
-
-            def calculate_iv_percentile(series, window):
-                """
-                Calculate IV Percentile: % of days where IV was below current level.
-
-                Args:
-                    series: VIX time series
-                    window: Lookback period (e.g., 252 for 1 year)
-
-                Returns:
-                    Series with IV Percentile values (0-100%)
-                """
-                def percentile_calc(x):
-                    if len(x) < 2:
-                        return 50.0  # Neutral default
-                    # Count how many days in window had VIX below current day
-                    current = x.iloc[-1]
-                    below_current = (x[:-1] < current).sum()
-                    return (below_current / (len(x) - 1)) * 100
-
-                return series.rolling(window=window, min_periods=30).apply(percentile_calc, raw=False)
-
-            data['iv_percentile'] = calculate_iv_percentile(data['vix'], lookback_period)
-
-            # Handle edge cases (not enough data)
-            data['iv_percentile'] = data['iv_percentile'].fillna(50.0)  # Use 50 as neutral default
-
-            print(f"✓ VIX data merged")
+            print(f"✓ VIX data merged (for reference)")
             print(f"  VIX range: {data['vix'].min():.2f} - {data['vix'].max():.2f}")
-            print(f"  IV Percentile range: {data['iv_percentile'].min():.1f}% - {data['iv_percentile'].max():.1f}%")
         else:
             print(f"⚠️  Warning: Could not fetch VIX data")
             data['vix'] = np.nan
-            data['iv_percentile'] = 50.0  # Default to neutral
 
-        # Calculate returns
-        data['returns'] = data['close'].pct_change()
+        # Calculate SPY's Implied Volatility from ATM options
+        # For synthetic data, we use VIX as a proxy for SPY IV since:
+        # 1. VIX represents S&P 500 implied volatility
+        # 2. SPY tracks S&P 500
+        # 3. This is the volatility we'll use to price SPY options
+        print(f"Calculating SPY implied volatility...")
+        if 'vix' in data.columns and not data['vix'].isna().all():
+            # Use VIX as SPY IV proxy (convert from percentage to decimal for internal use)
+            data['spy_iv'] = data['vix'] / 100.0
+        else:
+            # Fallback to historical volatility if VIX unavailable
+            data['spy_iv'] = data['volatility']
 
-        # Calculate rolling volatility (annualized)
-        data['volatility'] = data['returns'].rolling(
-            window=self.volatility_window
-        ).std() * np.sqrt(252)
+        # Calculate IV Percentile using 252 trading days (1 year) lookback
+        # IV Percentile = % of days in lookback period where SPY IV was below current level
+        # Formula: IVP = (# Days with lower IV than today) / (# Trading Days in period) * 100
+        lookback_period = 252  # ~1 year of trading days
 
-        # Forward fill any NaN volatility values
-        data['volatility'] = data['volatility'].bfill()
+        def calculate_iv_percentile(series, window):
+            """
+            Calculate IV Percentile: % of days where IV was below current level.
+
+            Args:
+                series: SPY IV time series (decimal form, e.g., 0.20 for 20%)
+                window: Lookback period (252 for 1 year)
+
+            Returns:
+                Series with IV Percentile values (0-100%)
+            """
+            def percentile_calc(x):
+                if len(x) < 2:
+                    return 50.0  # Neutral default
+                # Count how many days in window had IV below current day
+                current = x.iloc[-1]
+                below_current = (x[:-1] < current).sum()
+                return (below_current / (len(x) - 1)) * 100
+
+            return series.rolling(window=window, min_periods=30).apply(percentile_calc, raw=False)
+
+        data['iv_percentile'] = calculate_iv_percentile(data['spy_iv'], lookback_period)
+
+        # Handle edge cases (not enough data)
+        data['iv_percentile'] = data['iv_percentile'].fillna(50.0)  # Use 50 as neutral default
+
+        print(f"✓ SPY IV Percentile calculated (252-day lookback)")
+        print(f"  SPY IV range: {data['spy_iv'].min():.2%} - {data['spy_iv'].max():.2%}")
+        print(f"  IV Percentile range: {data['iv_percentile'].min():.1f}% - {data['iv_percentile'].max():.1f}%")
 
         # Use median volatility for any remaining NaN
         median_vol = data['volatility'].median()

@@ -5,11 +5,15 @@ Performs grid search over parameter ranges to find optimal strategy configuratio
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any, Set
 import pandas as pd
 import numpy as np
 from itertools import product
 import copy
+import time
+import random
+import os
+from pathlib import Path
 
 from ..backtester.optopsy_wrapper import OptopsyBacktester
 from ..strategies.base_strategy import BaseStrategy
@@ -24,7 +28,23 @@ class ParameterOptimizer:
     parameter ranges.
 
     Usage:
-        # Initialize for calendar spreads
+        # Initialize for vertical spreads
+        optimizer = ParameterOptimizer(
+            strategy_type='vertical',
+            strategy_class=BullPutSpread,
+            backtester=backtester,
+            options_data=options_data,
+            underlying_data=underlying_data,
+            base_config=config
+        )
+
+        # Define parameter ranges for vertical spreads
+        optimizer.set_parameter_range('dte', min=30, max=45, step=5)
+        optimizer.set_parameter_range('short_delta', min=0.25, max=0.40, step=0.05)
+        optimizer.set_parameter_range('long_delta', min=0.10, max=0.25, step=0.05)
+        optimizer.set_parameter_range('profit_target', min=0.40, max=0.60, step=0.05)
+
+        # Or for calendar spreads
         optimizer = ParameterOptimizer(
             strategy_type='calendar',
             strategy_class=CallCalendarSpread,
@@ -34,7 +54,6 @@ class ParameterOptimizer:
             base_config=config
         )
 
-        # Define parameter ranges (simplified syntax)
         optimizer.set_parameter_range('near_dte', min=20, max=35, step=5)
         optimizer.set_parameter_range('far_dte', min=45, max=75, step=10)
         optimizer.set_parameter_range('profit_target', min=0.15, max=0.35, step=0.05)
@@ -47,7 +66,7 @@ class ParameterOptimizer:
 
     # Strategy-specific allowed parameters
     VERTICAL_PARAMETERS = {
-        'entry': ['dte', 'target_delta', 'min_credit', 'max_credit',
+        'entry': ['dte', 'short_delta', 'long_delta', 'min_credit', 'max_credit',
                   'iv_percentile'],
         'exit': ['profit_target', 'stop_loss', 'dte_min']
     }
@@ -199,21 +218,271 @@ class ParameterOptimizer:
 
         return total
 
+    def _estimate_runtime_and_confirm(
+        self,
+        param_names: List[str],
+        param_values_lists: List[List],
+        total_combinations: int,
+        num_samples: int = 3
+    ) -> bool:
+        """
+        Run sample backtests to estimate total runtime and ask user for confirmation.
+
+        Args:
+            param_names: List of parameter names
+            param_values_lists: List of value lists for each parameter
+            total_combinations: Total number of combinations to test
+            num_samples: Number of sample backtests to run (default: 3)
+
+        Returns:
+            True if user confirms, False otherwise
+        """
+        print(f"\n{'='*60}")
+        print("ESTIMATING RUNTIME...")
+        print(f"{'='*60}")
+        print(f"Running {num_samples} sample backtests to estimate time...")
+
+        # Generate random sample combinations
+        all_combinations = list(product(*param_values_lists))
+        sample_size = min(num_samples, len(all_combinations))
+        sample_combinations = random.sample(all_combinations, sample_size)
+
+        # Run sample backtests and time them
+        sample_times = []
+        for i, combination in enumerate(sample_combinations, 1):
+            params = dict(zip(param_names, combination))
+            print(f"  Sample {i}/{sample_size}: Testing {params}")
+
+            start_time = time.time()
+            try:
+                self._run_single_backtest(params, verbose=False)
+                elapsed = time.time() - start_time
+                sample_times.append(elapsed)
+                print(f"    ✓ Completed in {elapsed:.2f} seconds")
+            except Exception as e:
+                print(f"    ⚠️  Sample failed: {str(e)}")
+                # Still record time for failed attempts
+                elapsed = time.time() - start_time
+                sample_times.append(elapsed)
+
+        # Calculate estimates
+        if not sample_times:
+            print("\n⚠️  All sample backtests failed. Cannot estimate runtime.")
+            response = input("Continue anyway? (y/n): ").strip().lower()
+            return response == 'y'
+
+        avg_time = np.mean(sample_times)
+        min_time = np.min(sample_times)
+        max_time = np.max(sample_times)
+
+        # Estimate total runtime
+        estimated_total_seconds = avg_time * total_combinations
+        estimated_min_seconds = min_time * total_combinations
+        estimated_max_seconds = max_time * total_combinations
+
+        # Format time estimates
+        def format_time(seconds):
+            """Convert seconds to human-readable format."""
+            if seconds < 60:
+                return f"{seconds:.0f} seconds"
+            elif seconds < 3600:
+                minutes = seconds / 60
+                return f"{minutes:.1f} minutes"
+            else:
+                hours = seconds / 3600
+                return f"{hours:.1f} hours"
+
+        print(f"\n{'='*60}")
+        print("RUNTIME ESTIMATE")
+        print(f"{'='*60}")
+        print(f"Sample backtests: {sample_size}")
+        print(f"Average time per backtest: {avg_time:.2f} seconds")
+        print(f"Time range: {min_time:.2f}s - {max_time:.2f}s")
+        print(f"\nTotal combinations: {total_combinations:,}")
+        print(f"\nEstimated total runtime:")
+        print(f"  Best case:  {format_time(estimated_min_seconds)}")
+        print(f"  Average:    {format_time(estimated_total_seconds)}")
+        print(f"  Worst case: {format_time(estimated_max_seconds)}")
+        print(f"{'='*60}\n")
+
+        # Get user confirmation
+        response = input("Do you want to proceed with optimization? (y/n): ").strip().lower()
+
+        if response == 'y':
+            print("\n✓ Starting optimization...\n")
+            return True
+        else:
+            print("\n✗ Optimization cancelled by user.")
+            return False
+
+    def _params_to_key(self, params: Dict) -> Tuple:
+        """
+        Convert parameter dictionary to hashable key for comparison.
+
+        Why this is needed:
+        - Dicts are not hashable (can't use in sets)
+        - Need to identify unique parameter combinations
+        - Order shouldn't matter: {'a': 1, 'b': 2} == {'b': 2, 'a': 1}
+
+        Args:
+            params: Parameter dictionary
+
+        Returns:
+            Tuple of sorted (key, value) pairs - hashable and order-independent
+
+        Example:
+            >>> _params_to_key({'dte': 30, 'delta': 0.25})
+            (('delta', 0.25), ('dte', 30))
+        """
+        return tuple(sorted(params.items()))
+
+    def _get_checkpoint_path(self, strategy_name: str, timestamp: str) -> Path:
+        """
+        Generate checkpoint file path.
+
+        Creates: optimization_checkpoints/<strategy>_<timestamp>.csv
+
+        Args:
+            strategy_name: Name of strategy being optimized
+            timestamp: Timestamp string for unique filename
+
+        Returns:
+            Path object to checkpoint file
+        """
+        checkpoint_dir = Path("optimization_checkpoints")
+        checkpoint_dir.mkdir(exist_ok=True)  # Create dir if doesn't exist
+        filename = f"{strategy_name}_{timestamp}.csv"
+        return checkpoint_dir / filename
+
+    def _save_checkpoint(
+        self,
+        checkpoint_path: Path,
+        results: List[Dict],
+        verbose: bool = True
+    ):
+        """
+        Save current optimization results to checkpoint file.
+
+        WHY: If optimization is interrupted, we don't lose progress!
+
+        Args:
+            checkpoint_path: Path to save checkpoint
+            results: List of result dictionaries
+            verbose: Print save confirmation
+
+        How it works:
+            1. Convert results list to DataFrame
+            2. Save as CSV (human-readable, easy to inspect)
+            3. Print confirmation (so user knows it's saving)
+
+        File format:
+            dte,delta,sharpe_ratio,total_return,...
+            30,0.25,1.52,0.24,...
+            35,0.30,1.67,0.28,...
+        """
+        if not results:
+            return  # Nothing to save
+
+        df = pd.DataFrame(results)
+        df.to_csv(checkpoint_path, index=False)
+
+        if verbose:
+            print(f"    💾 Checkpoint saved: {len(results)} results → {checkpoint_path.name}")
+
+    def _load_checkpoint(
+        self,
+        checkpoint_path: Path,
+        param_names: List[str]
+    ) -> Tuple[List[Dict], Set[Tuple]]:
+        """
+        Load previous optimization results from checkpoint.
+
+        WHY: Resume where we left off instead of starting over!
+
+        Args:
+            checkpoint_path: Path to checkpoint file
+            param_names: List of parameter names being optimized
+
+        Returns:
+            Tuple of:
+                - results: List of previously completed result dicts
+                - completed_keys: Set of parameter combination keys already done
+
+        How it works:
+            1. Load CSV into DataFrame
+            2. Extract results as list of dicts
+            3. Create set of "completed keys" for fast lookup
+            4. Return both so we can:
+               a) Include previous results in final output
+               b) Skip already-completed combinations
+
+        Example:
+            results, completed = _load_checkpoint(...)
+            # completed = {(('dte', 30), ('delta', 0.25)), ...}
+            # Can check: if params_key in completed: skip!
+        """
+        if not checkpoint_path.exists():
+            return [], set()  # No checkpoint found
+
+        print(f"\n📂 Found existing checkpoint: {checkpoint_path.name}")
+        df = pd.DataFrame(pd.read_csv(checkpoint_path))
+
+        if df.empty:
+            return [], set()
+
+        # Convert DataFrame back to list of dicts
+        results = df.to_dict('records')
+
+        # Build set of completed parameter combinations for fast lookup
+        completed_keys = set()
+        for result in results:
+            # Extract only the parameter columns (not metrics)
+            params = {k: result[k] for k in param_names if k in result}
+            key = self._params_to_key(params)
+            completed_keys.add(key)
+
+        print(f"    ✓ Loaded {len(results)} previous results")
+        print(f"    ✓ Will skip {len(completed_keys)} already-completed combinations")
+
+        return results, completed_keys
+
     def run_optimization(
         self,
         optimization_metric: str = 'sharpe_ratio',
-        verbose: bool = True
+        verbose: bool = True,
+        confirm: bool = True,
+        num_samples: int = 3,
+        checkpoint_every: int = 10,
+        resume_from: Optional[str] = None
     ) -> pd.DataFrame:
         """
         Run grid search optimization over all parameter combinations.
+
+        NEW FEATURES:
+        - Saves checkpoints periodically (every N combinations)
+        - Can resume from previous checkpoint if interrupted
+        - No progress lost if computer crashes or process stops
 
         Args:
             optimization_metric: Metric to optimize ('sharpe_ratio', 'total_return',
                                 'profit_factor', 'calmar_ratio', etc.)
             verbose: Print progress updates
+            confirm: Ask user to confirm before starting (default: True)
+            num_samples: Number of sample backtests for runtime estimation (default: 3)
+            checkpoint_every: Save progress every N combinations (default: 10)
+            resume_from: Path to checkpoint file to resume from, or None for new run
 
         Returns:
             DataFrame with results for all parameter combinations
+
+        Example:
+            # Fresh run with checkpoints
+            results = optimizer.run_optimization(checkpoint_every=10)
+
+            # Resume from previous checkpoint
+            results = optimizer.run_optimization(
+                resume_from='optimization_checkpoints/BullPutSpread_20250123_143022.csv'
+            )
         """
         if not self.parameter_ranges:
             raise ValueError("No parameter ranges defined. Use set_parameter_range() first.")
@@ -234,35 +503,100 @@ class ParameterOptimizer:
             print(f"Optimization metric: {optimization_metric}")
             print(f"{'='*60}\n")
 
+        # Estimate runtime and get user confirmation
+        if confirm:
+            user_confirmed = self._estimate_runtime_and_confirm(
+                param_names=param_names,
+                param_values_lists=param_values_lists,
+                total_combinations=total_combinations,
+                num_samples=num_samples
+            )
+            if not user_confirmed:
+                raise RuntimeError("Optimization cancelled by user")
+
+        # CHECKPOINT SETUP: Prepare for incremental saving and resume capability
+        strategy_name = self.strategy_class.__name__
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        if resume_from:
+            # User specified checkpoint file to resume from
+            checkpoint_path = Path(resume_from)
+            print(f"\n🔄 RESUME MODE: Loading checkpoint from {checkpoint_path}")
+        else:
+            # Create new checkpoint file for this run
+            checkpoint_path = self._get_checkpoint_path(strategy_name, timestamp)
+            if verbose:
+                print(f"\n💾 Checkpoint file: {checkpoint_path}")
+                print(f"    Saving every {checkpoint_every} combinations")
+
+        # Load previous results if resuming
+        results, completed_keys = self._load_checkpoint(checkpoint_path, param_names)
+        combinations_to_skip = len(completed_keys)
+        combinations_to_run = total_combinations - combinations_to_skip
+
+        if combinations_to_skip > 0 and verbose:
+            print(f"    ✓ Resuming: {combinations_to_skip} already done, {combinations_to_run} remaining\n")
+
         # Run backtest for each combination
-        results = []
+        start_time = time.time()
+        combinations_processed = combinations_to_skip  # Start from where we left off
 
-        for i, combination in enumerate(product(*param_values_lists), 1):
-            # Create parameter dict
-            params = dict(zip(param_names, combination))
+        try:  # Wrap in try-except to save checkpoint on Ctrl+C
+            for i, combination in enumerate(product(*param_values_lists), 1):
+                # Create parameter dict
+                params = dict(zip(param_names, combination))
+                params_key = self._params_to_key(params)
 
-            if verbose and i % max(1, total_combinations // 20) == 0:
-                print(f"Progress: {i}/{total_combinations} ({i/total_combinations*100:.1f}%)")
+                # SKIP if already completed (resume functionality)
+                if params_key in completed_keys:
+                    if verbose and i % max(1, total_combinations // 20) == 0:
+                        print(f"Progress: {i}/{total_combinations} ({i/total_combinations*100:.1f}%) [Skipping completed]")
+                    continue
 
-            # Run backtest with these parameters
-            try:
-                metrics = self._run_single_backtest(params, verbose=False)
+                combinations_processed += 1
 
-                # Store results
-                result_row = params.copy()
-                result_row.update(metrics)
-                results.append(result_row)
+                # Progress reporting
+                if verbose and combinations_processed % max(1, combinations_to_run // 20) == 0:
+                    print(f"Progress: {combinations_processed}/{total_combinations} ({combinations_processed/total_combinations*100:.1f}%)")
 
-            except Exception as e:
-                if verbose:
-                    print(f"  ⚠️  Combination {i} failed: {params}")
-                    print(f"      Error: {str(e)}")
+                # Run backtest with these parameters
+                try:
+                    metrics = self._run_single_backtest(params, verbose=False)
 
-                # Store failed result
-                result_row = params.copy()
-                result_row['error'] = str(e)
-                result_row[optimization_metric] = np.nan
-                results.append(result_row)
+                    # Store results
+                    result_row = params.copy()
+                    result_row.update(metrics)
+                    results.append(result_row)
+
+                except Exception as e:
+                    if verbose:
+                        print(f"  ⚠️  Combination {i} failed: {params}")
+                        print(f"      Error: {str(e)}")
+
+                    # Store failed result
+                    result_row = params.copy()
+                    result_row['error'] = str(e)
+                    result_row[optimization_metric] = np.nan
+                    results.append(result_row)
+
+                # CHECKPOINT SAVE: Save progress every N combinations
+                if len(results) % checkpoint_every == 0:
+                    self._save_checkpoint(checkpoint_path, results, verbose=verbose)
+
+        except KeyboardInterrupt:
+            # User pressed Ctrl+C - save progress before exiting!
+            print(f"\n\n⚠️  Interrupted by user (Ctrl+C)")
+            print(f"💾 Saving checkpoint before exit...")
+            self._save_checkpoint(checkpoint_path, results, verbose=True)
+            print(f"\nTo resume later, use:")
+            print(f"  results = optimizer.run_optimization(")
+            print(f"      resume_from='{checkpoint_path}'")
+            print(f"  )")
+            raise  # Re-raise to actually stop execution
+
+        # Final checkpoint save
+        if results:
+            self._save_checkpoint(checkpoint_path, results, verbose=verbose)
 
         # Convert to DataFrame
         self.results = pd.DataFrame(results)
@@ -274,6 +608,9 @@ class ParameterOptimizer:
                 ascending=False
             ).reset_index(drop=True)
 
+        # Calculate actual runtime
+        actual_runtime = time.time() - start_time
+
         if verbose:
             print(f"\n{'='*60}")
             print("OPTIMIZATION COMPLETE")
@@ -281,6 +618,20 @@ class ParameterOptimizer:
             print(f"Total combinations tested: {len(results)}")
             print(f"Successful backtests: {self.results[optimization_metric].notna().sum()}")
             print(f"Failed backtests: {self.results[optimization_metric].isna().sum()}")
+
+            # Show actual runtime
+            def format_time(seconds):
+                if seconds < 60:
+                    return f"{seconds:.0f} seconds"
+                elif seconds < 3600:
+                    minutes = seconds / 60
+                    return f"{minutes:.1f} minutes"
+                else:
+                    hours = seconds / 3600
+                    return f"{hours:.1f} hours"
+
+            print(f"\nActual runtime: {format_time(actual_runtime)}")
+            print(f"Average time per backtest: {actual_runtime / len(results):.2f} seconds")
 
             if not self.results.empty and optimization_metric in self.results.columns:
                 best_row = self.results.iloc[0]
@@ -498,7 +849,8 @@ def quick_optimize_vertical(
     underlying_data: pd.DataFrame,
     config: Dict,
     dte_range: Tuple[int, int] = (30, 45),
-    delta_range: Tuple[float, float] = (0.25, 0.40),
+    short_delta_range: Tuple[float, float] = (0.25, 0.40),
+    long_delta_range: Tuple[float, float] = (0.10, 0.25),
     profit_target_range: Tuple[float, float] = (0.40, 0.60)
 ) -> pd.DataFrame:
     """
@@ -511,7 +863,8 @@ def quick_optimize_vertical(
         underlying_data: Underlying data
         config: Base config
         dte_range: (min, max) for entry DTE
-        delta_range: (min, max) for target delta
+        short_delta_range: (min, max) for short leg delta
+        long_delta_range: (min, max) for long leg delta
         profit_target_range: (min, max) for profit target
 
     Returns:
@@ -528,7 +881,8 @@ def quick_optimize_vertical(
 
     # Simplified parameter syntax - 'dte' sets both dte_min and dte_max
     optimizer.set_parameter_range('dte', min=dte_range[0], max=dte_range[1], step=5)
-    optimizer.set_parameter_range('target_delta', min=delta_range[0], max=delta_range[1], step=0.05)
+    optimizer.set_parameter_range('short_delta', min=short_delta_range[0], max=short_delta_range[1], step=0.05)
+    optimizer.set_parameter_range('long_delta', min=long_delta_range[0], max=long_delta_range[1], step=0.05)
     optimizer.set_parameter_range('profit_target', min=profit_target_range[0], max=profit_target_range[1], step=0.05)
 
     results = optimizer.run_optimization(optimization_metric='sharpe_ratio')

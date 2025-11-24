@@ -313,6 +313,177 @@ class FinancialDataFetcher:
             logger.debug(f"Failed to get {key}: {e}")
         return None
 
+    def fetch_historical_financials(self, ticker: str, years: int = 10) -> Optional[pd.DataFrame]:
+        """
+        Fetch historical financial data for ROE persistence analysis
+
+        This method fetches multi-year financial statements from yfinance and transforms
+        them into a format suitable for the QualityPersistenceAnalyzer.
+
+        Args:
+            ticker: Stock ticker symbol
+            years: Number of years to fetch (default: 10, but yfinance typically provides 3-4)
+
+        Returns:
+            DataFrame with columns:
+                - year: int (e.g., 2021, 2022, 2023)
+                - revenue: float
+                - cogs: float (cost of goods sold)
+                - sga: float (selling, general & administrative)
+                - total_assets: float
+                - net_income: float
+                - shareholder_equity: float
+                - free_cash_flow: float
+                - total_debt: float
+                - nopat: float (net operating profit after tax)
+
+            Returns None if fetch failed or insufficient data
+
+        Note:
+            - yfinance typically provides 3-4 years of annual data (not 10)
+            - DataFrame will have as many rows as years available from yfinance
+            - Years are sorted in ascending order (oldest to newest)
+            - Missing values are filled with None
+        """
+        try:
+            logger.info(f"Fetching historical financials for {ticker} (target: {years} years)")
+
+            # Create yfinance Ticker object
+            stock = yf.Ticker(ticker)
+
+            # Get financial statements (yfinance returns years as columns)
+            financials = stock.financials  # Income statement
+            balance_sheet = stock.balance_sheet  # Balance sheet
+            cashflow = stock.cashflow  # Cash flow statement
+
+            # Check if we have any data
+            if financials.empty and balance_sheet.empty and cashflow.empty:
+                logger.warning(f"No historical financial data available for {ticker}")
+                return None
+
+            # Get available years (yfinance uses datetime columns)
+            # Combine years from all statements to get full coverage
+            all_years = set()
+            if not financials.empty:
+                all_years.update(financials.columns)
+            if not balance_sheet.empty:
+                all_years.update(balance_sheet.columns)
+            if not cashflow.empty:
+                all_years.update(cashflow.columns)
+
+            # Convert datetime columns to year integers
+            years_list = sorted([col.year for col in all_years])
+
+            if len(years_list) == 0:
+                logger.warning(f"No valid years found in financial data for {ticker}")
+                return None
+
+            logger.info(f"Found {len(years_list)} years of data for {ticker}: {years_list}")
+
+            # Build historical data DataFrame (years as rows)
+            historical_data = []
+
+            for year_val in years_list:
+                # Find the matching datetime column for this year
+                year_col = None
+                for col in all_years:
+                    if col.year == year_val:
+                        year_col = col
+                        break
+
+                if year_col is None:
+                    continue
+
+                # Extract data for this year
+                row_data = {'year': year_val}
+
+                # Income statement
+                if not financials.empty and year_col in financials.columns:
+                    col_idx = financials.columns.get_loc(year_col)
+                    row_data['revenue'] = self._safe_get(financials, 'Total Revenue', col_idx)
+                    row_data['cogs'] = self._safe_get(financials, 'Cost Of Revenue', col_idx)
+                    row_data['net_income'] = self._safe_get(financials, 'Net Income', col_idx)
+                    operating_income = self._safe_get(financials, 'Operating Income', col_idx)
+
+                    # Calculate SG&A (Operating Expense - COGS)
+                    operating_expense = self._safe_get(financials, 'Operating Expense', col_idx)
+                    if operating_expense is not None and row_data.get('cogs') is not None:
+                        row_data['sga'] = operating_expense - row_data['cogs']
+                    else:
+                        row_data['sga'] = None
+
+                    # Calculate NOPAT (approximate: operating income * (1 - tax rate))
+                    # Use 21% federal corporate tax rate as approximation
+                    if operating_income is not None:
+                        row_data['nopat'] = operating_income * 0.79
+                    else:
+                        row_data['nopat'] = None
+                else:
+                    row_data['revenue'] = None
+                    row_data['cogs'] = None
+                    row_data['net_income'] = None
+                    row_data['sga'] = None
+                    row_data['nopat'] = None
+
+                # Balance sheet
+                if not balance_sheet.empty and year_col in balance_sheet.columns:
+                    col_idx = balance_sheet.columns.get_loc(year_col)
+                    row_data['total_assets'] = self._safe_get(balance_sheet, 'Total Assets', col_idx)
+                    row_data['shareholder_equity'] = self._safe_get(balance_sheet, 'Stockholders Equity', col_idx)
+
+                    # Try to get total debt
+                    total_debt = self._safe_get(balance_sheet, 'Total Debt', col_idx)
+                    if total_debt is None:
+                        # Try alternative: Long Term Debt + Current Debt
+                        long_term_debt = self._safe_get(balance_sheet, 'Long Term Debt', col_idx) or 0
+                        current_debt = self._safe_get(balance_sheet, 'Current Debt', col_idx) or 0
+                        total_debt = long_term_debt + current_debt if (long_term_debt or current_debt) else None
+                    row_data['total_debt'] = total_debt
+                else:
+                    row_data['total_assets'] = None
+                    row_data['shareholder_equity'] = None
+                    row_data['total_debt'] = None
+
+                # Cash flow
+                if not cashflow.empty and year_col in cashflow.columns:
+                    col_idx = cashflow.columns.get_loc(year_col)
+                    row_data['free_cash_flow'] = self._safe_get(cashflow, 'Free Cash Flow', col_idx)
+                else:
+                    row_data['free_cash_flow'] = None
+
+                historical_data.append(row_data)
+
+            # Convert to DataFrame
+            df = pd.DataFrame(historical_data)
+
+            # Ensure columns exist (even if all None)
+            required_columns = ['year', 'revenue', 'cogs', 'sga', 'total_assets',
+                              'net_income', 'shareholder_equity', 'free_cash_flow',
+                              'total_debt', 'nopat']
+            for col in required_columns:
+                if col not in df.columns:
+                    df[col] = None
+
+            # Reorder columns to match expected format
+            df = df[required_columns]
+
+            # Sort by year (ascending: oldest to newest)
+            df = df.sort_values('year').reset_index(drop=True)
+
+            # Log data quality
+            complete_rows = df.dropna(subset=['revenue', 'net_income', 'shareholder_equity']).shape[0]
+            logger.info(f"Historical data for {ticker}: {len(df)} years, {complete_rows} complete rows")
+
+            if len(df) < 2:
+                logger.warning(f"Insufficient historical data for {ticker}: only {len(df)} year(s)")
+                return None
+
+            return df
+
+        except Exception as e:
+            logger.error(f"Failed to fetch historical financials for {ticker}: {e}")
+            return None
+
     def batch_fetch(self, tickers: List[str], delay: float = 2.0) -> Dict[str, Optional[FinancialData]]:
         """
         Fetch financial data for multiple tickers with rate limit protection

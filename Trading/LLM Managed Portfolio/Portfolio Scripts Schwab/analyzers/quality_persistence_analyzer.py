@@ -1128,9 +1128,10 @@ class QualityPersistenceAnalyzer:
         Validate if a holding meets tier-specific ROE persistence requirements.
 
         Requirements by tier (from quality_investing_thresholds_research.md):
-        - LARGE_CAP: 5+ consecutive years with ROE >15%
+        - LARGE_CAP: Prefer 5+ consecutive years with ROE >15%, minimum 2 years
+                    (flexible to accommodate yfinance's typical 3-4 year limitation)
         - MID_CAP: 2-3 consecutive years with ROE >15%
-        - SMALL_CAP: 6-8 consecutive quarters with positive ROE trend
+        - SMALL_CAP: 6-8 consecutive quarters with positive ROE trend (2+ years minimum)
         - MICRO_CAP: Not eligible for portfolio
 
         Args:
@@ -1169,7 +1170,8 @@ class QualityPersistenceAnalyzer:
         if len(df) == 0:
             return False, "No valid ROE data available"
 
-        # LARGE CAP: Require 5+ consecutive years with ROE >15%
+        # LARGE CAP: Prefer 5+ consecutive years with ROE >15%, minimum 2 years
+        # Note: yfinance typically provides 3-4 years, so we accept 2+ as minimum
         if tier == MarketCapTier.LARGE_CAP:
             roe_above_threshold = (df['roe'] > 0.15).astype(int)
 
@@ -1187,10 +1189,14 @@ class QualityPersistenceAnalyzer:
             years_analyzed = len(df)
             years_above_15 = (df['roe'] > 0.15).sum()
 
+            # Flexible validation: prefer 5+, accept 2+ minimum
             if max_streak >= 5:
-                return True, f"LARGE_CAP requirement met: {max_streak} consecutive years ROE >15% (analyzed {years_analyzed} years)"
+                return True, f"LARGE_CAP requirement met: {max_streak} consecutive years ROE >15% (ideal: analyzed {years_analyzed} years)"
+            elif max_streak >= 2:
+                # Accept with note about limited data
+                return True, f"LARGE_CAP requirement met: {max_streak} consecutive years ROE >15% (minimum met, prefer 5+; analyzed {years_analyzed} years)"
             else:
-                return False, f"LARGE_CAP requirement NOT met: Only {max_streak} consecutive years ROE >15% (need 5+). Total years >15%: {years_above_15}/{years_analyzed}"
+                return False, f"LARGE_CAP requirement NOT met: Only {max_streak} consecutive years ROE >15% (need 2+ minimum). Total years >15%: {years_above_15}/{years_analyzed}"
 
         # MID CAP: Require 2-3 consecutive years with ROE >15%
         elif tier == MarketCapTier.MID_CAP:
