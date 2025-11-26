@@ -108,7 +108,8 @@ class OptopsyBacktester:
         self,
         strategy: BaseStrategy,
         options_data: pd.DataFrame,
-        underlying_data: pd.DataFrame
+        underlying_data: pd.DataFrame,
+        verbose: bool = True
     ) -> Dict:
         """
         Run backtest for a given strategy.
@@ -117,6 +118,7 @@ class OptopsyBacktester:
             strategy: Strategy instance to backtest
             options_data: Historical options data
             underlying_data: Historical underlying price data
+            verbose: Print progress messages (default: True)
 
         Returns:
             Dictionary with backtest results
@@ -177,11 +179,12 @@ class OptopsyBacktester:
         # Set all timestamps to 12:00 PM (noon) ET - market midday
         trading_dates = trading_dates.map(lambda x: x.replace(hour=12, minute=0, second=0, microsecond=0))
 
-        print(f"Running backtest for {strategy.name}")
-        print(f"Config period: {self.start_date.date()} to {self.end_date.date()}")
-        print(f"Actual period: {actual_start.date()} to {actual_end.date()}")
-        print(f"Initial capital: ${self.initial_capital:,.2f}")
-        print(f"Trading days: {len(trading_dates)}")
+        if verbose:
+            print(f"Running backtest for {strategy.name}")
+            print(f"Config period: {self.start_date.date()} to {self.end_date.date()}")
+            print(f"Actual period: {actual_start.date()} to {actual_end.date()}")
+            print(f"Initial capital: ${self.initial_capital:,.2f}")
+            print(f"Trading days: {len(trading_dates)}")
 
         # Daily trade tracking for enforcing one trade per day limit
         trades_entered_today = 0

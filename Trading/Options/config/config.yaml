@@ -88,7 +88,7 @@ strategies:
 position_sizing:
   method: "fixed_risk"  # Options: fixed_risk, kelly 
   risk_per_trade_percent: 2.0  # Used when method = "fixed_risk"
-  max_positions: 5  # Maximum concurrent positions
+  max_positions: 20  # Maximum concurrent positions
   max_positions_per_strategy: 3
 
   # Kelly Criterion percentages (manually updated from Kelly_Criteria notebook)

@@ -165,7 +165,7 @@ class PerformanceAnalyzer:
     def _calculate_time_metrics(self) -> Dict:
         """Calculate time-based performance metrics."""
         # Monthly returns
-        equity_monthly = self.equity_curve.set_index('date').resample('M')['total_value'].last()
+        equity_monthly = self.equity_curve.set_index('date').resample('ME')['total_value'].last()
         monthly_returns = equity_monthly.pct_change().dropna() * 100
 
         positive_months = (monthly_returns > 0).sum()
