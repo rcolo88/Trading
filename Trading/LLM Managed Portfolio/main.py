@@ -37,16 +37,16 @@ Market Hours: Trading operations require market to be open (Mon-Fri 9:30AM-4PM E
 import argparse
 import pytz
 from datetime import datetime
-from core.market_hours import enforce_market_hours, is_market_open
-from core.portfolio_manager import PortfolioManager
-from schwab_integration.schwab_data_fetcher import SchwabDataFetcher
-from schwab_integration.schwab_account_manager import SchwabAccountManager
-from schwab_integration.schwab_trade_executor import SchwabTradeExecutor
-from validators.schwab_safety_validator import SafetyValidator
-from core.trade_executor import TradeExecutor
-from core.report_generator import ReportGenerator
-from config.hf_recommendation_generator import HFRecommendationGenerator
-from analysis.steps_orchestrator import STEPSOrchestrator
+from schwab_portfolio.core.market_hours import enforce_market_hours, is_market_open
+from schwab_portfolio.core.portfolio_manager import PortfolioManager
+from schwab_portfolio.schwab_integration.schwab_data_fetcher import SchwabDataFetcher
+from schwab_portfolio.schwab_integration.schwab_account_manager import SchwabAccountManager
+from schwab_portfolio.schwab_integration.schwab_trade_executor import SchwabTradeExecutor
+from schwab_portfolio.validators.schwab_safety_validator import SafetyValidator
+from schwab_portfolio.core.trade_executor import TradeExecutor
+from schwab_portfolio.core.report_generator import ReportGenerator
+from schwab_portfolio.config.hf_recommendation_generator import HFRecommendationGenerator
+from schwab_portfolio.analysis.steps_orchestrator import STEPSOrchestrator
 
 
 class LLMManagedPortfolio:
