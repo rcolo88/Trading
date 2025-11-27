@@ -353,7 +353,7 @@ class STEPSOrchestrator:
 
         try:
             # Import and run market environment analyzer
-            from analyzers.market_environment_analyzer import MarketEnvironmentAnalyzer
+            from components.market_environment_analyzer import MarketEnvironmentAnalyzer
 
             analyzer = MarketEnvironmentAnalyzer(enable_cache=True)
             env = analyzer.analyze_market_environment()
@@ -569,7 +569,7 @@ class STEPSOrchestrator:
         logger.info("🎯 Running STEP 3B: Thematic Discovery...")
 
         try:
-            from analysis.thematic_analysis_script import ThematicAnalysisScript
+            from workflows.thematic_analysis_script import ThematicAnalysisScript
 
             # Initialize thematic analyzer
             thematic_script = ThematicAnalysisScript(model_type='7B')
@@ -633,7 +633,7 @@ class STEPSOrchestrator:
         logger.info("🏆 Running STEP 4: Competitive Analysis...")
 
         try:
-            from analyzers.competitive_analyzer import CompetitiveAnalyzer
+            from components.competitive_analyzer import CompetitiveAnalyzer
 
             # Initialize analyzer
             analyzer = CompetitiveAnalyzer()
@@ -681,7 +681,7 @@ class STEPSOrchestrator:
         logger.info("💰 Running STEP 5: Valuation Analysis...")
 
         try:
-            from analyzers.valuation_analyzer import ValuationAnalyzer
+            from components.valuation_analyzer import ValuationAnalyzer
 
             # Initialize analyzer
             analyzer = ValuationAnalyzer()

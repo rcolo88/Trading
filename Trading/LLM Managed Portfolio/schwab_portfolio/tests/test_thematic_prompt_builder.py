@@ -11,7 +11,7 @@ Author: Portfolio Management System
 Version: 1.0.0
 """
 
-from analyzers.thematic_prompt_builder import (
+from components.thematic_prompt_builder import (
     ThematicPromptBuilder,
     ThematicScore,
     ModelType

@@ -16,7 +16,7 @@ from datetime import datetime
 from unittest.mock import Mock, patch, MagicMock
 
 # Import orchestrator
-from analysis.steps_orchestrator import (
+from workflows.steps_orchestrator import (
     STEPSOrchestrator,
     MarketEnvironment,
     QualityScore,

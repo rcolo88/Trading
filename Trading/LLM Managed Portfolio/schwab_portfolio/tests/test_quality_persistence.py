@@ -14,7 +14,7 @@ Date: 2025-10-30
 import pandas as pd
 import numpy as np
 import sys
-from analyzers.quality_persistence_analyzer import (
+from components.quality_persistence_analyzer import (
     QualityPersistenceAnalyzer,
     PersistenceClassification,
     TierEligibility

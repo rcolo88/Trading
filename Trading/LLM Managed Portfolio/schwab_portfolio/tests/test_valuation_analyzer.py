@@ -9,7 +9,7 @@ import json
 import os
 from pathlib import Path
 
-from analyzers.valuation_analyzer import (
+from components.valuation_analyzer import (
     ValuationAnalyzer,
     ValuationMetrics,
     ValuationRating

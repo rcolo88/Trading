@@ -9,7 +9,7 @@ import json
 import os
 from pathlib import Path
 
-from analyzers.competitive_analyzer import (
+from components.competitive_analyzer import (
     CompetitiveAnalyzer,
     CompetitorComparison,
     CompetitiveLandscape

@@ -1041,7 +1041,7 @@ class QualityPersistenceAnalyzer:
         classification: PersistenceClassification,
         trend_analysis: Dict[str, Any]
     ) -> List[str]:
-        """Generate key insights from analysis."""
+        """Generate key insights from workflows."""
         insights = []
 
         # Classification insight
@@ -1078,7 +1078,7 @@ class QualityPersistenceAnalyzer:
         metrics: PersistenceMetrics,
         trend_analysis: Dict[str, Any]
     ) -> List[str]:
-        """Generate warnings from analysis."""
+        """Generate warnings from workflows."""
         warnings = []
 
         # Limited data warning

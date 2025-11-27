@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from data.financial_data_fetcher import FinancialDataFetcher, FinancialData
 from quality.quality_metrics_calculator import QualityMetricsCalculator, QualityAnalysisResult
 from quality.market_cap_classifier import MarketCapClassifier
-from analyzers.quality_persistence_analyzer import QualityPersistenceAnalyzer
+from components.quality_persistence_analyzer import QualityPersistenceAnalyzer
 from config.hf_config import HFConfig
 from data.watchlist_config import WatchlistConfig, WatchlistIndex
 

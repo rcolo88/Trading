@@ -9,7 +9,7 @@ import json
 import os
 from pathlib import Path
 
-from analysis.thematic_analysis_script import ThematicAnalysisScript
+from workflows.thematic_analysis_script import ThematicAnalysisScript
 
 
 class TestThemeIdentification(unittest.TestCase):

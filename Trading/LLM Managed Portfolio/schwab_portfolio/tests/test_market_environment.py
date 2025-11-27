@@ -26,7 +26,7 @@ from unittest.mock import Mock, patch, MagicMock
 import pickle
 
 # Import the module to test
-from analyzers.market_environment_analyzer import (
+from components.market_environment_analyzer import (
     MarketEnvironment,
     MarketCache,
     MarketEnvironmentAnalyzer,

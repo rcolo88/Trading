@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Tuple
-from analyzers.performance_validator import PerformanceValidator
+from components.performance_validator import PerformanceValidator
 
 
 class ReportGenerator:

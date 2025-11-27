@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from data.financial_data_fetcher import FinancialDataFetcher
-from analyzers.quality_persistence_analyzer import QualityPersistenceAnalyzer
+from components.quality_persistence_analyzer import QualityPersistenceAnalyzer
 
 # Setup logging
 logging.basicConfig(

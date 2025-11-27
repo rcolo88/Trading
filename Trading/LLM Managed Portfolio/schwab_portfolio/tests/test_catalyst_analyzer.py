@@ -11,7 +11,7 @@ Author: Portfolio Management System
 Version: 1.0.0
 """
 
-from analyzers.catalyst_analyzer import (
+from components.catalyst_analyzer import (
     CatalystAnalyzer,
     Catalyst,
     CatalystAnalysis,

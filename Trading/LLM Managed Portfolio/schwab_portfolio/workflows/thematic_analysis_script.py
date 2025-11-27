@@ -19,7 +19,7 @@ from pathlib import Path
 # Add parent directory to path for imports (Portfolio Scripts Schwab/)
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from analyzers.thematic_prompt_builder import ThematicPromptBuilder, ThematicScore
+from components.thematic_prompt_builder import ThematicPromptBuilder, ThematicScore
 from data.financial_data_fetcher import FinancialDataFetcher, FinancialData
 import yfinance as yf
 

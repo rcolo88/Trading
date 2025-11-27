@@ -46,7 +46,7 @@ from schwab_portfolio.validators.schwab_safety_validator import SafetyValidator
 from schwab_portfolio.core.trade_executor import TradeExecutor
 from schwab_portfolio.core.report_generator import ReportGenerator
 from schwab_portfolio.config.hf_recommendation_generator import HFRecommendationGenerator
-from schwab_portfolio.analysis.steps_orchestrator import STEPSOrchestrator
+from schwab_portfolio.workflows.steps_orchestrator import STEPSOrchestrator
 
 
 class LLMManagedPortfolio:
