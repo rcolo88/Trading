@@ -30,7 +30,7 @@ from datetime import datetime
 
 # Import existing quality system
 from quality.quality_metrics_calculator import QualityMetricsCalculator
-from quality.quality_llm_prompts import QualityLLMPromptGenerator
+from prompts.quality_prompts import QualityLLMPromptGenerator
 
 # Import market cap classifier for tier-based analysis
 from quality.market_cap_classifier import MarketCapTier, MarketCapClassifier

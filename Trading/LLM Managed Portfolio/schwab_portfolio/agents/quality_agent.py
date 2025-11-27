@@ -26,7 +26,7 @@ from quality.quality_metrics_calculator import (
     QualityTier,
     RedFlag
 )
-from quality.quality_llm_prompts import (
+from prompts.quality_prompts import (
     QualityLLMPromptGenerator,
     LLMAnalysisResponse
 )
