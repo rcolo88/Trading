@@ -1,0 +1,401 @@
+============================================================
+QUALITY WATCHLIST - WEEKLY SCREENING SUMMARY
+============================================================
+Generated: 2025-11-14 14:12:34
+Total Stocks Screened: 380
+Minimum Quality Score: 70.0
+Stocks in Watchlist: 97
+============================================================
+
+QUALITY DISTRIBUTION:
+------------------------------------------------------------
+Elite (85-100):        39 stocks
+Strong (70-84):        58 stocks
+Moderate (50-69):       0 stocks
+
+Average Quality Score: 82.0
+Highest Quality Score: 99.7 (LULU)
+
+================================================================================
+TOP 50 QUALITY STOCKS:
+--------------------------------------------------------------------------------
+Rank   Ticker   Market Cap   Score    Tier         Red Flags 
+--------------------------------------------------------------------------------
+1      LULU     $20.30B        99.7   Elite        0         
+2      CPRX     $2.85B         97.3   Elite        0         
+3      CLX      $12.63B        97.0   Elite        1         
+4      BLDR     $11.50B        96.8   Elite        0         
+5      CL       $62.94B        96.5   Elite        1         
+6      GFF      $3.28B         96.0   Elite        1         
+7      NVR      $19.80B        95.7   Elite        0         
+8      DFIN     $1.22B         95.7   Elite        0         
+9      HRMY     $1.95B         95.7   Elite        0         
+10     NTAP     $22.01B        95.0   Elite        1         
+11     VSCO     $2.86B         92.4   Elite        1         
+12     META     $1539.49B      92.2   Elite        0         
+13     TPR      $20.79B        92.0   Elite        1         
+14     IBP      $6.77B         91.5   Elite        0         
+15     WDFC     $2.69B         91.2   Elite        0         
+16     ADMA     $3.75B         90.8   Elite        0         
+17     ABNB     $73.68B        90.3   Elite        0         
+18     HAS      $10.99B        89.8   Elite        1         
+19     KLAC     $150.72B       89.8   Elite        0         
+20     GOOG     $3344.23B      89.2   Elite        0         
+21     GOOGL    $3343.70B      89.2   Elite        0         
+22     SHW      $82.53B        89.1   Elite        1         
+23     FAST     $46.47B        88.8   Elite        0         
+24     COST     $410.59B       88.5   Elite        0         
+25     APAM     $2.98B         88.3   Elite        0         
+26     LRCX     $187.74B       88.1   Elite        0         
+27     RHI      $2.71B         87.9   Elite        0         
+28     GDDY     $17.53B        87.8   Elite        1         
+29     IDXX     $55.25B        87.5   Elite        0         
+30     CAKE     $2.25B         87.4   Elite        1         
+31     NVDA     $4600.37B      87.2   Elite        0         
+32     KR       $44.07B        86.8   Elite        1         
+33     EME      $27.87B        86.8   Elite        0         
+34     APP      $190.32B       86.7   Elite        1         
+35     HNI      $1.78B         86.3   Elite        0         
+36     XPEL     $1.14B         86.2   Elite        0         
+37     RMD      $35.88B        85.8   Elite        0         
+38     TPL      $23.37B        85.4   Elite        0         
+39     ROST     $52.42B        85.2   Elite        0         
+40     MOH      $7.08B         84.9   Strong       0         
+41     PJT      $6.61B         84.8   Strong       0         
+42     PHM      $23.13B        84.7   Strong       0         
+43     CNR      $4.22B         84.3   Strong       0         
+44     ODFL     $27.81B        84.1   Strong       0         
+45     MC       $4.69B         83.3   Strong       0         
+46     IDCC     $8.99B         83.3   Strong       0         
+47     BOX      $4.61B         83.0   Strong       1         
+48     GPC      $17.68B        82.6   Strong       0         
+49     ADSK     $63.63B        82.4   Strong       0         
+50     TT       $92.96B        82.1   Strong       0         
+
+================================================================================
+ELITE QUALITY STOCKS (Score >= 85):
+--------------------------------------------------------------------------------
+
+LULU: 99.7 (Market Cap: $20.30B)
+  Metrics:
+    gross_profitability: 0.825 (score: 10.0/10)
+    roe: 0.420 (score: 10.0/10)
+    operating_profitability: 0.897 (score: 10.0/10)
+    fcf_yield: 0.078 (score: 9.8/10)
+    roic: 0.336 (score: 10.0/10)
+
+CPRX: 97.3 (Market Cap: $2.85B)
+  Metrics:
+    gross_profitability: 0.497 (score: 10.0/10)
+    roe: 0.225 (score: 8.9/10)
+    operating_profitability: 0.310 (score: 10.0/10)
+    fcf_yield: 0.084 (score: 10.0/10)
+    roic: 0.211 (score: 10.0/10)
+
+CLX: 97.0 (Market Cap: $12.63B)
+  Metrics:
+    gross_profitability: 0.578 (score: 10.0/10)
+    roe: 2.523 (score: 10.0/10)
+    operating_profitability: 0.911 (score: 10.0/10)
+    fcf_yield: 0.060 (score: 8.0/10)
+    roic: 0.290 (score: 10.0/10)
+  Red Flags: 1
+
+BLDR: 96.8 (Market Cap: $11.50B)
+  Metrics:
+    gross_profitability: 0.509 (score: 10.0/10)
+    roe: 0.251 (score: 10.0/10)
+    operating_profitability: 1.192 (score: 10.0/10)
+    fcf_yield: 0.130 (score: 10.0/10)
+    roic: 0.146 (score: 6.8/10)
+
+CL: 96.5 (Market Cap: $62.94B)
+  Metrics:
+    gross_profitability: 0.758 (score: 10.0/10)
+    roe: 13.627 (score: 10.0/10)
+    operating_profitability: 0.765 (score: 10.0/10)
+    fcf_yield: 0.056 (score: 7.6/10)
+    roic: 0.392 (score: 10.0/10)
+  Red Flags: 1
+
+GFF: 96.0 (Market Cap: $3.28B)
+  Metrics:
+    gross_profitability: 0.430 (score: 9.4/10)
+    roe: 0.933 (score: 10.0/10)
+    operating_profitability: 0.844 (score: 10.0/10)
+    fcf_yield: 0.094 (score: 10.0/10)
+    roic: 0.163 (score: 7.8/10)
+  Red Flags: 1
+
+NVR: 95.7 (Market Cap: $19.80B)
+  Metrics:
+    gross_profitability: 0.422 (score: 9.2/10)
+    roe: 0.400 (score: 10.0/10)
+    operating_profitability: 1.543 (score: 10.0/10)
+    fcf_yield: 0.068 (score: 8.8/10)
+    roic: 0.301 (score: 10.0/10)
+
+DFIN: 95.7 (Market Cap: $1.22B)
+  Metrics:
+    gross_profitability: 0.575 (score: 10.0/10)
+    roe: 0.212 (score: 8.4/10)
+    operating_profitability: 0.524 (score: 10.0/10)
+    fcf_yield: 0.086 (score: 10.0/10)
+    roic: 0.196 (score: 9.8/10)
+
+HRMY: 95.7 (Market Cap: $1.95B)
+  Metrics:
+    gross_profitability: 0.558 (score: 10.0/10)
+    roe: 0.221 (score: 8.7/10)
+    operating_profitability: 0.348 (score: 10.0/10)
+    fcf_yield: 0.112 (score: 10.0/10)
+    roic: 0.180 (score: 8.8/10)
+
+NTAP: 95.0 (Market Cap: $22.01B)
+  Metrics:
+    gross_profitability: 0.426 (score: 9.3/10)
+    roe: 1.140 (score: 10.0/10)
+    operating_profitability: 0.313 (score: 10.0/10)
+    fcf_yield: 0.061 (score: 8.1/10)
+    roic: 0.248 (score: 10.0/10)
+  Red Flags: 1
+
+VSCO: 92.4 (Market Cap: $2.86B)
+  Metrics:
+    gross_profitability: 0.504 (score: 10.0/10)
+    roe: 0.258 (score: 10.0/10)
+    operating_profitability: 0.939 (score: 10.0/10)
+    fcf_yield: 0.086 (score: 10.0/10)
+    roic: 0.073 (score: 2.4/10)
+  Red Flags: 1
+
+META: 92.2 (Market Cap: $1539.49B)
+  Metrics:
+    gross_profitability: 0.487 (score: 10.0/10)
+    roe: 0.341 (score: 10.0/10)
+    operating_profitability: 0.361 (score: 10.0/10)
+    fcf_yield: 0.035 (score: 4.8/10)
+    roic: 0.237 (score: 10.0/10)
+
+TPR: 92.0 (Market Cap: $20.79B)
+  Metrics:
+    gross_profitability: 0.804 (score: 10.0/10)
+    roe: 0.214 (score: 8.4/10)
+    operating_profitability: 0.455 (score: 10.0/10)
+    fcf_yield: 0.053 (score: 7.3/10)
+    roic: 0.211 (score: 10.0/10)
+  Red Flags: 1
+
+IBP: 91.5 (Market Cap: $6.77B)
+  Metrics:
+    gross_profitability: 0.483 (score: 10.0/10)
+    roe: 0.364 (score: 10.0/10)
+    operating_profitability: 1.133 (score: 10.0/10)
+    fcf_yield: 0.037 (score: 5.1/10)
+    roic: 0.182 (score: 8.9/10)
+
+WDFC: 91.2 (Market Cap: $2.69B)
+  Metrics:
+    gross_profitability: 0.717 (score: 10.0/10)
+    roe: 0.339 (score: 10.0/10)
+    operating_profitability: 0.804 (score: 10.0/10)
+    fcf_yield: 0.031 (score: 4.2/10)
+    roic: 0.224 (score: 10.0/10)
+
+ADMA: 90.8 (Market Cap: $3.75B)
+  Metrics:
+    gross_profitability: 0.449 (score: 10.0/10)
+    roe: 0.566 (score: 10.0/10)
+    operating_profitability: 0.708 (score: 10.0/10)
+    fcf_yield: 0.029 (score: 3.9/10)
+    roic: 0.255 (score: 10.0/10)
+
+ABNB: 90.3 (Market Cap: $73.68B)
+  Metrics:
+    gross_profitability: 0.440 (score: 9.7/10)
+    roe: 0.315 (score: 10.0/10)
+    operating_profitability: 0.211 (score: 7.3/10)
+    fcf_yield: 0.061 (score: 8.1/10)
+    roic: 0.188 (score: 9.3/10)
+
+HAS: 89.8 (Market Cap: $10.99B)
+  Metrics:
+    gross_profitability: 0.421 (score: 9.1/10)
+    roe: 0.333 (score: 10.0/10)
+    operating_profitability: 0.346 (score: 10.0/10)
+    fcf_yield: 0.059 (score: 7.9/10)
+    roic: 0.126 (score: 5.5/10)
+  Red Flags: 1
+
+KLAC: 89.8 (Market Cap: $150.72B)
+  Metrics:
+    gross_profitability: 0.461 (score: 10.0/10)
+    roe: 0.866 (score: 10.0/10)
+    operating_profitability: 0.608 (score: 10.0/10)
+    fcf_yield: 0.025 (score: 3.2/10)
+    roic: 0.367 (score: 10.0/10)
+
+GOOG: 89.2 (Market Cap: $3344.23B)
+  Metrics:
+    gross_profitability: 0.452 (score: 10.0/10)
+    roe: 0.308 (score: 10.0/10)
+    operating_profitability: 0.575 (score: 10.0/10)
+    fcf_yield: 0.022 (score: 2.8/10)
+    roic: 0.253 (score: 10.0/10)
+
+GOOGL: 89.2 (Market Cap: $3343.70B)
+  Metrics:
+    gross_profitability: 0.452 (score: 10.0/10)
+    roe: 0.308 (score: 10.0/10)
+    operating_profitability: 0.575 (score: 10.0/10)
+    fcf_yield: 0.022 (score: 2.8/10)
+    roic: 0.253 (score: 10.0/10)
+
+SHW: 89.1 (Market Cap: $82.53B)
+  Metrics:
+    gross_profitability: 0.474 (score: 10.0/10)
+    roe: 0.662 (score: 10.0/10)
+    operating_profitability: 0.663 (score: 10.0/10)
+    fcf_yield: 0.025 (score: 3.3/10)
+    roic: 0.186 (score: 9.2/10)
+  Red Flags: 1
+
+FAST: 88.8 (Market Cap: $46.47B)
+  Metrics:
+    gross_profitability: 0.724 (score: 10.0/10)
+    roe: 0.318 (score: 10.0/10)
+    operating_profitability: 1.204 (score: 10.0/10)
+    fcf_yield: 0.020 (score: 2.6/10)
+    roic: 0.291 (score: 10.0/10)
+
+COST: 88.5 (Market Cap: $410.59B)
+  Metrics:
+    gross_profitability: 0.458 (score: 10.0/10)
+    roe: 0.278 (score: 10.0/10)
+    operating_profitability: 3.246 (score: 10.0/10)
+    fcf_yield: 0.019 (score: 2.4/10)
+    roic: 0.220 (score: 10.0/10)
+
+APAM: 88.3 (Market Cap: $2.98B)
+  Metrics:
+    gross_profitability: 0.320 (score: 6.1/10)
+    roe: 0.668 (score: 10.0/10)
+    operating_profitability: 0.594 (score: 10.0/10)
+    fcf_yield: 0.123 (score: 10.0/10)
+    roic: 0.420 (score: 10.0/10)
+
+LRCX: 88.1 (Market Cap: $187.74B)
+  Metrics:
+    gross_profitability: 0.421 (score: 9.1/10)
+    roe: 0.543 (score: 10.0/10)
+    operating_profitability: 0.719 (score: 10.0/10)
+    fcf_yield: 0.029 (score: 3.8/10)
+    roic: 0.325 (score: 10.0/10)
+
+RHI: 87.9 (Market Cap: $2.71B)
+  Metrics:
+    gross_profitability: 0.787 (score: 10.0/10)
+    roe: 0.183 (score: 7.1/10)
+    operating_profitability: 1.328 (score: 10.0/10)
+    fcf_yield: 0.131 (score: 10.0/10)
+    roic: 0.118 (score: 5.1/10)
+
+GDDY: 87.8 (Market Cap: $17.53B)
+  Metrics:
+    gross_profitability: 0.355 (score: 7.1/10)
+    roe: 1.354 (score: 10.0/10)
+    operating_profitability: 0.314 (score: 10.0/10)
+    fcf_yield: 0.072 (score: 9.2/10)
+    roic: 0.161 (score: 7.6/10)
+  Red Flags: 1
+
+IDXX: 87.5 (Market Cap: $55.25B)
+  Metrics:
+    gross_profitability: 0.722 (score: 10.0/10)
+    roe: 0.557 (score: 10.0/10)
+    operating_profitability: 0.804 (score: 10.0/10)
+    fcf_yield: 0.014 (score: 1.7/10)
+    roic: 0.345 (score: 10.0/10)
+
+CAKE: 87.4 (Market Cap: $2.25B)
+  Metrics:
+    gross_profitability: 0.497 (score: 10.0/10)
+    roe: 0.354 (score: 10.0/10)
+    operating_profitability: 0.754 (score: 10.0/10)
+    fcf_yield: 0.048 (score: 6.6/10)
+    roic: 0.075 (score: 2.5/10)
+  Red Flags: 1
+
+NVDA: 87.2 (Market Cap: $4600.37B)
+  Metrics:
+    gross_profitability: 0.877 (score: 10.0/10)
+    roe: 0.919 (score: 10.0/10)
+    operating_profitability: 1.022 (score: 10.0/10)
+    fcf_yield: 0.013 (score: 1.5/10)
+    roic: 0.718 (score: 10.0/10)
+
+KR: 86.8 (Market Cap: $44.07B)
+  Metrics:
+    gross_profitability: 0.635 (score: 10.0/10)
+    roe: 0.322 (score: 10.0/10)
+    operating_profitability: 2.234 (score: 10.0/10)
+    fcf_yield: 0.040 (score: 5.5/10)
+    roic: 0.091 (score: 3.5/10)
+  Red Flags: 1
+
+EME: 86.8 (Market Cap: $27.87B)
+  Metrics:
+    gross_profitability: 0.358 (score: 7.2/10)
+    roe: 0.343 (score: 10.0/10)
+    operating_profitability: 1.704 (score: 10.0/10)
+    fcf_yield: 0.048 (score: 6.7/10)
+    roic: 0.323 (score: 10.0/10)
+
+APP: 86.7 (Market Cap: $190.32B)
+  Metrics:
+    gross_profitability: 0.604 (score: 10.0/10)
+    roe: 1.450 (score: 10.0/10)
+    operating_profitability: 0.518 (score: 10.0/10)
+    fcf_yield: 0.011 (score: 1.2/10)
+    roic: 0.319 (score: 10.0/10)
+  Red Flags: 1
+
+HNI: 86.3 (Market Cap: $1.78B)
+  Metrics:
+    gross_profitability: 0.551 (score: 10.0/10)
+    roe: 0.166 (score: 6.3/10)
+    operating_profitability: 0.910 (score: 10.0/10)
+    fcf_yield: 0.098 (score: 10.0/10)
+    roic: 0.126 (score: 5.5/10)
+
+XPEL: 86.2 (Market Cap: $1.14B)
+  Metrics:
+    gross_profitability: 0.621 (score: 10.0/10)
+    roe: 0.202 (score: 7.9/10)
+    operating_profitability: 1.058 (score: 10.0/10)
+    fcf_yield: 0.035 (score: 4.7/10)
+    roic: 0.190 (score: 9.4/10)
+
+RMD: 85.8 (Market Cap: $35.88B)
+  Metrics:
+    gross_profitability: 0.374 (score: 7.7/10)
+    roe: 0.235 (score: 9.3/10)
+    operating_profitability: 0.462 (score: 10.0/10)
+    fcf_yield: 0.046 (score: 6.4/10)
+    roic: 0.195 (score: 9.7/10)
+
+TPL: 85.4 (Market Cap: $23.37B)
+  Metrics:
+    gross_profitability: 0.508 (score: 10.0/10)
+    roe: 0.401 (score: 10.0/10)
+    operating_profitability: 0.489 (score: 10.0/10)
+    fcf_yield: 0.003 (score: 0.3/10)
+    roic: 0.376 (score: 10.0/10)
+
+ROST: 85.2 (Market Cap: $52.42B)
+  Metrics:
+    gross_profitability: 0.394 (score: 8.3/10)
+    roe: 0.379 (score: 10.0/10)
+    operating_profitability: 1.197 (score: 10.0/10)
+    fcf_yield: 0.031 (score: 4.2/10)
+    roic: 0.183 (score: 9.0/10)

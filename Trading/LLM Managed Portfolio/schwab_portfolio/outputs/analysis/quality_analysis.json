@@ -1,0 +1,96 @@
+{
+  "timestamp": "2025-11-18T11:28:41.015745",
+  "holdings_count": 1,
+  "watchlist_count": 3,
+  "holdings_quality": {
+    "GSL": {
+      "composite_score": 69.07,
+      "tier": "Moderate",
+      "market_cap": 1241599360,
+      "red_flags_count": 0,
+      "red_flags": [],
+      "metrics": {
+        "gross_profitability": {
+          "value": 0.1646458751624885,
+          "score": 1.439376254874655,
+          "weighted_score": 4.318128764623965
+        },
+        "roe": {
+          "value": 0.24163484185992165,
+          "score": 9.641493222568071,
+          "weighted_score": 24.10373305642018
+        },
+        "operating_profitability": {
+          "value": 0.2900657117153939,
+          "score": 9.701971351461818,
+          "weighted_score": 19.403942702923636
+        },
+        "fcf_yield": {
+          "value": 0.15113732017387638,
+          "score": 10.0,
+          "weighted_score": 15.0
+        },
+        "roic": {
+          "value": 0.137438438807602,
+          "score": 6.246306328456121,
+          "weighted_score": 6.2463063284561215
+        }
+      }
+    }
+  },
+  "watchlist_quality": {
+    "MMM": {
+      "composite_score": 68.44,
+      "tier": "Moderate",
+      "market_cap": 88517730304,
+      "red_flags_count": 1
+    },
+    "AOS": {
+      "composite_score": 95.82,
+      "tier": "Elite",
+      "market_cap": 9027849216,
+      "red_flags_count": 0
+    },
+    "ABT": {
+      "composite_score": 68.88,
+      "tier": "Moderate",
+      "market_cap": 227843489792,
+      "red_flags_count": 0
+    }
+  },
+  "recommendations": {
+    "sell_candidates": [
+      {
+        "ticker": "GSL",
+        "quality_score": 69.07,
+        "tier": "Moderate",
+        "red_flags": 0,
+        "reason": "Quality score 69.1 below minimum threshold 70"
+      }
+    ],
+    "buy_alternatives": [
+      {
+        "ticker": "AOS",
+        "quality_score": 95.82,
+        "tier": "Elite",
+        "red_flags": 0,
+        "reason": "Elite quality score 95.8 (>=85)"
+      }
+    ]
+  },
+  "market_cap_tiers": {
+    "MMM": "Large Cap",
+    "AOS": "Mid Cap",
+    "GSL": "Small Cap",
+    "ABT": "Large Cap"
+  },
+  "roe_persistence": {},
+  "strict_filters": {
+    "GSL": {
+      "passed": true,
+      "fcf_positive": true,
+      "debt_to_equity_ok": true,
+      "gross_margin_ok": true
+    }
+  }
+}

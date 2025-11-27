@@ -1,0 +1,88 @@
+============================================================
+QUALITY METRICS ANALYSIS SUMMARY
+============================================================
+Generated: 2025-11-14 14:11:32
+Holdings Analyzed: 2
+Watchlist Analyzed: 44
+============================================================
+
+CURRENT HOLDINGS QUALITY:
+------------------------------------------------------------
+GOOGL:
+  Market Cap: $3343.70B
+  Quality Score: 89.2/100
+  Tier: Elite
+  Red Flags: 0
+
+NVDA:
+  Market Cap: $4600.37B
+  Quality Score: 87.2/100
+  Tier: Elite
+  Red Flags: 0
+
+
+============================================================
+SELL CANDIDATES (Quality <70):
+------------------------------------------------------------
+No sell candidates identified.
+
+
+============================================================
+BUY ALTERNATIVES (Top 10):
+------------------------------------------------------------
+GFF:
+  Quality Score: 96.0
+  Tier: Elite
+  Reason: Elite quality score 96.0 (>=85)
+
+DFIN:
+  Quality Score: 95.7
+  Tier: Elite
+  Reason: Elite quality score 95.7 (>=85)
+
+HRMY:
+  Quality Score: 95.7
+  Tier: Elite
+  Reason: Elite quality score 95.7 (>=85)
+
+NTAP:
+  Quality Score: 95.0
+  Tier: Elite
+  Reason: Elite quality score 95.0 (>=85)
+
+COST:
+  Quality Score: 88.5
+  Tier: Elite
+  Reason: Elite quality score 88.5 (>=85)
+
+APP:
+  Quality Score: 86.7
+  Tier: Elite
+  Reason: Elite quality score 86.7 (>=85)
+
+
+================================================================================
+TOP 20 WATCHLIST STOCKS BY QUALITY:
+--------------------------------------------------------------------------------
+Ticker   Market Cap   Score    Tier         Red Flags 
+--------------------------------------------------------------------------------
+GFF      $3.28B        96.0    Elite        1         
+DFIN     $1.22B        95.7    Elite        0         
+HRMY     $1.95B        95.7    Elite        0         
+NTAP     $22.01B       95.0    Elite        1         
+COST     $410.59B      88.5    Elite        0         
+APP      $190.32B      86.7    Elite        1         
+ODFL     $27.81B       84.1    Strong       0         
+OXM      $522.21M      81.9    Strong       0         
+ACLS     $2.51B        77.5    Strong       0         
+CSCO     $309.23B      70.8    Strong       0         
+SAH      $2.17B        65.2    Moderate     2         
+EPAM     $9.91B        63.4    Moderate     0         
+JBSS     $790.53M      62.1    Moderate     1         
+VZ       $172.71B      58.4    Moderate     0         
+OUT      $3.65B        58.4    Moderate     1         
+VIRT     $7.53B        56.4    Moderate     1         
+SUPN     $2.59B        55.7    Moderate     0         
+RAMP     $1.88B        55.5    Moderate     1         
+COP      $112.48B      54.0    Moderate     0         
+TMDX     $3.94B        52.2    Moderate     2         
