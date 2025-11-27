@@ -16,7 +16,7 @@ from dataclasses import dataclass
 import json
 import logging
 
-from quality.quality_metrics_calculator import (
+from schwab_portfolio.quality.quality_metrics_calculator import (
     QualityAnalysisResult,
     QualityTier,
     MetricScore,
