@@ -93,10 +93,13 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
     # Define parameter ranges to test
     # Calendar spread parameters: near_dte (sell), far_dte (buy)
     # Note: Smaller range for testing - expand based on results
-    optimizer.set_parameter_range('near_dte', min=20, max=35, step=5)       # 4 values
-    optimizer.set_parameter_range('far_dte', min=45, max=75, step=10)       # 4 values
-    optimizer.set_parameter_range('target_delta', min=0.45, max=0.55, step=0.05)  # 3 values
-    optimizer.set_parameter_range('profit_target', min=0.20, max=0.30, step=0.05)  # 3 values
+    optimizer.set_parameter_range('near_dte', min=20, max=35, step=5)       
+    optimizer.set_parameter_range('far_dte', min=45, max=75, step=5)      
+    optimizer.set_parameter_range('target_delta', min=0.45, max=0.55, step=0.05)  
+    optimizer.set_parameter_range('profit_target', min=0.10, max=0.70, step=0.1)  
+    optimizer.set_parameter_range('stop_loss', min=10, max=60, step=10)
+    optimizer.set_parameter_range('iv_percentile', min=15, max=75, step=5)
+    optimizer.set_parameter_range('dte_exit', min=1, max=21, step=2)
 
     total: int = optimizer.get_total_combinations()
     print(f"  ✓ Optimizer configured")
@@ -118,7 +121,7 @@ def run_optimization(optimizer: ParameterOptimizer) -> pd.DataFrame:
     # RECOMMENDED: Use Optuna for large search spaces (>1000 combinations)
     if total_combinations > 1000:
         MODE = 'optuna'
-        N_TRIALS = 500  # 200-1000 recommended
+        N_TRIALS = 1500  # 200-1000 recommended
     else:
         # Use grid search for small search spaces
         MODE = 'grid'
