@@ -7,6 +7,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import os
+import json
+import logging
+from pathlib import Path
+from typing import Any, Optional, Dict
+
+logger = logging.getLogger(__name__)
 
 
 def validate_performance_calculations(self):
@@ -134,3 +140,125 @@ def calculate_days_since(date_str):
         return (datetime.now() - date_obj).days
     except:
         return None
+
+
+# ============================================================================
+# NEW UTILITY FUNCTIONS - Centralized helpers for common operations
+# ============================================================================
+
+def safe_float(value: Any, default: float = 0.0) -> float:
+    """
+    Safely convert value to float with fallback
+
+    Args:
+        value: Value to convert
+        default: Fallback value if conversion fails (default 0.0)
+
+    Returns:
+        Float value or default if conversion fails
+    """
+    try:
+        return float(value) if value is not None else default
+    except (ValueError, TypeError):
+        logger.warning(f"Failed to convert {value} to float, using default {default}")
+        return default
+
+
+def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> float:
+    """
+    Safely divide with zero-check
+
+    Args:
+        numerator: Numerator value
+        denominator: Denominator value
+        default: Fallback value if denominator is zero (default 0.0)
+
+    Returns:
+        Division result or default if denominator is zero
+    """
+    if denominator == 0:
+        logger.warning(f"Division by zero prevented, using default {default}")
+        return default
+    return numerator / denominator
+
+
+def get_output_path(subdir: str, filename: str) -> Path:
+    """
+    Get standardized output path
+
+    Args:
+        subdir: Subdirectory under outputs/ (analysis, compliance, reports, valuations, cache)
+        filename: Output filename
+
+    Returns:
+        Full path to output file (Path object)
+
+    Example:
+        path = get_output_path('analysis', 'quality_analysis_20251126.json')
+        # Returns: schwab_portfolio/outputs/analysis/quality_analysis_20251126.json
+    """
+    base_dir = Path(__file__).parent.parent  # schwab_portfolio/
+    output_dir = base_dir / "outputs" / subdir
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return output_dir / filename
+
+
+def get_dated_filename(prefix: str, extension: str = "json") -> str:
+    """
+    Generate filename with current date
+
+    Args:
+        prefix: Filename prefix (e.g., "quality_analysis")
+        extension: File extension without dot (default: "json")
+
+    Returns:
+        Filename like "quality_analysis_20251126.json"
+
+    Example:
+        filename = get_dated_filename("quality_analysis", "json")
+        # Returns: "quality_analysis_20251126.json"
+    """
+    date_str = datetime.now().strftime("%Y%m%d")
+    return f"{prefix}_{date_str}.{extension}"
+
+
+def load_json(filepath: Path) -> Optional[Dict]:
+    """
+    Safely load JSON file with error handling
+
+    Args:
+        filepath: Path to JSON file
+
+    Returns:
+        Parsed JSON data as dict, or None if load fails
+    """
+    try:
+        with open(filepath, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load JSON from {filepath}: {e}")
+        return None
+
+
+def save_json(data: Dict, filepath: Path, indent: int = 2) -> bool:
+    """
+    Safely save JSON file with error handling
+
+    Args:
+        data: Dictionary to save
+        filepath: Output file path
+        indent: JSON indentation level (default 2)
+
+    Returns:
+        True if successful, False if failed
+    """
+    try:
+        filepath = Path(filepath)
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+        with open(filepath, 'w') as f:
+            json.dump(data, f, indent=indent)
+        logger.info(f"Saved JSON to {filepath}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save JSON to {filepath}: {e}")
+        return False
