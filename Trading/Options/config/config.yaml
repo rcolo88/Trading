@@ -29,16 +29,16 @@ strategies:
   bull_put_spread:          # Credit spread - neutral to bullish
     enabled: true
     entry:
-      dte_min: 30           # Days to expiration
+      dte_min: 35           # Days to expiration
       dte_max: 45
       short_delta: 0.30     # Sell put with ~30 delta
       long_delta: 0.10      # Buy put with ~20 delta
-      iv_percentile_min: 30 # Enter when IV is above 30th percentile (higher premium)
-      iv_percentile_max: 80 # Don't enter if IV > 80th percentile (too risky)
+      iv_percentile_min: 60 # Enter when IV is above 30th percentile (higher premium)
+      iv_percentile_max: 110 # Don't enter if IV > 80th percentile (too risky)
     exit:
-      profit_target: 0.50   # Close at 50% of max profit
-      stop_loss: 0.50       # Stop at 50% of max loss
-      dte_min: 21           # Close if DTE drops below 21
+      profit_target: 0.60   # Close at 50% of max profit
+      stop_loss: 0.20       # Stop at 50% of max loss
+      dte_min: 10           # Close if DTE drops below 21
 
   bull_call_spread:         # Debit spread - moderately bullish
     enabled: true
@@ -46,12 +46,12 @@ strategies:
       dte_min: 30
       dte_max: 60
       long_delta: 0.60      # Buy call with ~60 delta
-      short_delta: 0.40     # Sell call with ~40 delta
-      iv_percentile_min: 20 # Can enter in lower IV percentile (cheaper debit)
-      iv_percentile_max: 70 # Don't enter if IV > 70th percentile (too expensive)
+      short_delta: 0.60     # Sell call with ~40 delta
+      iv_percentile_min: 0 # Can enter in lower IV percentile (cheaper debit)
+      iv_percentile_max: 40 # Don't enter if IV > 70th percentile (too expensive)
     exit:
       profit_target: 0.75   # Target 75% of max profit
-      stop_loss: 0.50       # Stop at 50% of max loss
+      stop_loss: 0.20       # Stop at 50% of max loss
       dte_min: 14
 
   call_calendar:            # Time spread - neutral to slightly bullish
@@ -59,8 +59,8 @@ strategies:
     entry:
       # DTE Configuration - Two approaches supported:
       # Approach 1 (Default): Center ± Tolerance
-      near_dte: 30           # Sell 30 DTE call (center point)
-      far_dte: 60            # Buy 60 DTE call (center point)
+      near_dte: 20           # Sell 30 DTE call (center point)
+      far_dte: 45            # Buy 60 DTE call (center point)
       dte_tolerance: 5       # +/- 5 days tolerance (creates range: 25-35 and 55-65)
 
       # Approach 2 (For Optimizer): Min/Max Ranges
@@ -75,21 +75,19 @@ strategies:
       target_delta: 0.50     # Used if strike_selection = "delta"
       moneyness: 0.0         # Used if strike_selection = "moneyness" (0.0 = ATM)
       min_debit: 0.5         # Minimum debit to enter (optional)
-      max_debit: 20.0        # Maximum debit to enter (increased for SPY ~$530)
-      iv_percentile_min: 10  # Calendars prefer low IV environment (10th percentile+)
-      iv_percentile_max: 50  # Don't enter if IV > 50th percentile (defeats calendar purpose)
+      max_debit: 28.0        # Maximum debit to enter (increased for SPY ~$530)
+      iv_percentile_min: 0  # Calendars prefer low IV environment (10th percentile+)
+      iv_percentile_max: 60  # Don't enter if IV > 50th percentile (defeats calendar purpose)
     exit:
-      profit_target: 0.25    # Close at 25% profit
-      stop_loss: -0.50       # Stop at 50% loss
-      dte_exit: 7            # Exit when near-term has 7 DTE left
+      profit_target: 0.6    # Close at 60% profit
+      stop_loss: -0.1       # Stop at 10% loss
+      dte_exit: 1            # Exit when near-term has 7 DTE left
       max_underlying_move: 0.10  # Exit if underlying moves >10% from strike
 
 # Position sizing
 position_sizing:
-  method: "fixed_risk"  # Options: fixed_risk, kelly 
-  risk_per_trade_percent: 2.0  # Used when method = "fixed_risk"
-  max_positions: 20  # Maximum concurrent positions
-  max_positions_per_strategy: 3
+  method: "fixed_risk"  # Options: fixed_risk, kelly
+  max_risk_percent: 50.0  # Maximum portfolio risk exposure (% of current portfolio value)
 
   # Kelly Criterion percentages (manually updated from Kelly_Criteria notebook)
   # Workflow:

@@ -43,6 +43,94 @@ class OptopsyBacktester:
         self.equity_curve = []
         self.all_trades = []
 
+    def _calculate_position_max_risk(self, position: Position) -> float:
+        """
+        Calculate theoretical maximum loss for a position.
+
+        Args:
+            position: Open position
+
+        Returns:
+            Maximum theoretical loss in dollars
+        """
+        if not position.legs or len(position.legs) < 2:
+            return 0.0
+
+        short_leg = position.legs[0]
+        long_leg = position.legs[1]
+        strike_width = abs(short_leg['strike'] - long_leg['strike'])
+
+        # Determine strategy type from position.strategy_name
+        strategy_lower = position.strategy_name.lower()
+
+        if 'put' in strategy_lower and 'bull' in strategy_lower:
+            # Bull Put Spread (credit spread)
+            # Max loss = strike_width - premium_received
+            # entry_price is positive (credit received)
+            max_loss_per_contract = (strike_width - position.entry_price) * 100
+
+        elif 'call' in strategy_lower and 'bull' in strategy_lower:
+            # Bull Call Spread (debit spread)
+            # Max loss = premium_paid
+            # entry_price is negative (we paid), so use abs
+            max_loss_per_contract = abs(position.entry_price) * 100
+
+        elif 'calendar' in strategy_lower:
+            # Calendar Spread (debit spread)
+            # Max loss = debit_paid
+            # entry_price is positive (debit we paid)
+            max_loss_per_contract = position.entry_price * 100
+
+        else:
+            # Unknown strategy type, use conservative estimate
+            # Assume max loss = strike width
+            max_loss_per_contract = strike_width * 100
+
+        total_max_loss = max_loss_per_contract * position.contracts
+        return total_max_loss
+
+    def _calculate_total_portfolio_risk(self, strategy) -> float:
+        """
+        Calculate total theoretical risk from all open positions.
+
+        Args:
+            strategy: Strategy instance with open positions
+
+        Returns:
+            Total risk in dollars across all open positions
+        """
+        open_positions = strategy.get_open_positions()
+        total_risk = sum(
+            self._calculate_position_max_risk(pos)
+            for pos in open_positions
+        )
+        return total_risk
+
+    def _calculate_available_risk_budget(self, strategy) -> float:
+        """
+        Calculate how much risk budget remains for new positions.
+
+        Returns:
+            Available risk budget in dollars
+        """
+        # Get current portfolio value (account + unrealized P&L)
+        total_unrealized = sum(
+            p.unrealized_pnl for p in strategy.get_open_positions()
+        )
+        current_portfolio_value = self.account_value + total_unrealized
+
+        # Get max risk from config
+        max_risk_pct = self.config.get('position_sizing', {}).get('max_risk_percent', 50.0)
+        max_risk_dollars = current_portfolio_value * (max_risk_pct / 100.0)
+
+        # Calculate current risk exposure
+        current_risk = self._calculate_total_portfolio_risk(strategy)
+
+        # Available budget = max - current
+        available_risk = max_risk_dollars - current_risk
+
+        return max(0.0, available_risk)  # Never negative
+
     def prepare_optopsy_data(self, raw_data: pd.DataFrame) -> pd.DataFrame:
         """
         Convert raw options data to Optopsy format.
@@ -285,114 +373,125 @@ class OptopsyBacktester:
 
             # Check for new entry signals
             # BACKTEST RULE: Maximum one trade per day per strategy
-            # GOAL: Try to enter at least one trade per day if position sizing allows
-            max_positions = self.config.get('position_sizing', {}).get('max_positions', 5)
-            current_positions = len(strategy.get_open_positions())
+            if trades_entered_today < 1:
+                # Calculate available risk budget
+                available_risk_budget = self._calculate_available_risk_budget(strategy)
 
-            # Only attempt entry if:
-            # 1. Haven't entered a trade today (trades_entered_today < 1)
-            # 2. Have room for more positions (current_positions < max_positions)
-            if trades_entered_today < 1 and current_positions < max_positions:
-                # Get VIX and IV Percentile for the day (if available)
-                vix = daily_options['vix'].iloc[0] if 'vix' in daily_options.columns and not daily_options.empty else None
-                iv_percentile = daily_options['iv_percentile'].iloc[0] if 'iv_percentile' in daily_options.columns and not daily_options.empty else None
+                # Only attempt entry if we have risk budget available
+                if available_risk_budget > 0:
+                    # Get VIX and IV Percentile for the day (if available)
+                    vix = daily_options['vix'].iloc[0] if 'vix' in daily_options.columns and not daily_options.empty else None
+                    iv_percentile = daily_options['iv_percentile'].iloc[0] if 'iv_percentile' in daily_options.columns and not daily_options.empty else None
 
-                entry_signal = strategy.generate_entry_signal(
-                    date=current_date,
-                    options_data=daily_options,
-                    underlying_price=underlying_price,
-                    vix=vix,
-                    iv_percentile=iv_percentile
-                )
-
-                if entry_signal:
-                    # Calculate position size
-                    contracts = strategy.calculate_position_size(
-                        signal=entry_signal,
-                        account_value=self.account_value,
-                        risk_per_trade_percent=self.config.get('position_sizing', {}).get('risk_per_trade_percent', 2.0),
-                        full_config=self.config  # Pass full config for Kelly parameters
+                    entry_signal = strategy.generate_entry_signal(
+                        date=current_date,
+                        options_data=daily_options,
+                        underlying_price=underlying_price,
+                        vix=vix,
+                        iv_percentile=iv_percentile
                     )
 
-                    # Get entry price
-                    entry_price = self._get_entry_price(daily_options, entry_signal)
+                    if entry_signal:
+                        # Get current portfolio value for position sizing
+                        total_unrealized = sum(
+                            p.unrealized_pnl for p in strategy.get_open_positions()
+                        )
+                        current_portfolio_value = self.account_value + total_unrealized
 
-                    if entry_price and contracts > 0:
-                        # Get leg details from options data
-                        option_type = 'put' if 'put' in strategy.spread_type else 'call'
-
-                        # Get short leg details
-                        short_leg_data = self._get_leg_details(
-                            daily_options, entry_signal.short_strike, option_type, entry_signal
+                        # Calculate position size with available risk constraint
+                        contracts = strategy.calculate_position_size(
+                            signal=entry_signal,
+                            account_value=current_portfolio_value,
+                            available_risk_budget=available_risk_budget,
+                            full_config=self.config  # Pass full config for Kelly parameters
                         )
 
-                        # Get long leg details
-                        long_leg_data = self._get_leg_details(
-                            daily_options, entry_signal.long_strike, option_type, entry_signal, is_long=True
-                        )
+                        # Get entry price
+                        entry_price = self._get_entry_price(daily_options, entry_signal)
 
-                        # Create position
-                        position = Position(
-                            strategy_name=strategy.name,
-                            entry_date=current_date,
-                            entry_price=entry_price,
-                            contracts=contracts,
-                            legs=[
-                                {
-                                    'strike': entry_signal.short_strike,
-                                    'option_type': option_type,
-                                    'position': 'short',
-                                    'delta': short_leg_data.get('delta'),
-                                    'price': short_leg_data.get('price'),
-                                    'expiration': short_leg_data.get('expiration')
-                                },
-                                {
-                                    'strike': entry_signal.long_strike,
-                                    'option_type': option_type,
-                                    'position': 'long',
-                                    'delta': long_leg_data.get('delta'),
-                                    'price': long_leg_data.get('price'),
-                                    'expiration': long_leg_data.get('expiration')
-                                }
-                            ],
-                            notes=entry_signal.notes
-                        )
+                        if entry_price and contracts > 0:
+                            # Get leg details from options data
+                            option_type = 'put' if 'put' in strategy.spread_type else 'call'
 
-                        # Store entry market conditions
-                        position.underlying_price_entry = underlying_price
-                        position.vix_entry = vix
-                        position.iv_percentile_entry = iv_percentile
+                            # Get short leg details
+                            short_leg_data = self._get_leg_details(
+                                daily_options, entry_signal.short_strike, option_type, entry_signal
+                            )
 
-                        # Store entry DTE for Kelly analysis
-                        if hasattr(entry_signal, 'dte') and entry_signal.dte is not None:
-                            position.entry_dte = entry_signal.dte
+                            # Get long leg details
+                            long_leg_data = self._get_leg_details(
+                                daily_options, entry_signal.long_strike, option_type, entry_signal, is_long=True
+                            )
 
-                        # Store expiration dates for calendar spreads
-                        if hasattr(entry_signal, 'near_expiration'):
-                            position.near_expiration = entry_signal.near_expiration
-                        if hasattr(entry_signal, 'far_expiration'):
-                            position.far_expiration = entry_signal.far_expiration
+                            # Create position
+                            position = Position(
+                                strategy_name=strategy.name,
+                                entry_date=current_date,
+                                entry_price=entry_price,
+                                contracts=contracts,
+                                legs=[
+                                    {
+                                        'strike': entry_signal.short_strike,
+                                        'option_type': option_type,
+                                        'position': 'short',
+                                        'delta': short_leg_data.get('delta'),
+                                        'price': short_leg_data.get('price'),
+                                        'expiration': short_leg_data.get('expiration')
+                                    },
+                                    {
+                                        'strike': entry_signal.long_strike,
+                                        'option_type': option_type,
+                                        'position': 'long',
+                                        'delta': long_leg_data.get('delta'),
+                                        'price': long_leg_data.get('price'),
+                                        'expiration': long_leg_data.get('expiration')
+                                    }
+                                ],
+                                notes=entry_signal.notes
+                            )
 
-                        strategy.positions.append(position)
+                            # Store entry market conditions
+                            position.underlying_price_entry = underlying_price
+                            position.vix_entry = vix
+                            position.iv_percentile_entry = iv_percentile
 
-                        # Increment daily trade counter (enforce max one trade per day)
-                        trades_entered_today += 1
+                            # Store entry DTE for Kelly analysis
+                            if hasattr(entry_signal, 'dte') and entry_signal.dte is not None:
+                                position.entry_dte = entry_signal.dte
 
-                        # Apply entry commission
-                        commission = self._calculate_commission(contracts)
-                        self.account_value -= commission
+                            # Store expiration dates for calendar spreads
+                            if hasattr(entry_signal, 'near_expiration'):
+                                position.near_expiration = entry_signal.near_expiration
+                            if hasattr(entry_signal, 'far_expiration'):
+                                position.far_expiration = entry_signal.far_expiration
+
+                            strategy.positions.append(position)
+
+                            # Increment daily trade counter (enforce max one trade per day)
+                            trades_entered_today += 1
+
+                            # Apply entry commission
+                            commission = self._calculate_commission(contracts)
+                            self.account_value -= commission
 
             # Track daily entry attempts for reporting
+            available_risk = self._calculate_available_risk_budget(strategy)
+            total_risk = self._calculate_total_portfolio_risk(strategy)
+            max_risk_pct = self.config.get('position_sizing', {}).get('max_risk_percent', 50.0)
+
             self.daily_entry_log.append({
                 'date': current_date,
                 'trades_entered': trades_entered_today,
-                'attempted_entry': (trades_entered_today < 1 and current_positions < max_positions),
+                'attempted_entry': (trades_entered_today < 1 and available_risk > 0),
                 'entry_blocked_reason': (
-                    'max_positions_reached' if current_positions >= max_positions
+                    'max_risk_reached' if available_risk <= 0 and trades_entered_today < 1
                     else 'already_entered_today' if trades_entered_today >= 1
                     else 'no_entry_signal' if trades_entered_today == 0
                     else 'entered'
-                )
+                ),
+                'current_risk_dollars': total_risk,
+                'available_risk_dollars': available_risk,
+                'max_risk_percent': max_risk_pct
             })
 
             # Record equity curve
@@ -623,7 +722,7 @@ class OptopsyBacktester:
         total_trading_days = len(daily_log_df)
         days_with_entry = (daily_log_df['trades_entered'] > 0).sum()
         days_no_entry = total_trading_days - days_with_entry
-        days_blocked_by_max_positions = (daily_log_df['entry_blocked_reason'] == 'max_positions_reached').sum()
+        days_blocked_by_max_risk = (daily_log_df['entry_blocked_reason'] == 'max_risk_reached').sum()
         days_no_signal = (daily_log_df['entry_blocked_reason'] == 'no_entry_signal').sum()
         daily_entry_rate = (days_with_entry / total_trading_days * 100) if total_trading_days > 0 else 0
 
@@ -645,7 +744,7 @@ class OptopsyBacktester:
             'total_trading_days': total_trading_days,
             'days_with_entry': days_with_entry,
             'days_no_entry': days_no_entry,
-            'days_blocked_by_max_positions': days_blocked_by_max_positions,
+            'days_blocked_by_max_risk': days_blocked_by_max_risk,
             'days_no_signal': days_no_signal,
             'daily_entry_rate_pct': daily_entry_rate,
             'daily_entry_log': daily_log_df,
@@ -673,7 +772,7 @@ class OptopsyBacktester:
         print(f"Days with Entry:          {results['days_with_entry']} ({results['daily_entry_rate_pct']:.1f}%)")
         print(f"Days No Entry:            {results['days_no_entry']}")
         print(f"  - No entry signal:      {results['days_no_signal']}")
-        print(f"  - Max positions reached: {results['days_blocked_by_max_positions']}")
+        print(f"  - Max risk reached:     {results['days_blocked_by_max_risk']}")
         print("="*60 + "\n")
 
     def export_trades(

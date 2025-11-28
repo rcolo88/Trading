@@ -279,9 +279,17 @@ class VerticalSpread(BaseStrategy):
         Calculate position size based on risk management rules.
 
         For vertical spreads, we calculate based on max risk per trade.
+        Position size is constrained by available risk budget.
         Supports both fixed risk and Kelly Criterion methods.
         """
-        # Max risk for vertical spread = strike width - premium received (for credit)
+        # Get available risk budget (passed from backtester)
+        available_risk_budget = kwargs.get('available_risk_budget', float('inf'))
+
+        # If no risk budget available, return 0 contracts
+        if available_risk_budget <= 0:
+            return 0
+
+        # Max risk for vertical spread = strike width (conservative estimate)
         strike_width = abs(signal.short_strike - signal.long_strike)
         max_risk_per_contract = strike_width * 100  # $100 per point
 
@@ -298,18 +306,23 @@ class VerticalSpread(BaseStrategy):
                 kelly_pct = kelly_pct_dict.get(self.spread_type)
 
                 if kelly_pct is not None:
-                    max_risk_dollars = account_value * kelly_pct
-                    contracts = int(max_risk_dollars / max_risk_per_contract)
-                    return max(1, contracts)
+                    # Kelly sizing: risk a percentage of portfolio
+                    kelly_risk_dollars = account_value * kelly_pct
+                    contracts_kelly = int(kelly_risk_dollars / max_risk_per_contract)
                 else:
-                    print(f"⚠ Kelly % not found for {self.spread_type}, using fixed risk")
+                    print(f"⚠ Kelly % not found for {self.spread_type}, defaulting to 1 contract")
+                    contracts_kelly = 1
 
-        # Fallback to fixed risk percentage
-        risk_per_trade_pct = kwargs.get('risk_per_trade_percent', 2.0)
-        max_risk_dollars = account_value * (risk_per_trade_pct / 100)
-        contracts = int(max_risk_dollars / max_risk_per_contract)
+                # Cap by available risk budget
+                contracts_budget = int(available_risk_budget / max_risk_per_contract)
+                contracts = min(contracts_kelly, contracts_budget)
 
-        return max(1, contracts)  # At least 1 contract
+                return max(1, contracts) if contracts > 0 else 0
+
+        # Fixed risk method: use all available risk budget
+        contracts = int(available_risk_budget / max_risk_per_contract)
+
+        return max(1, contracts) if contracts > 0 else 0
 
     def _get_option_type(self) -> str:
         """Get option type based on spread type."""

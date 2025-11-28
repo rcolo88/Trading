@@ -496,12 +496,21 @@ class CalendarSpread(BaseStrategy):
         Calculate position size based on risk management rules.
 
         For calendar spreads, max risk is the debit paid.
+        Position size is constrained by available risk budget.
         Supports both fixed risk and Kelly Criterion methods.
         """
-        # For calendar spreads, max risk = debit paid
-        # Estimated debit for position sizing (would be actual in practice)
-        estimated_debit = 2.0  # Placeholder, would be from actual data
-        max_risk_per_contract = estimated_debit * 100  # $100 per point
+        # Get available risk budget (passed from backtester)
+        available_risk_budget = kwargs.get('available_risk_budget', float('inf'))
+
+        # If no risk budget available, return 0 contracts
+        if available_risk_budget <= 0:
+            return 0
+
+        # For calendar spreads, max risk is the debit paid
+        # Use a conservative estimate based on typical calendar pricing
+        # In practice, this will be refined when actual entry_price is known
+        estimated_max_debit = self.entry_config.get('max_debit', 5.0)
+        max_risk_per_contract = estimated_max_debit * 100  # $100 per point
 
         # Check if full_config provided
         full_config = kwargs.get('full_config')
@@ -516,18 +525,23 @@ class CalendarSpread(BaseStrategy):
                 kelly_pct = kelly_pct_dict.get(self.spread_type)
 
                 if kelly_pct is not None:
-                    max_risk_dollars = account_value * kelly_pct
-                    contracts = int(max_risk_dollars / max_risk_per_contract)
-                    return max(1, contracts)
+                    # Kelly sizing: risk a percentage of portfolio
+                    kelly_risk_dollars = account_value * kelly_pct
+                    contracts_kelly = int(kelly_risk_dollars / max_risk_per_contract)
                 else:
-                    print(f"⚠ Kelly % not found for {self.spread_type}, using fixed risk")
+                    print(f"⚠ Kelly % not found for {self.spread_type}, defaulting to 1 contract")
+                    contracts_kelly = 1
 
-        # Fallback to fixed risk percentage
-        risk_per_trade_pct = kwargs.get('risk_per_trade_percent', 2.0)
-        max_risk_dollars = account_value * (risk_per_trade_pct / 100)
-        contracts = int(max_risk_dollars / max_risk_per_contract)
+                # Cap by available risk budget
+                contracts_budget = int(available_risk_budget / max_risk_per_contract)
+                contracts = min(contracts_kelly, contracts_budget)
 
-        return max(1, contracts)  # At least 1 contract
+                return max(1, contracts) if contracts > 0 else 0
+
+        # Fixed risk method: use all available risk budget
+        contracts = int(available_risk_budget / max_risk_per_contract)
+
+        return max(1, contracts) if contracts > 0 else 0
 
     def _get_option_type(self) -> str:
         """Get option type based on spread type."""

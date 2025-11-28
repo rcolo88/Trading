@@ -72,9 +72,11 @@ print(f"Quarter Kelly: {kelly_pct/4:.2%}")
 ```yaml
 position_sizing:
   method: 'kelly'
-  kelly_pct: 0.15  # Use Half Kelly or Quarter Kelly
-  risk_per_trade_percent: 2.0
-  max_positions: 5
+  max_risk_percent: 50.0  # Maximum portfolio risk (% of current value)
+  kelly_pct:
+    bull_put_spread: 0.06
+    bull_call_spread: 0.04
+    call_calendar: 0.05
 ```
 
 **Step 6: Re-run backtest with Kelly-based sizing**
@@ -85,7 +87,10 @@ Run the backtest again using the updated Kelly percentage for more realistic pos
 
 - **Use Half Kelly (50%) or Quarter Kelly (25%)**: Full Kelly is too aggressive and can lead to large drawdowns
 - **Recalculate periodically**: As your strategy evolves, update Kelly % based on new results
-- **Consider constraints**: Max positions and account size may limit Kelly implementation
+- **Risk-Based Position Sizing**: The `max_risk_percent` parameter now controls portfolio risk exposure dynamically
+  - Recalculated after each day based on current portfolio value
+  - Allows more positions when portfolio grows, restricts when it contracts
+  - Ensures total theoretical max loss never exceeds the specified percentage
 
 ## Trade Export & Review
 
