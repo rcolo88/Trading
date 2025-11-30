@@ -29,16 +29,16 @@ strategies:
   bull_put_spread:          # Credit spread - neutral to bullish
     enabled: true
     entry:
-      dte_min: 35           # Days to expiration
-      dte_max: 45
-      short_delta: 0.30     # Sell put with ~30 delta
+      dte_min: 50           # Days to expiration
+      dte_max: 60
+      short_delta: 0.20     # Sell put with ~30 delta
       long_delta: 0.10      # Buy put with ~20 delta
       iv_percentile_min: 60 # Enter when IV is above 30th percentile (higher premium)
-      iv_percentile_max: 110 # Don't enter if IV > 80th percentile (too risky)
+      iv_percentile_max: 150 # Don't enter if IV > 80th percentile (too risky)
     exit:
-      profit_target: 0.60   # Close at 50% of max profit
-      stop_loss: 0.20       # Stop at 50% of max loss
-      dte_min: 10           # Close if DTE drops below 21
+      profit_target: 0.50   # Close at 50% of max profit
+      stop_loss: 0.10       # Stop at 50% of max loss
+      dte_min: 21           # Close if DTE drops below 21
 
   bull_call_spread:         # Debit spread - moderately bullish
     enabled: true
@@ -84,6 +84,35 @@ strategies:
       dte_exit: 1            # Exit when near-term has 7 DTE left
       max_underlying_move: 0.10  # Exit if underlying moves >10% from strike
 
+  iron_condor:              # Market-neutral credit spread - high IV strategy
+    enabled: true
+    entry:
+      # Time parameters
+      dte_min: 30
+      dte_max: 45
+
+      # Put spread (below current price)
+      put_short_delta: 0.20    # Sell put ~20 delta
+      put_long_delta: 0.10     # Buy put ~10 delta
+
+      # Call spread (above current price)
+      call_short_delta: 0.20   # Sell call ~20 delta
+      call_long_delta: 0.10    # Buy call ~10 delta
+
+      # IV Percentile filters (HIGH IV environment)
+      iv_percentile_min: 60    # Only enter when IV elevated
+      iv_percentile_max: 85    # Avoid extreme volatility
+
+      # Credit/risk requirements
+      min_credit: 1.50         # Minimum total credit to enter
+      max_wing_width: 10.0     # Maximum strike width (risk control)
+
+    exit:
+      profit_target: 0.50      # Close at 50% max profit
+      stop_loss: 0.75          # Stop at 75% max loss
+      dte_min: 14              # Exit with 14 DTE remaining
+      breach_threshold: 0.02   # Exit if price within 2% of short strike
+
 # Position sizing
 position_sizing:
   method: "fixed_risk"  # Options: fixed_risk, kelly
@@ -97,6 +126,7 @@ position_sizing:
     bull_put_spread: 0.06    # Example: 6% (Half Kelly of 12%)
     bull_call_spread: 0.04   # Example: 4% (Half Kelly of 8%)
     call_calendar: 0.05      # Example: 5% (Half Kelly of 10%)
+    iron_condor: 0.05        # Example: 5% (Half Kelly of 10%)
 
 # Market filters (global fallback - each strategy has its own IV Percentile criteria in entry section)
 market_filters:

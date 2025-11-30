@@ -16,6 +16,7 @@ import pandas as pd
 
 from src.strategies.vertical_spreads import BullPutSpread, BullCallSpread
 from src.strategies.calendar_spreads import CallCalendarSpread
+from src.strategies.iron_condor import IronCondor
 from src.backtester.optopsy_wrapper import OptopsyBacktester
 from src.data_fetchers.synthetic_generator import load_sample_spy_options_data
 from src.data_fetchers.yahoo_options import fetch_spy_data
@@ -78,6 +79,15 @@ def main():
     # print(f"   Near DTE: {call_calendar_config['entry']['near_dte']}")
     # print(f"   Far DTE: {call_calendar_config['entry']['far_dte']}")
     # print(f"   Strike selection: {call_calendar_config['entry']['strike_selection']}")
+
+    # Option 4: Iron Condor (Market-Neutral Credit Spread - High IV Strategy)
+    # Uncomment the following lines to test Iron Condor instead:
+    # print("\n3. Creating Iron Condor strategy...")
+    # iron_condor_config = config['strategies']['iron_condor']
+    # strategy = IronCondor(iron_condor_config)
+    # print(f"   Strategy: {strategy.name}")
+    # print(f"   Entry DTE range: {iron_condor_config['entry']['dte_min']}-{iron_condor_config['entry']['dte_max']}")
+    # print(f"   IV Percentile range: {iron_condor_config['entry']['iv_percentile_min']}-{iron_condor_config['entry']['iv_percentile_max']}")
 
     # 4. Run backtest
     print("\n4. Running backtest...")

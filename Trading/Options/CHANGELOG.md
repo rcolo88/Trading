@@ -5,8 +5,47 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+
+- **Iron Condor Strategy**: Market-neutral credit spread for high IV environments
+  - New file: [src/strategies/iron_condor.py](src/strategies/iron_condor.py)
+  - Combines Bull Put Spread + Bear Call Spread (4-leg strategy)
+  - Optimized for IV Percentile 60-85% (high volatility environments)
+  - Collects premium from both put and call sides
+  - Supports delta-based strike selection (20Δ short / 10Δ long on both sides)
+  - Risk calculation: `max_loss = wider_wing - total_credit`
+  - Entry/exit logic:
+    - Entry: Validates DTE range, IV Percentile, credit thresholds, wing widths
+    - Exit: Profit target (50%), stop loss (75%), DTE minimum (14), price breach (2%)
+  - Position sizing: Fixed risk or Kelly Criterion based on available risk budget
+  - Created [optimize_iron_condor.py](optimize_iron_condor.py) for parameter grid search
+  - Created [compare_strategies.py](compare_strategies.py) for side-by-side backtest comparison
+
+- **Backtester Enhancements**:
+  - Updated [src/backtester/optopsy_wrapper.py](src/backtester/optopsy_wrapper.py):
+    - Extended `_calculate_position_max_risk()` to handle 4-leg Iron Condor positions
+    - Enhanced position creation logic to support both 2-leg and 4-leg strategies
+    - Leg detection: Iron Condor identified by presence of `put_short_strike` and `call_short_strike`
+
+- **Configuration Updates**:
+  - Added `iron_condor` strategy section to [config/config.yaml](config/config.yaml)
+    - Entry parameters: DTE (30-45), put/call deltas, IV Percentile (60-85%), credit thresholds
+    - Exit parameters: Profit target (50%), stop loss (75%), DTE minimum (14), breach threshold (2%)
+  - Added `iron_condor` Kelly percentage (0.05 = 5%) to position_sizing section
+
 - Documentation restructuring into focused guide files in `guides/` directory
 - Streamlined CLAUDE.md to ~25 lines with emphasis on changelog and GitHub
+
+### Why Iron Condor for High IV?
+
+- **Superior to Bull Put Spread in elevated volatility**:
+  - Bull Put Spread: Collects premium from 1 side (put only)
+  - Iron Condor: Collects premium from 2 sides (put + call) = 2-3x more credit
+  - Both benefit from IV mean reversion, but Iron Condor captures more premium
+
+- **Market-neutral advantage**:
+  - Profits from range-bound price action, not directional movement
+  - Ideal when markets spike volatility then stabilize
+  - Risk is capped on both sides (wider of two wings limits max loss)
 
 ## [2025-11-17] - IV Percentile Integration
 
