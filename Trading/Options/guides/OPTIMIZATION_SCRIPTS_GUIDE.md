@@ -180,20 +180,34 @@ Completed: 2024-11-25 10:31:16
 ### Results Files
 
 **Location:**
-- Main results: `optimization_results/StrategyName_TIMESTAMP.csv`
-- Checkpoints: `optimization_checkpoints/StrategyName_TIMESTAMP.csv`
+
+- **Master/Compiled Results** (authoritative): `optimization_results/compiled/StrategyName_compiled_DATERANGE.csv`
+  - Accumulates all optimization runs for that strategy and date range
+  - Deduplicates by parameter combination (keeps latest result)
+  - This is your permanent optimization history
+- Checkpoints (temporary): `optimization_checkpoints/StrategyName_*.csv`
+  - Auto-saved progress during long optimizations
+  - Can be deleted after run completes
 
 **CSV Contents:**
-- All parameter combinations tested
+
+- All parameter combinations tested across all runs
 - Performance metrics for each combination
-- Sorted by optimization metric (default: sharpe_ratio)
+- Sorted by optimization metric (default: sharpe_ratio, descending)
 
 **Example:**
+
 ```csv
 dte,short_delta,profit_target,sharpe_ratio,total_return_pct,max_drawdown_pct,...
 35,0.35,0.6,0.3903,6.14,-5.78,...
 35,0.35,0.4,0.3903,6.14,-5.78,...
 ```
+
+**Why Compiled CSV?**
+
+- Preserves history of all parameter optimizations
+- Prevents redundant testing of same parameters
+- Serves as master reference for best-performing parameters
 
 ---
 
@@ -215,9 +229,103 @@ def setup_optimizer(config, options_data, underlying_data):
     # ... rest of function ...
 ```
 
-**Parameter Naming:**
-- **Vertical Spreads:** `dte`, `short_delta`, `long_delta`, `profit_target`, `stop_loss`
-- **Calendar Spreads:** `near_dte`, `far_dte`, `target_delta`, `profit_target`, `stop_loss`
+### All Tunable Parameters
+
+#### Vertical Spreads (Bull Put, Bear Call, Bull Call, Bear Put)
+
+**Entry Parameters:**
+
+| Parameter | Type | Range Example | Description |
+|-----------|------|---|---|
+| `dte` | int | `min=20, max=50` | Days to expiration for option entry. Single value sets both min/max DTE target |
+| `short_delta` | float | `min=0.20, max=0.60` | Delta of SHORT leg (the sold option). Higher delta = more directional bias |
+| `long_delta` | float | `min=0.10, max=0.40` | Delta of LONG leg (the bought option). Used for protection/width |
+| `iv_percentile` | int | `min=10, max=90` | IV percentile range for entry (10=low IV, 90=high IV). Single value expands to min/max |
+
+**Exit Parameters:**
+
+| Parameter | Type | Range Example | Description |
+|-----------|------|---|---|
+| `profit_target` | float | `min=0.20, max=0.75` | **Decimal percentage** - Close at X% of max profit. Example: 0.50 = 50% of max profit |
+| `stop_loss` | float | `min=0.25, max=1.0` | **Percentage of max loss** - Stop at X% of max loss. Example: 0.50 = 50% of max loss (MUST be 0.0-1.0) |
+| `dte_min` | int | `min=5, max=21` | Close position if DTE drops below this threshold |
+
+**Example Configuration:**
+```python
+optimizer.set_parameter_range('dte', min=30, max=45, step=5)
+optimizer.set_parameter_range('short_delta', min=0.25, max=0.40, step=0.05)
+optimizer.set_parameter_range('long_delta', min=0.10, max=0.25, step=0.05)
+optimizer.set_parameter_range('profit_target', min=0.40, max=0.60, step=0.10)
+optimizer.set_parameter_range('stop_loss', min=0.25, max=1.0, step=0.25)
+optimizer.set_parameter_range('iv_percentile', min=20, max=80, step=10)
+optimizer.set_parameter_range('dte_min', min=5, max=21, step=4)
+```
+
+---
+
+#### Calendar Spreads (Call Calendar, Put Calendar)
+
+**Entry Parameters:**
+
+| Parameter | Type | Range Example | Description |
+|-----------|------|---|---|
+| `near_dte` | int | `min=20, max=35` | Days to expiration for NEAR leg (sold option). 20-35 DTE typical |
+| `far_dte` | int | `min=45, max=75` | Days to expiration for FAR leg (bought option). 45-75 DTE typical |
+| `target_delta` | float | `min=0.40, max=0.60` | Delta target for strike selection. 0.50 = ATM (at-the-money) |
+| `min_debit` | float | `min=0.25, max=0.50` | Minimum debit (cost) to enter. Avoids cheap, illiquid spreads |
+| `max_debit` | float | `min=5.00, max=30.00` | Maximum debit (cost) to enter. Limits capital per spread |
+| `iv_percentile_min` | int | `min=0, max=30` | **RANGE MIN** - Only enter if IV percentile >= this. Low IV preferred |
+| `iv_percentile_max` | int | `min=30, max=100` | **RANGE MAX** - Only enter if IV percentile <= this. Avoid extremely high IV |
+
+**Exit Parameters:**
+
+| Parameter | Type | Range Example | Description |
+|-----------|------|---|---|
+| `profit_target` | float | `min=0.15, max=0.50` | **Decimal percentage** - Close at X% of max profit. Example: 0.25 = 25% of max profit |
+| `stop_loss` | float | `min=-0.60, max=-0.10` | **NEGATIVE decimal** - Stop at X% loss. Example: -0.50 = 50% loss (MUST BE NEGATIVE!) |
+| `dte_exit` | int | `min=1, max=21` | Close position when near-leg DTE drops to this value |
+| `max_underlying_move` | float | `min=0.05, max=0.20` | Exit if underlying moves >X% from strike. 0.10 = 10% move |
+
+**Example Configuration:**
+```python
+optimizer.set_parameter_range('near_dte', min=20, max=35, step=5)
+optimizer.set_parameter_range('far_dte', min=45, max=75, step=5)
+optimizer.set_parameter_range('target_delta', min=0.45, max=0.55, step=0.05)
+optimizer.set_parameter_range('min_debit', min=0.25, max=0.50, step=0.25)
+optimizer.set_parameter_range('max_debit', min=5.00, max=30.00, step=5.00)
+optimizer.set_parameter_range('iv_percentile_min', min=0, max=20, step=5)
+optimizer.set_parameter_range('iv_percentile_max', min=30, max=60, step=10)
+optimizer.set_parameter_range('profit_target', min=0.15, max=0.35, step=0.05)
+optimizer.set_parameter_range('stop_loss', min=-0.60, max=-0.10, step=0.10)
+optimizer.set_parameter_range('dte_exit', min=1, max=21, step=2)
+optimizer.set_parameter_range('max_underlying_move', min=0.05, max=0.20, step=0.05)
+```
+
+---
+
+### Important Parameter Notes
+
+**Critical Format Issues:**
+
+⚠️ **Calendar Spread `stop_loss`:** MUST be negative decimal
+- ✅ Correct: `stop_loss: -0.50` (means 50% loss)
+- ❌ Wrong: `stop_loss: 50` (will never trigger)
+- ❌ Wrong: `stop_loss: 0.50` (will always trigger)
+
+⚠️ **Calendar Spread `iv_percentile`:** Use explicit min/max, NOT single value
+- ✅ Correct: `iv_percentile_min: 0, iv_percentile_max: 30` (0-30% range)
+- ❌ Wrong: `iv_percentile: 25` (requires EXACTLY 25%)
+
+⚠️ **Vertical Spread `profit_target`:** Decimal percentage of max profit
+- Example: Bull Put with 0.50 max profit, `profit_target: 0.50` = close at $0.25 profit
+- ✅ Typical values: 0.25 (25%) to 0.75 (75%)
+
+⚠️ **Vertical Spread `stop_loss`:** Percentage of maximum loss (0.0 to 1.0)
+
+- ✅ Correct: `stop_loss: 0.50` (exit at 50% of max loss)
+- ✅ Correct: `stop_loss: 0.75` (exit at 75% of max loss)
+- ❌ Wrong: `stop_loss: 1.5` (impossible - can't lose more than 100% of max loss)
+- ✅ Typical values: 0.25 (25%) to 1.0 (100%)
 
 ### Change Optimization Metric
 

@@ -64,3 +64,9 @@ logs/
 
 # Backtest results (exported trade files)
 backtest_results/
+
+# Optimization results
+# Keep only compiled/ folder (master history)
+# Regular optimization CSVs are merged into compiled/ and don't need version control
+optimization_results/*.csv
+optimization_results/checkpoints/

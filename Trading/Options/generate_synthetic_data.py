@@ -50,13 +50,14 @@ def main():
     symbol = "SPY"
     start_date = "2025-01-01"
     end_date = "2025-11-19"
+    max_dte_ = 95
 
     print(f"\nConfiguration:")
     print(f"  Symbol: {symbol}")
     print(f"  Date range: {start_date} to {end_date}")
     print(f"  Data frequency: End-of-Day (EOD)")
     print(f"  Include weekly expirations: Yes")
-    print(f"  Maximum DTE: 60 days")
+    print(f"  Maximum DTE:  {max_dte_} days")
 
     # User confirmation (skip if -y flag is used)
     if not args.yes:
@@ -87,7 +88,7 @@ def main():
             start_date=start_date,
             end_date=end_date,
             include_weekly=True,
-            max_dte=60,
+            max_dte=max_dte_,
             save_to_csv=True
         )
 

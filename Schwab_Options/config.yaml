@@ -9,7 +9,7 @@ underlying:
 backtest:
   start_date: "2025-01-03"  # Matches synthetic data start date
   end_date: "2025-11-17"    # Matches synthetic data end date
-  initial_capital: 10000
+  initial_capital: 100000
 
 # Data source configuration
 data_source:
@@ -77,7 +77,7 @@ strategies:
       min_debit: 0.5         # Minimum debit to enter (optional)
       max_debit: 28.0        # Maximum debit to enter (increased for SPY ~$530)
       iv_percentile_min: 0  # Calendars prefer low IV environment (10th percentile+)
-      iv_percentile_max: 60  # Don't enter if IV > 60th percentile (defeats calendar purpose)
+      iv_percentile_max: 50  # Don't enter if IV > 50th percentile (defeats calendar purpose)
     exit:
       profit_target: 0.6    # Close at 60% profit
       stop_loss: -0.1       # Stop at 10% loss

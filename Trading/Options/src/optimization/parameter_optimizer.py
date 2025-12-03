@@ -77,15 +77,21 @@ class ParameterOptimizer:
 
     # Strategy-specific allowed parameters
     VERTICAL_PARAMETERS = {
-        'entry': ['dte', 'short_delta', 'long_delta', 'min_credit', 'max_credit',
-                  'iv_percentile'],
+        'entry': ['dte', 'short_delta', 'long_delta', 'iv_percentile'],
         'exit': ['profit_target', 'stop_loss', 'dte_min']
     }
 
     CALENDAR_PARAMETERS = {
         'entry': ['near_dte', 'far_dte', 'target_delta', 'min_debit', 'max_debit',
-                  'iv_percentile'],
+                  'iv_percentile_min', 'iv_percentile_max'],
         'exit': ['profit_target', 'stop_loss', 'dte_exit', 'max_underlying_move']
+    }
+
+    IRON_CONDOR_PARAMETERS = {
+        'entry': ['dte_min', 'dte_max', 'put_short_delta', 'put_long_delta',
+                  'call_short_delta', 'call_long_delta', 'iv_percentile_min', 'iv_percentile_max',
+                  'min_credit', 'max_wing_width'],
+        'exit': ['profit_target', 'stop_loss', 'dte_min', 'breach_threshold']
     }
 
     # Mapping of simplified parameters to their expanded forms
@@ -96,7 +102,11 @@ class ParameterOptimizer:
             'iv_percentile': ['iv_percentile_min', 'iv_percentile_max']  # Single IV percentile sets both min and max
         },
         'calendar': {
-            'iv_percentile': ['iv_percentile_min', 'iv_percentile_max']  # Single IV percentile sets both min and max
+            # Note: Calendar spreads use explicit iv_percentile_min and iv_percentile_max
+            # (not a single iv_percentile value) to avoid requiring exact match filters
+        },
+        'iron_condor': {
+            # Iron Condor uses explicit parameters with no expansion needed
         }
     }
 
@@ -120,8 +130,8 @@ class ParameterOptimizer:
             underlying_data: Historical underlying price data
             base_config: Base configuration dictionary
         """
-        if strategy_type not in ['vertical', 'calendar']:
-            raise ValueError("strategy_type must be 'vertical' or 'calendar'")
+        if strategy_type not in ['vertical', 'calendar', 'iron_condor']:
+            raise ValueError("strategy_type must be 'vertical', 'calendar', or 'iron_condor'")
 
         self.strategy_type = strategy_type
         self.strategy_class = strategy_class
@@ -133,8 +143,10 @@ class ParameterOptimizer:
         # Get allowed parameters for this strategy type
         if strategy_type == 'vertical':
             self.allowed_params = self.VERTICAL_PARAMETERS
-        else:
+        elif strategy_type == 'calendar':
             self.allowed_params = self.CALENDAR_PARAMETERS
+        else:
+            self.allowed_params = self.IRON_CONDOR_PARAMETERS
 
         # Parameter ranges storage
         self.parameter_ranges: Dict[str, Dict[str, Any]] = {}
@@ -821,42 +833,88 @@ class ParameterOptimizer:
 
         # Map strategy class to config key
         config_key_map = {
-            'BullPutSpread': 'bull_put',
-            'BullCallSpread': 'bull_call',
-            'BearPutSpread': 'bear_put',
-            'BearCallSpread': 'bear_call',
+            'BullPutSpread': 'bull_put_spread',
+            'BullCallSpread': 'bull_call_spread',
+            'BearPutSpread': 'bear_put_spread',
+            'BearCallSpread': 'bear_call_spread',
             'CallCalendarSpread': 'call_calendar',
-            'PutCalendarSpread': 'put_calendar'
+            'PutCalendarSpread': 'put_calendar',
+            'IronCondor': 'iron_condor'
         }
 
         config_key = config_key_map.get(strategy_name)
         if not config_key:
             raise ValueError(f"Unknown strategy class: {strategy_name}")
 
-        # Update config parameters
+        # Get existing strategy config from base_config (preserve all non-optimized params)
+        if config_key not in config['strategies']:
+            # Strategy config missing - this should not happen with correct key mapping
+            raise ValueError(
+                f"Strategy config key '{config_key}' not found in config.yaml. "
+                f"Available keys: {list(config['strategies'].keys())}"
+            )
+
+        # Deep copy the existing config to preserve all parameters
+        strategy_config = copy.deepcopy(config['strategies'][config_key])
+
+        # Ensure entry and exit sections exist
+        if 'entry' not in strategy_config:
+            strategy_config['entry'] = {}
+        if 'exit' not in strategy_config:
+            strategy_config['exit'] = {}
+
+        # Update ONLY the optimized parameters
         for param_name, param_value in params.items():
             section, key = self._parse_parameter_name(param_name)
-
-            if config_key not in config['strategies']:
-                config['strategies'][config_key] = {'entry': {}, 'exit': {}}
-
-            if section not in config['strategies'][config_key]:
-                config['strategies'][config_key][section] = {}
 
             # Check if this parameter needs to be expanded
             expansion_map = self.PARAMETER_EXPANSION.get(self.strategy_type, {})
             if key in expansion_map:
                 # Expand to multiple config keys (e.g., 'dte' -> 'dte_min' and 'dte_max')
                 for expanded_key in expansion_map[key]:
-                    config['strategies'][config_key][section][expanded_key] = param_value
+                    strategy_config[section][expanded_key] = param_value
             else:
                 # Use parameter as-is
-                config['strategies'][config_key][section][key] = param_value
+                strategy_config[section][key] = param_value
 
-        # Create strategy instance with updated config
+        # Validate parameter formats to catch mismatches early
+        if self.strategy_type == 'calendar':
+            # Validate stop_loss is negative
+            if 'stop_loss' in strategy_config.get('exit', {}):
+                sl = strategy_config['exit']['stop_loss']
+                if sl > 0:
+                    raise ValueError(
+                        f"stop_loss must be negative decimal (got {sl}). "
+                        f"Use -0.50 for 50% loss, not 50."
+                    )
+
+            # Validate iv_percentile_max >= iv_percentile_min
+            entry = strategy_config.get('entry', {})
+            if 'iv_percentile_max' in entry and 'iv_percentile_min' in entry:
+                if entry['iv_percentile_max'] < entry['iv_percentile_min']:
+                    raise ValueError(
+                        f"iv_percentile_max ({entry['iv_percentile_max']}) must be >= "
+                        f"iv_percentile_min ({entry['iv_percentile_min']})"
+                    )
+
+            # Ensure iv_percentile_min has default if only max was set
+            if 'iv_percentile_max' in entry and 'iv_percentile_min' not in entry:
+                strategy_config['entry']['iv_percentile_min'] = 0
+
+        elif self.strategy_type == 'vertical':
+            # Validate stop_loss is between 0.0 and 1.0 (percentage of max loss)
+            if 'stop_loss' in strategy_config.get('exit', {}):
+                sl = strategy_config['exit']['stop_loss']
+                if sl < 0.0 or sl > 1.0:
+                    raise ValueError(
+                        f"stop_loss must be between 0.0 and 1.0 (got {sl}). "
+                        f"Use 0.50 for 50% of max loss, not 1.5 or -0.50."
+                    )
+
+        # Create strategy instance with merged config
         # CRITICAL: Pass only the strategy-specific portion of config (with 'entry'/'exit' at top level)
-        # Not the full config! Strategy expects config['entry'], not config['strategies']['bull_put']['entry']
-        strategy = self.strategy_class(config['strategies'][config_key])
+        # Not the full config! Strategy expects config['entry'], not config['strategies']['bull_put_spread']['entry']
+        strategy = self.strategy_class(strategy_config)
 
         # Run backtest (verbose=False to avoid cluttering output during optimization)
         backtest_results = self.backtester.run_backtest(

@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Reverted
+
+- **Risk Calculation Changes Reverted** (2025-12-03):
+  - Reverted recent changes to `src/backtester/optopsy_wrapper.py`, `src/strategies/base_strategy.py`, and related files
+  - **Reason**: Changes broke Call Calendar Spread backtest (reduced from ~146 trades to 4 trades, -92% return instead of +600%)
+  - **Status**: Code restored to last known working state from GitHub
+  - **Verification**: Call Calendar now executes 115 trades with 80.87% win rate and +359.84% return
+
 ### Added
 
 - **Iron Condor Strategy**: Market-neutral credit spread for high IV environments
