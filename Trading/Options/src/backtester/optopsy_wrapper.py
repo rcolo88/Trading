@@ -56,55 +56,35 @@ class OptopsyBacktester:
         if not position.legs or len(position.legs) < 2:
             return 0.0
 
+        short_leg = position.legs[0]
+        long_leg = position.legs[1]
+        strike_width = abs(short_leg['strike'] - long_leg['strike'])
+
         # Determine strategy type from position.strategy_name
         strategy_lower = position.strategy_name.lower()
 
-        if 'iron condor' in strategy_lower:
-            # Iron Condor (4 legs: sell put, buy put, sell call, buy call)
-            # Max risk = wider wing - credit received
-            if len(position.legs) < 4:
-                return 0.0
+        if 'put' in strategy_lower and 'bull' in strategy_lower:
+            # Bull Put Spread (credit spread)
+            # Max loss = strike_width - premium_received
+            # entry_price is positive (credit received)
+            max_loss_per_contract = (strike_width - position.entry_price) * 100
 
-            put_short = position.legs[0]['strike']   # Sell put
-            put_long = position.legs[1]['strike']    # Buy put
-            call_short = position.legs[2]['strike']  # Sell call
-            call_long = position.legs[3]['strike']   # Buy call
+        elif 'call' in strategy_lower and 'bull' in strategy_lower:
+            # Bull Call Spread (debit spread)
+            # Max loss = premium_paid
+            # entry_price is negative (we paid), so use abs
+            max_loss_per_contract = abs(position.entry_price) * 100
 
-            put_width = abs(put_short - put_long)
-            call_width = abs(call_long - call_short)
-            max_width = max(put_width, call_width)
-
-            # Max loss = (wider wing - credit) * contracts * $100
-            max_loss_per_contract = (max_width - position.entry_price) * 100
+        elif 'calendar' in strategy_lower:
+            # Calendar Spread (debit spread)
+            # Max loss = debit_paid
+            # entry_price is positive (debit we paid)
+            max_loss_per_contract = position.entry_price * 100
 
         else:
-            # Other strategies (2-leg spreads)
-            short_leg = position.legs[0]
-            long_leg = position.legs[1]
-            strike_width = abs(short_leg['strike'] - long_leg['strike'])
-
-            if 'put' in strategy_lower and 'bull' in strategy_lower:
-                # Bull Put Spread (credit spread)
-                # Max loss = strike_width - premium_received
-                # entry_price is positive (credit received)
-                max_loss_per_contract = (strike_width - position.entry_price) * 100
-
-            elif 'call' in strategy_lower and 'bull' in strategy_lower:
-                # Bull Call Spread (debit spread)
-                # Max loss = premium_paid
-                # entry_price is negative (we paid), so use abs
-                max_loss_per_contract = abs(position.entry_price) * 100
-
-            elif 'calendar' in strategy_lower:
-                # Calendar Spread (debit spread)
-                # Max loss = debit_paid
-                # entry_price is positive (debit we paid)
-                max_loss_per_contract = position.entry_price * 100
-
-            else:
-                # Unknown strategy type, use conservative estimate
-                # Assume max loss = strike width
-                max_loss_per_contract = strike_width * 100
+            # Unknown strategy type, use conservative estimate
+            # Assume max loss = strike width
+            max_loss_per_contract = strike_width * 100
 
         total_max_loss = max_loss_per_contract * position.contracts
         return total_max_loss
@@ -430,73 +410,26 @@ class OptopsyBacktester:
                         entry_price = self._get_entry_price(daily_options, entry_signal)
 
                         if entry_price and contracts > 0:
-                            # Build legs based on strategy type
-                            legs = []
+                            # Get leg details from options data
+                            option_type = 'put' if 'put' in strategy.spread_type else 'call'
 
-                            # Check for Iron Condor (4-leg strategy)
-                            if hasattr(entry_signal, 'put_short_strike') and hasattr(entry_signal, 'call_short_strike'):
-                                # Iron Condor: 4 legs (put spread + call spread)
-                                put_short_data = self._get_leg_details(
-                                    daily_options, entry_signal.put_short_strike, 'put', entry_signal
-                                )
-                                put_long_data = self._get_leg_details(
-                                    daily_options, entry_signal.put_long_strike, 'put', entry_signal, is_long=True
-                                )
-                                call_short_data = self._get_leg_details(
-                                    daily_options, entry_signal.call_short_strike, 'call', entry_signal
-                                )
-                                call_long_data = self._get_leg_details(
-                                    daily_options, entry_signal.call_long_strike, 'call', entry_signal, is_long=True
-                                )
+                            # Get short leg details
+                            short_leg_data = self._get_leg_details(
+                                daily_options, entry_signal.short_strike, option_type, entry_signal
+                            )
 
-                                legs = [
-                                    {
-                                        'strike': entry_signal.put_short_strike,
-                                        'option_type': 'put',
-                                        'position': 'short',
-                                        'delta': put_short_data.get('delta'),
-                                        'price': put_short_data.get('price'),
-                                        'expiration': put_short_data.get('expiration')
-                                    },
-                                    {
-                                        'strike': entry_signal.put_long_strike,
-                                        'option_type': 'put',
-                                        'position': 'long',
-                                        'delta': put_long_data.get('delta'),
-                                        'price': put_long_data.get('price'),
-                                        'expiration': put_long_data.get('expiration')
-                                    },
-                                    {
-                                        'strike': entry_signal.call_short_strike,
-                                        'option_type': 'call',
-                                        'position': 'short',
-                                        'delta': call_short_data.get('delta'),
-                                        'price': call_short_data.get('price'),
-                                        'expiration': call_short_data.get('expiration')
-                                    },
-                                    {
-                                        'strike': entry_signal.call_long_strike,
-                                        'option_type': 'call',
-                                        'position': 'long',
-                                        'delta': call_long_data.get('delta'),
-                                        'price': call_long_data.get('price'),
-                                        'expiration': call_long_data.get('expiration')
-                                    }
-                                ]
+                            # Get long leg details
+                            long_leg_data = self._get_leg_details(
+                                daily_options, entry_signal.long_strike, option_type, entry_signal, is_long=True
+                            )
 
-                            else:
-                                # Standard 2-leg spreads (Bull Put, Bull Call, Calendar)
-                                option_type = 'put' if 'put' in strategy.spread_type else 'call'
-
-                                short_leg_data = self._get_leg_details(
-                                    daily_options, entry_signal.short_strike, option_type, entry_signal
-                                )
-
-                                long_leg_data = self._get_leg_details(
-                                    daily_options, entry_signal.long_strike, option_type, entry_signal, is_long=True
-                                )
-
-                                legs = [
+                            # Create position
+                            position = Position(
+                                strategy_name=strategy.name,
+                                entry_date=current_date,
+                                entry_price=entry_price,
+                                contracts=contracts,
+                                legs=[
                                     {
                                         'strike': entry_signal.short_strike,
                                         'option_type': option_type,
@@ -513,15 +446,7 @@ class OptopsyBacktester:
                                         'price': long_leg_data.get('price'),
                                         'expiration': long_leg_data.get('expiration')
                                     }
-                                ]
-
-                            # Create position
-                            position = Position(
-                                strategy_name=strategy.name,
-                                entry_date=current_date,
-                                entry_price=entry_price,
-                                contracts=contracts,
-                                legs=legs,
+                                ],
                                 notes=entry_signal.notes
                             )
 
