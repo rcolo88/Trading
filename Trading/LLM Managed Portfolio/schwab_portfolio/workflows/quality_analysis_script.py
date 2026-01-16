@@ -40,15 +40,15 @@ logger = logging.getLogger(__name__)
 
 class QualityAnalysisScript:
     """
-    Standalone quality analysis pipeline
+    Standalone quality analysis pipeline for stock indices
 
     Workflow:
-    1. Load current portfolio holdings
-    2. Fetch watchlist tickers from configured index (SP500/SP400/SP600/etc.)
-    3. Fetch financial data for holdings + watchlist
-    4. Calculate quality metrics for all tickers
-    5. Identify SELL candidates (holdings with quality <70)
-    6. Identify BUY alternatives (watchlist with quality >85 OR >15 points better)
+    1. Fetch watchlist tickers from configured index (SP500/SP400/SP600/etc.)
+    2. Fetch financial data for all tickers in the index
+    3. Calculate quality metrics for all tickers
+    4. Classify market cap tiers
+    5. Analyze ROE persistence
+    6. Rank stocks by quality score
     7. Export results to JSON and summary text
     """
 
@@ -67,31 +67,7 @@ class QualityAnalysisScript:
         self.quality_calculator = QualityMetricsCalculator()
         self.results = {}
 
-    def load_portfolio_holdings(self) -> List[str]:
-        """
-        Load current portfolio holdings from portfolio_state.json
 
-        Returns:
-            List of ticker symbols in portfolio
-        """
-        # Portfolio state is in parent directory
-        portfolio_path = Path(__file__).parent.parent / "portfolio_state.json"
-
-        if not portfolio_path.exists():
-            logger.warning(f"Portfolio state not found at {portfolio_path}")
-            return []
-
-        try:
-            with open(portfolio_path, 'r') as f:
-                state = json.load(f)
-
-            holdings = list(state.get('holdings', {}).keys())
-            logger.info(f"Loaded {len(holdings)} holdings from portfolio: {holdings}")
-            return holdings
-
-        except Exception as e:
-            logger.error(f"Failed to load portfolio holdings: {e}")
-            return []
 
     def get_watchlist_tickers(self, limit: Optional[int] = None) -> List[str]:
         """
@@ -187,123 +163,47 @@ class QualityAnalysisScript:
 
         return quality_results
 
-    def identify_recommendations(
-        self,
-        holdings: List[str],
-        holdings_quality: Dict[str, QualityAnalysisResult],
-        watchlist_quality: Dict[str, QualityAnalysisResult]
-    ) -> Dict[str, List[Dict]]:
-        """
-        Identify SELL and BUY recommendations based on quality analysis
 
-        Args:
-            holdings: List of current holdings
-            holdings_quality: Quality results for holdings
-            watchlist_quality: Quality results for watchlist
-
-        Returns:
-            Dict with 'sell_candidates' and 'buy_alternatives' lists
-        """
-        sell_candidates = []
-        buy_alternatives = []
-
-        # Identify SELL candidates (holdings with quality <70)
-        for ticker in holdings:
-            if ticker not in holdings_quality:
-                continue
-
-            result = holdings_quality[ticker]
-
-            if result.composite_score < QUALITY_MIN_SCORE:
-                sell_candidates.append({
-                    'ticker': ticker,
-                    'quality_score': result.composite_score,
-                    'tier': result.tier.value,
-                    'red_flags': len(result.red_flags),
-                    'reason': f"Quality score {result.composite_score:.1f} below minimum threshold {QUALITY_MIN_SCORE}"
-                })
-
-        # Identify BUY alternatives from watchlist
-        for ticker, result in watchlist_quality.items():
-            # Skip if already holding
-            if ticker in holdings:
-                continue
-
-            # Alternative 1: Quality score >85 (ideal)
-            if result.composite_score >= QUALITY_IDEAL_SCORE:
-                buy_alternatives.append({
-                    'ticker': ticker,
-                    'quality_score': result.composite_score,
-                    'tier': result.tier.value,
-                    'red_flags': len(result.red_flags),
-                    'reason': f"Elite quality score {result.composite_score:.1f} (>={QUALITY_IDEAL_SCORE})"
-                })
-                continue
-
-            # Alternative 2: Score >70 AND >15 points better than weakest holding
-            if result.composite_score >= QUALITY_MIN_SCORE:
-                # Find weakest holding
-                weakest_holding_score = min(
-                    [r.composite_score for r in holdings_quality.values()],
-                    default=100
-                )
-
-                if result.composite_score - weakest_holding_score >= QUALITY_SWAP_THRESHOLD:
-                    buy_alternatives.append({
-                        'ticker': ticker,
-                        'quality_score': result.composite_score,
-                        'tier': result.tier.value,
-                        'red_flags': len(result.red_flags),
-                        'reason': f"Quality score {result.composite_score:.1f} is {result.composite_score - weakest_holding_score:.1f} points better than weakest holding"
-                    })
-
-        # Sort by quality score (descending)
-        sell_candidates.sort(key=lambda x: x['quality_score'])
-        buy_alternatives.sort(key=lambda x: x['quality_score'], reverse=True)
-
-        logger.info(f"Identified {len(sell_candidates)} SELL candidates and {len(buy_alternatives)} BUY alternatives")
-
-        return {
-            'sell_candidates': sell_candidates,
-            'buy_alternatives': buy_alternatives
-        }
 
     def export_results(
         self,
-        holdings_quality: Dict[str, QualityAnalysisResult],
-        watchlist_quality: Dict[str, QualityAnalysisResult],
-        recommendations: Dict[str, List[Dict]],
+        quality_results: Dict[str, QualityAnalysisResult],
         market_cap_tiers: Dict[str, str],
         roe_persistence: Dict[str, Dict],
         strict_filters: Dict[str, Dict]
     ):
         """
-        Export analysis results to JSON and summary text (4-tier framework)
+        Export quality analysis results to JSON and summary text
 
         Args:
-            holdings_quality: Quality results for holdings
-            watchlist_quality: Quality results for watchlist
-            recommendations: SELL and BUY recommendations
-            market_cap_tiers: Market cap tier classification (4-tier framework)
+            quality_results: Quality analysis results for all tickers
+            market_cap_tiers: Market cap tier classification
             roe_persistence: ROE persistence analysis results
             strict_filters: Small cap strict quality filters results
         """
         # Create outputs directory if it doesn't exist
-        output_dir = Path(__file__).parent / "outputs"
+        output_dir = Path(__file__).parent.parent / "outputs"
         output_dir.mkdir(exist_ok=True)
 
         # Generate timestamp for filenames
         timestamp = datetime.now().strftime("%Y%m%d")
 
-        # Prepare JSON output (4-tier framework)
+        # Sort quality results by composite score (descending) for consistent ordering
+        sorted_results = sorted(
+            quality_results.items(),
+            key=lambda x: x[1].composite_score,
+            reverse=True
+        )
+
+        # Prepare JSON output
         output_data = {
             'timestamp': datetime.now().isoformat(),
-            'holdings_count': len(holdings_quality),
-            'watchlist_count': len(watchlist_quality),
-            'holdings_quality': {
+            'index': self.watchlist_config.index.value,
+            'tickers_analyzed': len(quality_results),
+            'quality_results': {
                 ticker: {
                     'composite_score': result.composite_score,
-                    'tier': result.tier.value,
+                    'tier': result.tier.value if result.tier else "Unknown",
                     'market_cap': result.market_cap,
                     'red_flags_count': len(result.red_flags),
                     'red_flags': [
@@ -323,45 +223,53 @@ class QualityAnalysisScript:
                         for m in result.metric_scores
                     }
                 }
-                for ticker, result in holdings_quality.items()
+                for ticker, result in sorted_results  # Use sorted results
             },
-            'watchlist_quality': {
-                ticker: {
-                    'composite_score': result.composite_score,
-                    'tier': result.tier.value,
-                    'market_cap': result.market_cap,
-                    'red_flags_count': len(result.red_flags)
-                }
-                for ticker, result in watchlist_quality.items()
-            },
-            'recommendations': recommendations,
-            'market_cap_tiers': market_cap_tiers,  # NEW: 4-tier framework
-            'roe_persistence': roe_persistence,    # NEW: 4-tier framework
-            'strict_filters': strict_filters        # NEW: 4-tier framework
+            'market_cap_tiers': market_cap_tiers,
+            'roe_persistence': roe_persistence,
+            'strict_filters': strict_filters
         }
 
-        # Export JSON (fixed filename - no timestamp)
+        # Export JSON (handle numpy types)
         json_file = output_dir / "quality_analysis.json"
         with open(json_file, 'w') as f:
-            json.dump(output_data, f, indent=2)
+            json.dump(output_data, f, indent=2, default=str)
 
         logger.info(f"Exported JSON results to {json_file}")
 
-        # Export summary text (fixed filename - no timestamp)
+        # Export summary text
         summary_file = output_dir / "quality_analysis_summary.txt"
         with open(summary_file, 'w') as f:
             f.write("="*60 + "\n")
-            f.write("QUALITY METRICS ANALYSIS SUMMARY\n")
+            f.write("QUALITY ANALYSIS SUMMARY\n")
             f.write("="*60 + "\n")
             f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-            f.write(f"Holdings Analyzed: {len(holdings_quality)}\n")
-            f.write(f"Watchlist Analyzed: {len(watchlist_quality)}\n")
+            f.write(f"Index: {self.watchlist_config.index.value}\n")
+            f.write(f"Stocks Analyzed: {len(quality_results)}\n")
             f.write("="*60 + "\n\n")
 
-            # Current Holdings
-            f.write("CURRENT HOLDINGS QUALITY:\n")
+            # Quality Score Distribution
+            f.write("QUALITY SCORE DISTRIBUTION:\n")
             f.write("-"*60 + "\n")
-            for ticker, result in sorted(holdings_quality.items(), key=lambda x: x[1].composite_score, reverse=True):
+            elite = sum(1 for r in quality_results.values() if r.composite_score >= 85)
+            strong = sum(1 for r in quality_results.values() if 70 <= r.composite_score < 85)
+            moderate = sum(1 for r in quality_results.values() if 50 <= r.composite_score < 70)
+            weak = sum(1 for r in quality_results.values() if r.composite_score < 50)
+
+            f.write(f"Elite (85-100): {elite} stocks\n")
+            f.write(f"Strong (70-84): {strong} stocks\n")
+            f.write(f"Moderate (50-69): {moderate} stocks\n")
+            f.write(f"Weak (0-49): {weak} stocks\n")
+            f.write("\n")
+
+            # Top 20 Stocks by Quality
+            f.write("="*80 + "\n")
+            f.write("TOP 20 STOCKS BY QUALITY SCORE:\n")
+            f.write("-"*80 + "\n")
+            f.write(f"{'Rank':<4} {'Ticker':<8} {'Market Cap':<12} {'Score':<8} {'Tier':<12} {'Red Flags':<10}\n")
+            f.write("-"*80 + "\n")
+
+            for rank, (ticker, result) in enumerate(sorted_results[:20], 1):
                 # Format market cap
                 if result.market_cap:
                     if result.market_cap >= 1e9:
@@ -373,132 +281,88 @@ class QualityAnalysisScript:
                 else:
                     market_cap_str = "N/A"
 
-                f.write(f"{ticker}:\n")
-                f.write(f"  Market Cap: {market_cap_str}\n")
-                f.write(f"  Quality Score: {result.composite_score:.1f}/100\n")
-                f.write(f"  Tier: {result.tier.value}\n")
-                f.write(f"  Red Flags: {len(result.red_flags)}\n")
-                if result.red_flags:
-                    for rf in result.red_flags:
-                        f.write(f"    - [{rf.severity}] {rf.description}\n")
-                f.write("\n")
+                tier = result.tier.value if result.tier else "Unknown"
+                f.write(f"{rank:<4} {ticker:<8} {market_cap_str:<12} {result.composite_score:5.1f}    {tier:<12} {len(result.red_flags):<10}\n")
 
-            # SELL Candidates
-            f.write("\n" + "="*60 + "\n")
-            f.write("SELL CANDIDATES (Quality <70):\n")
+            # Market Cap Distribution
+            f.write(f"\n{'='*60}\n")
+            f.write("MARKET CAP DISTRIBUTION:\n")
             f.write("-"*60 + "\n")
-            if recommendations['sell_candidates']:
-                for candidate in recommendations['sell_candidates']:
-                    f.write(f"{candidate['ticker']}:\n")
-                    f.write(f"  Quality Score: {candidate['quality_score']:.1f}\n")
-                    f.write(f"  Reason: {candidate['reason']}\n")
-                    f.write(f"  Red Flags: {candidate['red_flags']}\n")
-                    f.write("\n")
-            else:
-                f.write("No sell candidates identified.\n\n")
 
-            # BUY Alternatives
-            f.write("\n" + "="*60 + "\n")
-            f.write("BUY ALTERNATIVES (Top 10):\n")
-            f.write("-"*60 + "\n")
-            if recommendations['buy_alternatives']:
-                for alternative in recommendations['buy_alternatives'][:10]:
-                    f.write(f"{alternative['ticker']}:\n")
-                    f.write(f"  Quality Score: {alternative['quality_score']:.1f}\n")
-                    f.write(f"  Tier: {alternative['tier']}\n")
-                    f.write(f"  Reason: {alternative['reason']}\n")
-                    f.write("\n")
-            else:
-                f.write("No buy alternatives identified.\n\n")
+            large_cap = sum(1 for tier in market_cap_tiers.values() if tier == "Large Cap")
+            mid_cap = sum(1 for tier in market_cap_tiers.values() if tier == "Mid Cap")
+            small_cap = sum(1 for tier in market_cap_tiers.values() if tier == "Small Cap")
+            micro_cap = sum(1 for tier in market_cap_tiers.values() if tier == "Micro Cap")
 
-            # Top Watchlist Overall
-            f.write("\n" + "="*80 + "\n")
-            f.write("TOP 20 WATCHLIST STOCKS BY QUALITY:\n")
-            f.write("-"*80 + "\n")
-            f.write(f"{'Ticker':<8} {'Market Cap':<12} {'Score':<8} {'Tier':<12} {'Red Flags':<10}\n")
-            f.write("-"*80 + "\n")
-            sorted_watchlist = sorted(
-                watchlist_quality.items(),
-                key=lambda x: x[1].composite_score,
-                reverse=True
-            )
-            for ticker, result in sorted_watchlist[:20]:
-                # Format market cap
-                if result.market_cap:
-                    if result.market_cap >= 1e9:
-                        market_cap_str = f"${result.market_cap / 1e9:.2f}B"
-                    elif result.market_cap >= 1e6:
-                        market_cap_str = f"${result.market_cap / 1e6:.2f}M"
-                    else:
-                        market_cap_str = f"${result.market_cap:.0f}"
-                else:
-                    market_cap_str = "N/A"
+            f.write(f"Large Cap (≥$50B): {large_cap} stocks\n")
+            f.write(f"Mid Cap ($2B-$50B): {mid_cap} stocks\n")
+            f.write(f"Small Cap ($500M-$2B): {small_cap} stocks\n")
+            f.write(f"Micro Cap (<$500M): {micro_cap} stocks\n")
 
-                f.write(f"{ticker:<8} {market_cap_str:<12} {result.composite_score:5.1f}    {result.tier.value:<12} {len(result.red_flags):<10}\n")
+            # ROE Persistence Summary
+            if roe_persistence:
+                f.write(f"\n{'='*60}\n")
+                f.write("ROE PERSISTENCE SUMMARY:\n")
+                f.write("-"*60 + "\n")
+
+                compounders = sum(1 for r in roe_persistence.values() if r.get('classification') == 'Quality Compounder')
+                improvers = sum(1 for r in roe_persistence.values() if r.get('classification') == 'Quality Improver')
+                deteriorators = sum(1 for r in roe_persistence.values() if r.get('classification') == 'Quality Deteriorator')
+                inconsistent = sum(1 for r in roe_persistence.values() if r.get('classification') == 'Inconsistent')
+
+                f.write(f"Quality Compounders: {compounders} stocks\n")
+                f.write(f"Quality Improvers: {improvers} stocks\n")
+                f.write(f"Quality Deteriorators: {deteriorators} stocks\n")
+                f.write(f"Inconsistent: {inconsistent} stocks\n")
 
         logger.info(f"Exported summary to {summary_file}")
 
         # Print summary to console
         print("\n" + "="*60)
-        print("QUALITY METRICS ANALYSIS COMPLETE")
+        print("QUALITY ANALYSIS COMPLETE")
         print("="*60)
-        print(f"Holdings analyzed: {len(holdings_quality)}")
-        print(f"Watchlist analyzed: {len(watchlist_quality)}")
-        print(f"SELL candidates: {len(recommendations['sell_candidates'])}")
-        print(f"BUY alternatives: {len(recommendations['buy_alternatives'])}")
+        print(f"Index: {self.watchlist_config.index.value}")
+        print(f"Stocks analyzed: {len(quality_results)}")
+        print(f"Elite quality: {elite} stocks (≥85)")
+        print(f"Strong quality: {strong} stocks (70-84)")
         print(f"\nResults saved to:")
         print(f"  - {json_file}")
         print(f"  - {summary_file}")
         print("="*60 + "\n")
 
-    def run(self, watchlist_limit: int = 50):
+    def run(self, watchlist_limit: Optional[int] = None):
         """
-        Run complete quality analysis pipeline
+        Run complete quality analysis pipeline for stock index
 
         Args:
-            watchlist_limit: Maximum number of watchlist tickers to analyze (default: 50)
+            watchlist_limit: Maximum number of watchlist tickers to analyze (default: None for full index)
         """
         logger.info("Starting quality analysis pipeline")
 
-        # Load holdings
-        holdings = self.load_portfolio_holdings()
-        if not holdings:
-            logger.error("No holdings to analyze. Exiting.")
-            return
-
-        # Get watchlist
+        # Get watchlist tickers from configured index
         watchlist = self.get_watchlist_tickers(limit=watchlist_limit)
         if not watchlist:
             logger.error("No watchlist tickers available. Exiting.")
             return
 
-        # Combine holdings + watchlist for fetching
-        all_tickers = list(set(holdings + watchlist))
-        logger.info(f"Total tickers to analyze: {len(all_tickers)}")
+        logger.info(f"Analyzing {len(watchlist)} tickers from {self.watchlist_config.index.value}")
 
         # Fetch financial data
-        financial_data = self.fetch_financial_data(all_tickers)
+        financial_data = self.fetch_financial_data(watchlist)
 
         # Calculate quality metrics
         quality_results = self.calculate_quality_metrics(financial_data)
-
-        # Split results into holdings vs watchlist
-        holdings_quality = {ticker: result for ticker, result in quality_results.items() if ticker in holdings}
-        watchlist_quality = {ticker: result for ticker, result in quality_results.items() if ticker in watchlist}
 
         # Classify market cap tiers (4-tier framework integration)
         logger.info("Classifying market cap tiers...")
         market_cap_results = self.market_cap_classifier.batch_classify_tickers(list(quality_results.keys()))
         market_cap_tiers = {
-            ticker: tier_data.tier.value
+            ticker: tier_data.tier.value if tier_data.tier else "Unknown"
             for ticker, tier_data in market_cap_results.classifications.items()
         }
         logger.info(f"Classified {len(market_cap_tiers)} tickers into market cap tiers")
 
         # Analyze ROE persistence (4-tier framework integration)
-        # NOTE: ROE persistence requires historical data. yfinance typically provides 3-4 years
-        # which is sufficient for mid-cap (2-3 years) and small-cap (2 years) requirements.
-        # Large-cap requirement (5+ years) may not always be met, but we handle this gracefully.
         logger.info("Analyzing ROE persistence...")
         roe_persistence = {}
         for ticker in quality_results.keys():
@@ -507,12 +371,12 @@ class QualityAnalysisScript:
                 hist_data = self.fetcher.fetch_historical_financials(ticker)
 
                 if hist_data is not None and len(hist_data) >= 2:
-                    # Minimum 2 years required for small cap analysis
+                    # Minimum 2 years required for analysis
                     persistence_result = self.roe_analyzer.analyze_company(hist_data, ticker=ticker)
 
                     if persistence_result:
                         # Extract incremental ROCE from trend_analysis if available
-                        incremental_roce = persistence_result.trend_analysis.get('incremental_roce_advantage', 0.0)
+                        incremental_roce = persistence_result.trend_analysis.get('incremental_roce_advantage', 0.0) if persistence_result.trend_analysis else 0.0
 
                         roe_persistence[ticker] = {
                             'years_analyzed': persistence_result.persistence_metrics.years_analyzed,
@@ -522,21 +386,18 @@ class QualityAnalysisScript:
                             'classification': persistence_result.classification.value,
                             'compounder_confidence': persistence_result.compounder_confidence
                         }
-                        logger.debug(f"ROE persistence for {ticker}: {persistence_result.classification.value} ({persistence_result.compounder_confidence:.1f}% confidence)")
-                else:
-                    logger.debug(f"Insufficient historical data for {ticker} (need 2+ years)")
-
+                        logger.debug(f"ROE persistence for {ticker}: {persistence_result.classification.value}")
             except Exception as e:
                 logger.warning(f"Failed to analyze ROE persistence for {ticker}: {e}")
                 continue
 
         logger.info(f"Analyzed ROE persistence for {len(roe_persistence)} tickers")
 
-        # Analyze small cap strict filters (4-tier framework integration)
+        # Analyze small cap strict filters
         logger.info("Analyzing small cap strict filters...")
         strict_filters = {}
         for ticker, tier in market_cap_tiers.items():
-            if tier == "Small Cap":  # Only check small caps
+            if tier == "Small Cap":
                 data = financial_data.get(ticker)
                 if data:
                     try:
@@ -570,14 +431,9 @@ class QualityAnalysisScript:
                         continue
         logger.info(f"Analyzed strict filters for {len(strict_filters)} small cap tickers")
 
-        # Generate recommendations
-        recommendations = self.identify_recommendations(holdings, holdings_quality, watchlist_quality)
-
-        # Export results (including market cap tiers, ROE persistence, and strict filters)
+        # Export results (quality rankings only)
         self.export_results(
-            holdings_quality,
-            watchlist_quality,
-            recommendations,
+            quality_results,
             market_cap_tiers,
             roe_persistence,
             strict_filters

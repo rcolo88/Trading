@@ -48,7 +48,10 @@ from data.financial_data_fetcher import (
     get_sp500_tickers,
     get_sp400_tickers,
     get_sp600_tickers,
-    get_nasdaq100_tickers
+    get_nasdaq100_tickers,
+    get_russell3000_tickers,
+    get_russell1000_tickers,
+    get_russell2000_tickers
 )
 
 logger = logging.getLogger(__name__)
@@ -62,20 +65,26 @@ class WatchlistIndex(Enum):
         SP400: S&P MidCap 400 (mid cap $2B-$50B, ~400 tickers)
         SP600: S&P SmallCap 600 (small cap $500M-$2B, ~600 tickers)
         NASDAQ100: NASDAQ-100 (tech-focused large cap, ~100 tickers)
+        RUSSELL1000: Russell 1000 (large/mid cap, ~1000 tickers)
+        RUSSELL2000: Russell 2000 (small cap, ~2000 tickers)
+        RUSSELL3000: Russell 3000 (broad market, ~3000 tickers)
         COMBINED_SP: S&P Composite 1500 (SP500 + SP400 + SP600, ~1500 tickers)
         CUSTOM: Custom ticker list provided by user
 
     Market Cap Tiers:
-        - Large Cap: ≥$50B (dominates SP500, NASDAQ100)
-        - Mid Cap: $2B-$50B (dominates SP400)
-        - Small Cap: $500M-$2B (dominates SP600)
-        - Micro Cap: <$500M (not included in S&P indexes)
+        - Large Cap: ≥$50B (dominates SP500, NASDAQ100, Russell 1000)
+        - Mid Cap: $2B-$50B (dominates SP400, Russell 1000)
+        - Small Cap: $500M-$2B (dominates SP600, Russell 2000)
+        - Micro Cap: <$500M (not included in major indexes)
 
     Performance Expectations:
         - SP500 (~500 tickers): 12-17 minutes with ThreadPoolExecutor
         - SP400 (~400 tickers): 10-14 minutes
         - SP600 (~600 tickers): 15-20 minutes
         - NASDAQ100 (~100 tickers): 3-5 minutes
+        - RUSSELL1000 (~1000 tickers): 30-40 minutes
+        - RUSSELL2000 (~2000 tickers): 60-80 minutes
+        - RUSSELL3000 (~3000 tickers): 90-120 minutes
         - COMBINED_SP (~1500 tickers): 45-60 minutes
         - CUSTOM: Depends on list size
 
@@ -83,13 +92,19 @@ class WatchlistIndex(Enum):
         - Daily screening: SP500 with limit=50 (2-5 min, uses cache)
         - Weekly screening: SP500 full (12-17 min, refresh data)
         - Monthly screening: COMBINED_SP (45-60 min, find small cap opportunities)
+        - Broad market: RUSSELL3000 (90-120 min, comprehensive coverage)
         - Tech focus: NASDAQ100 (3-5 min, tech sector analysis)
+        - Large/Mid cap focus: RUSSELL1000 (30-40 min, covers top 1000)
+        - Small cap focus: RUSSELL2000 (60-80 min, pure small cap)
         - Custom screening: CUSTOM with hand-picked tickers
     """
     SP500 = "sp500"
     SP400 = "sp400"
     SP600 = "sp600"
     NASDAQ100 = "nasdaq100"
+    RUSSELL1000 = "russell1000"
+    RUSSELL2000 = "russell2000"
+    RUSSELL3000 = "russell3000"
     COMBINED_SP = "combined_sp"
     CUSTOM = "custom"
 
@@ -176,6 +191,18 @@ class WatchlistConfig:
         elif self.index == WatchlistIndex.NASDAQ100:
             tickers = get_nasdaq100_tickers()
             logger.info(f"Fetched {len(tickers)} tickers from NASDAQ-100")
+
+        elif self.index == WatchlistIndex.RUSSELL1000:
+            tickers = get_russell1000_tickers()
+            logger.info(f"Fetched {len(tickers)} tickers from Russell 1000")
+
+        elif self.index == WatchlistIndex.RUSSELL2000:
+            tickers = get_russell2000_tickers()
+            logger.info(f"Fetched {len(tickers)} tickers from Russell 2000")
+
+        elif self.index == WatchlistIndex.RUSSELL3000:
+            tickers = get_russell3000_tickers()
+            logger.info(f"Fetched {len(tickers)} tickers from Russell 3000")
 
         elif self.index == WatchlistIndex.COMBINED_SP:
             # Combine all three S&P indexes

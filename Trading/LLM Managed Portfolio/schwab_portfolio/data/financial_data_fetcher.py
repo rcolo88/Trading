@@ -599,8 +599,8 @@ def get_sp500_tickers() -> List[str]:
         response.raise_for_status()
 
         tables = pd.read_html(StringIO(response.text))
-        # The ticker table is the second table (index 1), first is a warning message
-        sp500_table = tables[1]
+        # The ticker table is the first table (index 0) containing the company list
+        sp500_table = tables[0]
         tickers = sp500_table['Symbol'].tolist()
         logger.info(f"Fetched {len(tickers)} S&P 500 tickers")
         return tickers
@@ -632,8 +632,8 @@ def get_sp400_tickers() -> List[str]:
         response.raise_for_status()
 
         tables = pd.read_html(StringIO(response.text))
-        # Use second table (index 1) which contains the ticker list
-        sp400_table = tables[1]
+        # Use first table (index 0) which contains the company list
+        sp400_table = tables[0]
         tickers = sp400_table['Symbol'].tolist()
         logger.info(f"Fetched {len(tickers)} S&P MidCap 400 tickers")
         return tickers
@@ -665,8 +665,8 @@ def get_sp600_tickers() -> List[str]:
         response.raise_for_status()
 
         tables = pd.read_html(StringIO(response.text))
-        # Use second table (index 1) which contains the ticker list
-        sp600_table = tables[1]
+        # Use first table (index 0) which contains the company list
+        sp600_table = tables[0]
         tickers = sp600_table['Symbol'].tolist()
         logger.info(f"Fetched {len(tickers)} S&P SmallCap 600 tickers")
         return tickers
@@ -707,6 +707,92 @@ def get_nasdaq100_tickers() -> List[str]:
         return tickers
     except Exception as e:
         logger.error(f"Failed to fetch NASDAQ-100 tickers: {e}")
+        return []
+
+
+def get_russell3000_tickers() -> List[str]:
+    """
+    Get Russell 3000 ticker list
+
+    The Russell 3000 Index measures the performance of the 3,000 largest
+    publicly traded U.S. companies, representing approximately 98% of the
+    investable U.S. equity market.
+
+    Note: As an approximation, this combines S&P 500, S&P MidCap 400,
+    and S&P SmallCap 600 tickers. The actual Russell 3000 may differ
+    slightly in methodology and constituents.
+
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        # Combine the three S&P indexes as an approximation of Russell 3000
+        sp500 = get_sp500_tickers()
+        sp400 = get_sp400_tickers()
+        sp600 = get_sp600_tickers()
+
+        # Combine and deduplicate
+        all_tickers = set(sp500) | set(sp400) | set(sp600)
+        tickers = list(all_tickers)
+
+        logger.info(f"Fetched {len(tickers)} approximated Russell 3000 tickers "
+                   f"(SP500: {len(sp500)}, SP400: {len(sp400)}, SP600: {len(sp600)})")
+        return tickers
+    except Exception as e:
+        logger.error(f"Failed to fetch Russell 3000 tickers: {e}")
+        return []
+
+
+def get_russell1000_tickers() -> List[str]:
+    """
+    Get Russell 1000 ticker list
+
+    The Russell 1000 Index measures the performance of the 1,000 largest
+    companies in the Russell 3000 Index, representing approximately 90%
+    of the total market capitalization of the Russell 3000.
+
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        # Russell 1000 is approximately the top 1/3 of Russell 3000
+        # We'll use S&P 500 + S&P MidCap 400 as a close approximation
+        sp500 = get_sp500_tickers()
+        sp400 = get_sp400_tickers()
+
+        # Combine and deduplicate
+        all_tickers = set(sp500) | set(sp400)
+        tickers = list(all_tickers)
+
+        logger.info(f"Fetched {len(tickers)} approximated Russell 1000 tickers "
+                   f"(SP500: {len(sp500)}, SP400: {len(sp400)})")
+        return tickers
+    except Exception as e:
+        logger.error(f"Failed to fetch Russell 1000 tickers: {e}")
+        return []
+
+
+def get_russell2000_tickers() -> List[str]:
+    """
+    Get Russell 2000 ticker list
+
+    The Russell 2000 Index measures the performance of the 2,000 smallest
+    companies in the Russell 3000 Index, representing the small-cap segment
+    of the U.S. equity market.
+
+    Returns:
+        List of ticker symbols
+    """
+    try:
+        # Russell 2000 is approximately the smallest 2/3 of Russell 3000
+        # We'll use S&P SmallCap 600 as a close approximation
+        sp600 = get_sp600_tickers()
+
+        logger.info(f"Fetched {len(sp600)} approximated Russell 2000 tickers "
+                   f"(SP600: {len(sp600)})")
+        return sp600
+    except Exception as e:
+        logger.error(f"Failed to fetch Russell 2000 tickers: {e}")
         return []
 
 

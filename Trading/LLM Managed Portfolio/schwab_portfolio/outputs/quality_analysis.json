@@ -1,0 +1,453 @@
+{
+  "timestamp": "2026-01-16T12:59:41.688397",
+  "index": "sp500",
+  "tickers_analyzed": 9,
+  "quality_results": {
+    "ADBE": {
+      "composite_score": 55.1,
+      "tier": "Moderate",
+      "market_cap": 126207975424,
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "BANKRUPTCY RISK",
+          "severity": "CRITICAL",
+          "description": "Altman Z-Score at 0.00 (<1.0). High bankruptcy probability."
+        }
+      ],
+      "metrics": {
+        "Profitability": {
+          "value": 0.0,
+          "score": 10.0,
+          "weighted_score": 3.5
+        },
+        "Earnings Quality": {
+          "value": 0.0,
+          "score": 5.9,
+          "weighted_score": 1.1800000000000002
+        },
+        "Growth Quality": {
+          "value": 0.0,
+          "score": 5.0,
+          "weighted_score": 0.75
+        },
+        "Safety": {
+          "value": 0.0,
+          "score": 4.0,
+          "weighted_score": 0.6
+        },
+        "ROE Persistence": {
+          "value": 0.0,
+          "score": 3.0,
+          "weighted_score": 0.44999999999999996
+        }
+      }
+    },
+    "AOS": {
+      "composite_score": 54.2,
+      "tier": "Moderate",
+      "market_cap": 10079520768,
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "BANKRUPTCY RISK",
+          "severity": "CRITICAL",
+          "description": "Altman Z-Score at 0.00 (<1.0). High bankruptcy probability."
+        }
+      ],
+      "metrics": {
+        "Profitability": {
+          "value": 0.0,
+          "score": 9.7,
+          "weighted_score": 3.3949999999999996
+        },
+        "Earnings Quality": {
+          "value": 0.0,
+          "score": 5.9,
+          "weighted_score": 1.1800000000000002
+        },
+        "Growth Quality": {
+          "value": 0.0,
+          "score": 5.0,
+          "weighted_score": 0.75
+        },
+        "Safety": {
+          "value": 0.0,
+          "score": 4.0,
+          "weighted_score": 0.6
+        },
+        "ROE Persistence": {
+          "value": 0.0,
+          "score": 3.0,
+          "weighted_score": 0.44999999999999996
+        }
+      }
+    },
+    "ACN": {
+      "composite_score": 49.7,
+      "tier": "Weak",
+      "market_cap": 178730221568,
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "BANKRUPTCY RISK",
+          "severity": "CRITICAL",
+          "description": "Altman Z-Score at 0.00 (<1.0). High bankruptcy probability."
+        }
+      ],
+      "metrics": {
+        "Profitability": {
+          "value": 0.0,
+          "score": 8.2,
+          "weighted_score": 2.8699999999999997
+        },
+        "Earnings Quality": {
+          "value": 0.0,
+          "score": 5.9,
+          "weighted_score": 1.1800000000000002
+        },
+        "Growth Quality": {
+          "value": 0.0,
+          "score": 5.0,
+          "weighted_score": 0.75
+        },
+        "Safety": {
+          "value": 0.0,
+          "score": 4.0,
+          "weighted_score": 0.6
+        },
+        "ROE Persistence": {
+          "value": 0.0,
+          "score": 3.0,
+          "weighted_score": 0.44999999999999996
+        }
+      }
+    },
+    "MMM": {
+      "composite_score": 49.1,
+      "tier": "Weak",
+      "market_cap": 90579001344,
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "BANKRUPTCY RISK",
+          "severity": "CRITICAL",
+          "description": "Altman Z-Score at 0.00 (<1.0). High bankruptcy probability."
+        }
+      ],
+      "metrics": {
+        "Profitability": {
+          "value": 0.0,
+          "score": 8.0,
+          "weighted_score": 2.8
+        },
+        "Earnings Quality": {
+          "value": 0.0,
+          "score": 5.9,
+          "weighted_score": 1.1800000000000002
+        },
+        "Growth Quality": {
+          "value": 0.0,
+          "score": 5.0,
+          "weighted_score": 0.75
+        },
+        "Safety": {
+          "value": 0.0,
+          "score": 4.0,
+          "weighted_score": 0.6
+        },
+        "ROE Persistence": {
+          "value": 0.0,
+          "score": 3.0,
+          "weighted_score": 0.44999999999999996
+        }
+      }
+    },
+    "ABBV": {
+      "composite_score": 45.3,
+      "tier": "Weak",
+      "market_cap": 380040708096,
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "BANKRUPTCY RISK",
+          "severity": "CRITICAL",
+          "description": "Altman Z-Score at 0.00 (<1.0). High bankruptcy probability."
+        }
+      ],
+      "metrics": {
+        "Profitability": {
+          "value": 0.0,
+          "score": 6.7,
+          "weighted_score": 2.3449999999999998
+        },
+        "Earnings Quality": {
+          "value": 0.0,
+          "score": 5.9,
+          "weighted_score": 1.1800000000000002
+        },
+        "Growth Quality": {
+          "value": 0.0,
+          "score": 5.0,
+          "weighted_score": 0.75
+        },
+        "Safety": {
+          "value": 0.0,
+          "score": 4.0,
+          "weighted_score": 0.6
+        },
+        "ROE Persistence": {
+          "value": 0.0,
+          "score": 3.0,
+          "weighted_score": 0.44999999999999996
+        }
+      }
+    },
+    "ABT": {
+      "composite_score": 42.3,
+      "tier": "Weak",
+      "market_cap": 213502099456,
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "BANKRUPTCY RISK",
+          "severity": "CRITICAL",
+          "description": "Altman Z-Score at 0.00 (<1.0). High bankruptcy probability."
+        }
+      ],
+      "metrics": {
+        "Profitability": {
+          "value": 0.0,
+          "score": 5.7,
+          "weighted_score": 1.9949999999999999
+        },
+        "Earnings Quality": {
+          "value": 0.0,
+          "score": 5.9,
+          "weighted_score": 1.1800000000000002
+        },
+        "Growth Quality": {
+          "value": 0.0,
+          "score": 5.0,
+          "weighted_score": 0.75
+        },
+        "Safety": {
+          "value": 0.0,
+          "score": 4.0,
+          "weighted_score": 0.6
+        },
+        "ROE Persistence": {
+          "value": 0.0,
+          "score": 3.0,
+          "weighted_score": 0.44999999999999996
+        }
+      }
+    },
+    "A": {
+      "composite_score": 42.0,
+      "tier": "Weak",
+      "market_cap": 40058609664,
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "BANKRUPTCY RISK",
+          "severity": "CRITICAL",
+          "description": "Altman Z-Score at 0.00 (<1.0). High bankruptcy probability."
+        }
+      ],
+      "metrics": {
+        "Profitability": {
+          "value": 0.0,
+          "score": 5.6,
+          "weighted_score": 1.9599999999999997
+        },
+        "Earnings Quality": {
+          "value": 0.0,
+          "score": 5.9,
+          "weighted_score": 1.1800000000000002
+        },
+        "Growth Quality": {
+          "value": 0.0,
+          "score": 5.0,
+          "weighted_score": 0.75
+        },
+        "Safety": {
+          "value": 0.0,
+          "score": 4.0,
+          "weighted_score": 0.6
+        },
+        "ROE Persistence": {
+          "value": 0.0,
+          "score": 3.0,
+          "weighted_score": 0.44999999999999996
+        }
+      }
+    },
+    "AES": {
+      "composite_score": 36.6,
+      "tier": "Weak",
+      "market_cap": 10243860480,
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "BANKRUPTCY RISK",
+          "severity": "CRITICAL",
+          "description": "Altman Z-Score at 0.00 (<1.0). High bankruptcy probability."
+        }
+      ],
+      "metrics": {
+        "Profitability": {
+          "value": 0.0,
+          "score": 3.8,
+          "weighted_score": 1.3299999999999998
+        },
+        "Earnings Quality": {
+          "value": 0.0,
+          "score": 5.9,
+          "weighted_score": 1.1800000000000002
+        },
+        "Growth Quality": {
+          "value": 0.0,
+          "score": 5.0,
+          "weighted_score": 0.75
+        },
+        "Safety": {
+          "value": 0.0,
+          "score": 4.0,
+          "weighted_score": 0.6
+        },
+        "ROE Persistence": {
+          "value": 0.0,
+          "score": 3.0,
+          "weighted_score": 0.44999999999999996
+        }
+      }
+    },
+    "AMD": {
+      "composite_score": 28.0,
+      "tier": "Weak",
+      "market_cap": 377949847552,
+      "red_flags_count": 1,
+      "red_flags": [
+        {
+          "category": "BANKRUPTCY RISK",
+          "severity": "CRITICAL",
+          "description": "Altman Z-Score at 0.00 (<1.0). High bankruptcy probability."
+        }
+      ],
+      "metrics": {
+        "Profitability": {
+          "value": 0.0,
+          "score": 0.9,
+          "weighted_score": 0.315
+        },
+        "Earnings Quality": {
+          "value": 0.0,
+          "score": 5.9,
+          "weighted_score": 1.1800000000000002
+        },
+        "Growth Quality": {
+          "value": 0.0,
+          "score": 5.0,
+          "weighted_score": 0.75
+        },
+        "Safety": {
+          "value": 0.0,
+          "score": 4.0,
+          "weighted_score": 0.6
+        },
+        "ROE Persistence": {
+          "value": 0.0,
+          "score": 3.0,
+          "weighted_score": 0.44999999999999996
+        }
+      }
+    }
+  },
+  "market_cap_tiers": {
+    "MMM": "Large Cap",
+    "AOS": "Mid Cap",
+    "ABT": "Large Cap",
+    "ABBV": "Large Cap",
+    "ACN": "Large Cap",
+    "ADBE": "Large Cap",
+    "AMD": "Large Cap",
+    "AES": "Mid Cap",
+    "A": "Mid Cap"
+  },
+  "roe_persistence": {
+    "MMM": {
+      "years_analyzed": 4,
+      "roe_years_above_15pct": "3",
+      "roe_mean": 0.10422898566471245,
+      "incremental_roce_advantage": 0.0,
+      "classification": "Inconsistent",
+      "compounder_confidence": 61.0
+    },
+    "AOS": {
+      "years_analyzed": 4,
+      "roe_years_above_15pct": "3",
+      "roe_mean": 0.2464497343638023,
+      "incremental_roce_advantage": 0.0,
+      "classification": "Quality Compounder",
+      "compounder_confidence": 91.0
+    },
+    "ABT": {
+      "years_analyzed": 4,
+      "roe_years_above_15pct": "3",
+      "roe_mean": 0.20397860040592128,
+      "incremental_roce_advantage": 0.0,
+      "classification": "Inconsistent",
+      "compounder_confidence": 49.0
+    },
+    "ABBV": {
+      "years_analyzed": 4,
+      "roe_years_above_15pct": "4",
+      "roe_mean": 0.7977738313018354,
+      "incremental_roce_advantage": 0.0,
+      "classification": "Inconsistent",
+      "compounder_confidence": 49.0
+    },
+    "ACN": {
+      "years_analyzed": 5,
+      "roe_years_above_15pct": "4",
+      "roe_mean": 0.2703743517719677,
+      "incremental_roce_advantage": 0.0,
+      "classification": "Quality Deteriorator",
+      "compounder_confidence": 67.5
+    },
+    "ADBE": {
+      "years_analyzed": 5,
+      "roe_years_above_15pct": "4",
+      "roe_mean": 0.4186794472009294,
+      "incremental_roce_advantage": 0.0,
+      "classification": "Quality Deteriorator",
+      "compounder_confidence": 67.5
+    },
+    "AMD": {
+      "years_analyzed": 4,
+      "roe_years_above_15pct": "1",
+      "roe_mean": 0.1224157959365595,
+      "incremental_roce_advantage": 0.0,
+      "classification": "Quality Deteriorator",
+      "compounder_confidence": 66.0
+    },
+    "AES": {
+      "years_analyzed": 4,
+      "roe_years_above_15pct": "1",
+      "roe_mean": 0.047653999315343115,
+      "incremental_roce_advantage": 0.0,
+      "classification": "Inconsistent",
+      "compounder_confidence": 61.0
+    },
+    "A": {
+      "years_analyzed": 5,
+      "roe_years_above_15pct": "4",
+      "roe_mean": 0.21509283277743585,
+      "incremental_roce_advantage": 0.0,
+      "classification": "Quality Deteriorator",
+      "compounder_confidence": 67.5
+    }
+  },
+  "strict_filters": {}
+}

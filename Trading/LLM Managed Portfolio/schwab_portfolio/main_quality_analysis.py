@@ -5,7 +5,7 @@ Algorithmic quality scoring for stocks based on academic research
 
 This script provides a simple command-line interface to the quality scoring system.
 Choose between:
-1. Index analysis: Analyze portfolio vs watchlist (multiple stocks)
+1. Index analysis: Analyze stocks from a market index (S&P 500, Russell 2000, etc.)
 2. Individual stock analysis: Deep dive on specific ticker
 
 Usage:
@@ -19,7 +19,7 @@ Usage:
 
 Output (Index):
     - outputs/quality_analysis.json: Complete analysis results
-    - outputs/quality_analysis_summary.txt: Human-readable summary with recommendations
+    - outputs/quality_analysis_summary.txt: Quality rankings and statistics
 
 Output (Individual):
     - outputs/stock_analysis_AAPL_20250116.txt: Detailed individual analysis
@@ -55,13 +55,16 @@ def main():
     group.add_argument(
         '--index',
         type=str,
-        choices=['sp500', 'sp400', 'sp600', 'nasdaq100', 'combined_sp'],
+        choices=['sp500', 'sp400', 'sp600', 'nasdaq100', 'russell1000', 'russell2000', 'russell3000', 'combined_sp'],
         help='Index to screen. Options:\n'
-             '  sp500: S&P 500 (large cap ~500, 12-17 min)\n'
-             '  sp400: S&P MidCap 400 (mid cap ~400, 10-14 min)\n'
-             '  sp600: S&P SmallCap 600 (small cap ~600, 15-20 min)\n'
-             '  nasdaq100: NASDAQ-100 (tech ~100, 3-5 min)\n'
-             '  combined_sp: S&P 1500 (~1500, 45-60 min)'
+              '  sp500: S&P 500 (large cap ~500, 12-17 min)\n'
+              '  sp400: S&P MidCap 400 (mid cap ~400, 10-14 min)\n'
+              '  sp600: S&P SmallCap 600 (small cap ~600, 15-20 min)\n'
+              '  nasdaq100: NASDAQ-100 (tech ~100, 3-5 min)\n'
+              '  russell1000: Russell 1000 (large/mid cap ~1000, 30-40 min)\n'
+              '  russell2000: Russell 2000 (small cap ~2000, 60-80 min)\n'
+              '  russell3000: Russell 3000 (broad market ~3000, 90-120 min)\n'
+              '  combined_sp: S&P 1500 (~1500, 45-60 min)'
     )
     group.add_argument(
         '--ticker',
@@ -113,6 +116,9 @@ def main():
             'sp400': WatchlistIndex.SP400,
             'sp600': WatchlistIndex.SP600,
             'nasdaq100': WatchlistIndex.NASDAQ100,
+            'russell1000': WatchlistIndex.RUSSELL1000,
+            'russell2000': WatchlistIndex.RUSSELL2000,
+            'russell3000': WatchlistIndex.RUSSELL3000,
             'combined_sp': WatchlistIndex.COMBINED_SP
         }
 

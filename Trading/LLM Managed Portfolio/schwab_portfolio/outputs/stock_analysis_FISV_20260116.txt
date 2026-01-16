@@ -1,34 +1,32 @@
 ================================================================================
-INDIVIDUAL STOCK QUALITY ANALYSIS: AAPL
+INDIVIDUAL STOCK QUALITY ANALYSIS: FISV
 ================================================================================
-Generated: 2026-01-16 08:10:47
+Generated: 2026-01-16 08:58:07
 
 🏢 COMPANY OVERVIEW
 ----------------------------------------
-Ticker: AAPL
-Sector: Technology
-Industry: Consumer Electronics
-Market Cap: .2f
-Market Cap Tier: Large Cap
+Ticker: FISV
+Market Cap: $36.15B
+Market Cap Tier: Mid Cap
 
 📊 QUALITY SCORE SUMMARY
 ----------------------------------------
-.1f
-Tier: Elite
+Quality Score: 44.7/100
+Tier: Weak
 Red Flags: 0
 Data Quality: complete
 
 💡 INVESTMENT RECOMMENDATION
 ----------------------------------------
-STRONG BUY - Elite quality stock
+SELL/AVOID - Weak quality fundamentals | ROE Persistence: Inconsistent performance
 
 📈 DETAILED QUALITY METRICS
 ----------------------------------------
-30
-30
-30
-30
-30
+gross_profitability: 0.16 (Score: 1.3)
+roe: 0.12 (Score: 3.8)
+operating_profitability: 0.18 (Score: 6.4)
+fcf_yield: 0.14 (Score: 10.0)
+roic: 0.09 (Score: 3.4)
 
 ✅ NO RED FLAGS DETECTED
 ----------------------------------------
@@ -36,23 +34,23 @@ This stock shows no major quality concerns.
 
 💰 KEY FINANCIAL METRICS
 ----------------------------------------
-.2f
-.2f
-.2f
-.2f
-.2f
-.2f
-.1f
-.1f
+Revenue: $20.46B
+Net Income: $3.13B
+Free Cash Flow: $5.06B
+Total Assets: $77.18B
+Shareholder Equity: $27.07B
+Total Debt: $24.96B
+Gross Margin: 60.8%
+Return on Equity: 11.6%
 
 📊 ROE PERSISTENCE ANALYSIS
 ----------------------------------------
-Years Analyzed: 5
-ROE Years Above 15%: 4
-.1f
-.1f
-Classification: Quality Deteriorator
-.1f
+Years Analyzed: 4
+ROE Years Above 15%: 0
+ROE Mean: 8.6%
+Incremental ROCE Advantage: 0.0%
+Classification: Inconsistent
+Compounder Confidence: 39.0%
 
 ================================================================================
 Quality Framework: Academic research-based metrics

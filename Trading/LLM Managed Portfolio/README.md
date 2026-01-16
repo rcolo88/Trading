@@ -27,15 +27,46 @@ Check the `outputs/` folder for two files:
 
 ## 📊 What Does This Do?
 
-This system evaluates stocks using **5 key quality metrics** based on academic research:
+This system evaluates stocks using the **NEW_5FACTOR Quality Framework** based on academic research:
 
-1. **Gross Profitability** - How efficiently the company generates profits
-2. **Return on Equity (ROE)** - How well the company uses shareholder money
-3. **Operating Profitability** - Profit margins from core operations
-4. **Free Cash Flow Yield** - Cash generation relative to company value
-5. **Return on Invested Capital (ROIC)** - Overall capital efficiency
+### 5 Quality Dimensions
 
-It then gives each stock a **quality score** (0-100) and **tier** (Elite/Strong/Moderate/Weak).
+| Dimension | Weight | Metrics |
+|-----------|--------|---------|
+| **Profitability** | 35% | Gross Profitability, ROE, ROIC |
+| **Earnings Quality** | 20% | Accrual Ratio, Cash Conversion, Piotroski F-Score |
+| **Growth Quality** | 15% | Asset Growth (inverse), Revenue CAGR, Margin Trend |
+| **Safety** | 15% | Beta, Altman Z-Score, Debt/EBITDA, Interest Coverage |
+| **ROE Persistence** | 15% | Years with ROE >15%, ROE Trend, ROE Stability |
+
+### Market Cap Adjustments
+
+Smaller companies use shorter lookback periods due to data availability:
+
+| Tier | Market Cap | Multiplier |
+|------|------------|------------|
+| Mega Cap | > $200B | 1.25x |
+| Large Cap | $10B - $200B | 1.00x |
+| Mid Cap | $2B - $10B | 0.75x |
+| Small Cap | $300M - $2B | 0.50x |
+| Micro Cap | < $300M | 0.35x |
+
+### Quality Tiers
+
+| Score Range | Tier | Interpretation |
+|-------------|------|----------------|
+| 85-100 | Elite | Exceptional quality |
+| 70-84 | Strong | Good companies |
+| 50-69 | Moderate | Average quality |
+| 0-49 | Weak | Concerning fundamentals |
+
+It then gives each stock a **quality score** (0-100) and **tier** (Elite/Strong/Moderate/Weak), and ranks them by quality within any market index.
+
+### Score Multipliers
+
+Final scores are adjusted by:
+- **Safety Multiplier** (0.70-1.00): Based on leverage, Z-score, volatility
+- **Data Quality Multiplier** (0.80-1.00): Based on data availability
 
 ---
 
@@ -83,7 +114,7 @@ python main_quality_analysis.py --ticker MSFT
 
 | Mode | Use Case | Output | Time |
 |------|----------|--------|------|
-| `--index sp500` | Find quality stocks from large universe | Comparative analysis + recommendations | 12-17 min |
+| `--index sp500` | Find highest quality stocks in an index | Ranked quality analysis | 12-17 min |
 | `--ticker AAPL` | Deep dive on specific stock | Detailed individual analysis | ~5-10 sec |
 
 ### International Markets
@@ -135,9 +166,11 @@ The system can analyze stocks from these pre-built indexes:
 | **`cac40`** | CAC 40 (France) | ~40 stocks | French market | 2-3 min | `--index cac40` |
 | **`hangseng`** | Hang Seng (Hong Kong) | ~50 stocks | Hong Kong market | 3-5 min | `--index hangseng` |
 | **`shanghai`** | Shanghai Composite (China) | ~1500+ stocks | Chinese market | 60+ min | `--index shanghai` |
-| **`russell2000`** | Russell 2000 (US Small Cap) | ~2000 stocks | US small caps | 80+ min | `--index russell2000` |
-| **`russell1000`** | Russell 1000 (US Large/Mid) | ~1000 stocks | US large/mid caps | 40+ min | `--index russell1000` |
-| **`russell3000`** | Russell 3000 (US Total) | ~3000 stocks | US total market | 120+ min | `--index russell3000` |
+| **`russell2000`** | Russell 2000* (US Small Cap) | ~600 stocks | US small caps | 60+ min | `--index russell2000` |
+| **`russell1000`** | Russell 1000* (US Large/Mid) | ~900 stocks | US large/mid caps | 40+ min | `--index russell1000` |
+| **`russell3000`** | Russell 3000* (US Total) | ~1500 stocks | US total market | 120+ min | `--index russell3000` |
+
+**Note on Russell Indexes:** Russell indexes marked with (*) use S&P indexes as approximations since direct Russell data requires a paid FTSE Russell subscription. Russell 1000 is approximated by combining S&P 500 + S&P MidCap 400 (~900 stocks). Russell 2000 uses S&P SmallCap 600 (~600 stocks). Russell 3000 combines all three S&P indexes (~1500 stocks).
 
 **⚠️ Storage Note:** Large indexes like Russell 2000/3000 and Shanghai Composite will download significant amounts of financial data and may use several GB of disk space for caching. Use `--limit` to analyze fewer stocks if storage is a concern.
 
@@ -221,38 +254,6 @@ python main_quality_analysis.py --index russell2000 --limit 10
 
 ---
 
-## 💼 Portfolio Analysis
-
-### Setting Up Your Portfolio
-
-Edit `schwab_portfolio/portfolio_state.json`:
-
-```json
-{
-  "holdings": {
-    "AAPL": {
-      "shares": 10,
-      "entry_price": 175.00,
-      "allocation": 1750.00
-    },
-    "MSFT": {
-      "shares": 5,
-      "entry_price": 330.00,
-      "allocation": 1650.00
-    }
-  },
-  "cash": 250.00
-}
-```
-
-### Analyzing Your Holdings
-
-The system automatically compares your holdings against the watchlist and provides:
-
-- **SELL candidates** - Stocks in your portfolio with quality scores below 70
-- **BUY alternatives** - High-quality stocks not in your portfolio
-- **Quality rankings** - How your holdings stack up
-
 ---
 
 ## 🔍 Understanding the Output
@@ -264,17 +265,34 @@ The system automatically compares your holdings against the watchlist and provid
 - **0-49**: Weak quality (consider selling)
 
 ### Red Flags Detected
-The system watches for:
-- High debt levels
-- Declining profits
-- Poor cash flow
-- Accounting irregularities
+
+The system watches for quality and risk red flags across all dimensions:
+
+**Earnings Quality:**
+- High Accruals (>10% of assets)
+- Low Cash Conversion (<0.8x)
+- Poor Piotroski F-Score (≤3)
+
+**Growth Quality:**
+- Excessive Asset Growth (>40%)
+- Declining Revenue (negative CAGR)
+- Margin Compression (>5% decline)
+
+**Safety:**
+- Bankruptcy Risk (Z-Score <1.0)
+- High Leverage (Debt/EBITDA >4.0x)
+- Weak Interest Coverage (<3.0x)
+- High Beta (>2.0)
 
 ### Market Cap Tiers
-- **Large Cap**: $50B+ (S&P 500 companies)
-- **Mid Cap**: $2B-$50B (growth potential)
-- **Small Cap**: $500M-$2B (higher risk/reward)
-- **Micro Cap**: <$500M (not analyzed)
+
+| Tier | Market Cap | Multiplier | Use Case |
+|------|------------|------------|----------|
+| Mega Cap | > $200B | 1.25x | Stable, extended lookback |
+| Large Cap | $10B - $200B | 1.00x | Core holdings |
+| Mid Cap | $2B - $10B | 0.75x | Growth opportunities |
+| Small Cap | $300M - $2B | 0.50x | Higher risk/reward |
+| Micro Cap | < $300M | 0.35x | Limited data available |
 
 ---
 
@@ -316,10 +334,22 @@ python main_quality_analysis.py --help
 ## 📚 Academic Foundation
 
 This system is built on proven research:
+
+**Quality Framework:**
 - **Novy-Marx (2013)**: Gross profitability predicts returns better than traditional metrics
 - **Piotroski (2000)**: F-Score fundamentals-based investing
-- **Fama-French (1993)**: Quality and size factors matter
-- **Quality Investing**: Multi-year studies show quality beats the market
+- **Sloan (1996)**: Accrual anomaly - low accruals predict higher returns
+- **Cooper, Gulen, Schill (2008)**: Asset growth anomaly - low asset growth predicts higher returns
+- **Fama-French (2015)**: Quality factor definition
+- **Altman (1968)**: Z-Score bankruptcy prediction
+
+**Multi-Factor Approach:**
+The NEW_5FACTOR framework combines multiple quality dimensions to identify companies with:
+- Strong profitability and returns on capital
+- High quality, sustainable earnings
+- Conservative, profitable growth
+- Low financial risk
+- Persistent ROE performance over time
 
 **No guarantees** - this is educational/research software. Always do your own research!
 

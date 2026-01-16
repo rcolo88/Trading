@@ -1,0 +1,45 @@
+============================================================
+QUALITY ANALYSIS SUMMARY
+============================================================
+Generated: 2026-01-16 12:59:41
+Index: sp500
+Stocks Analyzed: 9
+============================================================
+
+QUALITY SCORE DISTRIBUTION:
+------------------------------------------------------------
+Elite (85-100): 0 stocks
+Strong (70-84): 0 stocks
+Moderate (50-69): 2 stocks
+Weak (0-49): 7 stocks
+
+================================================================================
+TOP 20 STOCKS BY QUALITY SCORE:
+--------------------------------------------------------------------------------
+Rank Ticker   Market Cap   Score    Tier         Red Flags 
+--------------------------------------------------------------------------------
+1    ADBE     $126.21B      55.1    Moderate     1         
+2    AOS      $10.08B       54.2    Moderate     1         
+3    ACN      $178.73B      49.7    Weak         1         
+4    MMM      $90.58B       49.1    Weak         1         
+5    ABBV     $380.04B      45.3    Weak         1         
+6    ABT      $213.50B      42.3    Weak         1         
+7    A        $40.06B       42.0    Weak         1         
+8    AES      $10.24B       36.6    Weak         1         
+9    AMD      $377.95B      28.0    Weak         1         
+
+============================================================
+MARKET CAP DISTRIBUTION:
+------------------------------------------------------------
+Large Cap (≥$50B): 6 stocks
+Mid Cap ($2B-$50B): 3 stocks
+Small Cap ($500M-$2B): 0 stocks
+Micro Cap (<$500M): 0 stocks
+
+============================================================
+ROE PERSISTENCE SUMMARY:
+------------------------------------------------------------
+Quality Compounders: 1 stocks
+Quality Improvers: 0 stocks
+Quality Deteriorators: 4 stocks
+Inconsistent: 4 stocks
