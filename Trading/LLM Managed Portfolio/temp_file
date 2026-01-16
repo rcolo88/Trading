@@ -1,0 +1,8 @@
+        # Quality Score Summary
+        report.append("📊 QUALITY SCORE SUMMARY")
+        report.append("-"*40)
+        report.append(".1f")
+        report.append(f"Tier: {self.quality_result.tier.value}")
+        report.append(f"Red Flags: {len(self.quality_result.red_flags)}")
+        report.append(f"Data Quality: {self.financial_data.data_quality}")
+        report.append("")

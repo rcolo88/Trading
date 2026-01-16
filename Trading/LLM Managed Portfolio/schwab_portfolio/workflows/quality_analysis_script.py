@@ -23,8 +23,12 @@ from data.financial_data_fetcher import FinancialDataFetcher, FinancialData
 from quality.quality_metrics_calculator import QualityMetricsCalculator, QualityAnalysisResult
 from quality.market_cap_classifier import MarketCapClassifier
 from components.quality_persistence_analyzer import QualityPersistenceAnalyzer
-from config.hf_config import HFConfig
 from data.watchlist_config import WatchlistConfig, WatchlistIndex
+
+# Quality thresholds (formerly from HFConfig)
+QUALITY_MIN_SCORE = 70      # Minimum quality score for holdings
+QUALITY_IDEAL_SCORE = 85    # Ideal quality score for new buys
+QUALITY_SWAP_THRESHOLD = 15 # Minimum score improvement to swap holdings
 
 # Setup logging
 logging.basicConfig(
@@ -53,10 +57,11 @@ class QualityAnalysisScript:
         Initialize quality analysis script
 
         Args:
-            watchlist_config: Watchlist configuration (defaults to HFConfig.WATCHLIST_CONFIG)
+            watchlist_config: Watchlist configuration (defaults to S&P 500)
         """
-        self.watchlist_config = watchlist_config or HFConfig.WATCHLIST_CONFIG
+        self.watchlist_config = watchlist_config or WatchlistConfig(index=WatchlistIndex.SP500)
         self.financial_fetcher = FinancialDataFetcher(enable_cache=True)
+        self.fetcher = self.financial_fetcher  # Alias for compatibility
         self.market_cap_classifier = MarketCapClassifier()
         self.roe_analyzer = QualityPersistenceAnalyzer()
         self.quality_calculator = QualityMetricsCalculator()
@@ -98,14 +103,7 @@ class QualityAnalysisScript:
         Returns:
             List of ticker symbols
         """
-        # Legacy support: check deprecated WATCHLIST_TICKERS first
-        if hasattr(HFConfig, 'WATCHLIST_TICKERS') and HFConfig.WATCHLIST_TICKERS:
-            logger.warning("WATCHLIST_TICKERS is deprecated. Use WATCHLIST_CONFIG instead.")
-            watchlist = HFConfig.WATCHLIST_TICKERS[:limit] if limit else HFConfig.WATCHLIST_TICKERS
-            logger.info(f"Using legacy WATCHLIST_TICKERS: {len(watchlist)} tickers")
-            return watchlist
-
-        # Use new WatchlistConfig system
+        # Use WatchlistConfig system
         # Apply limit override if provided
         if limit:
             config_with_limit = WatchlistConfig(
@@ -216,13 +214,13 @@ class QualityAnalysisScript:
 
             result = holdings_quality[ticker]
 
-            if result.composite_score < HFConfig.QUALITY_MIN_SCORE:
+            if result.composite_score < QUALITY_MIN_SCORE:
                 sell_candidates.append({
                     'ticker': ticker,
                     'quality_score': result.composite_score,
                     'tier': result.tier.value,
                     'red_flags': len(result.red_flags),
-                    'reason': f"Quality score {result.composite_score:.1f} below minimum threshold {HFConfig.QUALITY_MIN_SCORE}"
+                    'reason': f"Quality score {result.composite_score:.1f} below minimum threshold {QUALITY_MIN_SCORE}"
                 })
 
         # Identify BUY alternatives from watchlist
@@ -232,25 +230,25 @@ class QualityAnalysisScript:
                 continue
 
             # Alternative 1: Quality score >85 (ideal)
-            if result.composite_score >= HFConfig.QUALITY_IDEAL_SCORE:
+            if result.composite_score >= QUALITY_IDEAL_SCORE:
                 buy_alternatives.append({
                     'ticker': ticker,
                     'quality_score': result.composite_score,
                     'tier': result.tier.value,
                     'red_flags': len(result.red_flags),
-                    'reason': f"Elite quality score {result.composite_score:.1f} (>={HFConfig.QUALITY_IDEAL_SCORE})"
+                    'reason': f"Elite quality score {result.composite_score:.1f} (>={QUALITY_IDEAL_SCORE})"
                 })
                 continue
 
             # Alternative 2: Score >70 AND >15 points better than weakest holding
-            if result.composite_score >= HFConfig.QUALITY_MIN_SCORE:
+            if result.composite_score >= QUALITY_MIN_SCORE:
                 # Find weakest holding
                 weakest_holding_score = min(
                     [r.composite_score for r in holdings_quality.values()],
                     default=100
                 )
 
-                if result.composite_score - weakest_holding_score >= HFConfig.QUALITY_SWAP_THRESHOLD:
+                if result.composite_score - weakest_holding_score >= QUALITY_SWAP_THRESHOLD:
                     buy_alternatives.append({
                         'ticker': ticker,
                         'quality_score': result.composite_score,

@@ -24,7 +24,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from data.financial_data_fetcher import FinancialDataFetcher, FinancialData
 from quality.quality_metrics_calculator import QualityMetricsCalculator, QualityAnalysisResult
-from config.hf_config import HFConfig
 from data.watchlist_config import WatchlistConfig, WatchlistIndex
 
 # Setup logging
@@ -58,11 +57,11 @@ class WatchlistGenerator:
         Initialize watchlist generator
 
         Args:
-            watchlist_config: Watchlist configuration (defaults to HFConfig.WATCHLIST_CONFIG)
+            watchlist_config: Watchlist configuration (defaults to S&P 500)
             min_quality_score: Minimum quality score for inclusion (default: 70)
             max_workers: Number of parallel workers for fetching (default: 10)
         """
-        self.watchlist_config = watchlist_config or HFConfig.WATCHLIST_CONFIG
+        self.watchlist_config = watchlist_config or WatchlistConfig(index=WatchlistIndex.SP500)
         self.min_quality_score = min_quality_score
         self.max_workers = max_workers
         self.financial_fetcher = FinancialDataFetcher(enable_cache=True)

@@ -30,7 +30,6 @@ from datetime import datetime
 
 # Import existing quality system
 from quality.quality_metrics_calculator import QualityMetricsCalculator
-from prompts.quality_prompts import QualityLLMPromptGenerator
 
 # Import market cap classifier for tier-based analysis
 from quality.market_cap_classifier import MarketCapTier, MarketCapClassifier
@@ -230,7 +229,6 @@ class QualityPersistenceAnalyzer:
     def __init__(self):
         """Initialize the persistence analyzer."""
         self.calculator = QualityMetricsCalculator()
-        self.prompt_generator = QualityLLMPromptGenerator()
         logger.info("QualityPersistenceAnalyzer initialized")
 
     def analyze_company(

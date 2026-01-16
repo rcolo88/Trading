@@ -1,0 +1,61 @@
+================================================================================
+INDIVIDUAL STOCK QUALITY ANALYSIS: AAPL
+================================================================================
+Generated: 2026-01-16 08:10:47
+
+🏢 COMPANY OVERVIEW
+----------------------------------------
+Ticker: AAPL
+Sector: Technology
+Industry: Consumer Electronics
+Market Cap: .2f
+Market Cap Tier: Large Cap
+
+📊 QUALITY SCORE SUMMARY
+----------------------------------------
+.1f
+Tier: Elite
+Red Flags: 0
+Data Quality: complete
+
+💡 INVESTMENT RECOMMENDATION
+----------------------------------------
+STRONG BUY - Elite quality stock
+
+📈 DETAILED QUALITY METRICS
+----------------------------------------
+30
+30
+30
+30
+30
+
+✅ NO RED FLAGS DETECTED
+----------------------------------------
+This stock shows no major quality concerns.
+
+💰 KEY FINANCIAL METRICS
+----------------------------------------
+.2f
+.2f
+.2f
+.2f
+.2f
+.2f
+.1f
+.1f
+
+📊 ROE PERSISTENCE ANALYSIS
+----------------------------------------
+Years Analyzed: 5
+ROE Years Above 15%: 4
+.1f
+.1f
+Classification: Quality Deteriorator
+.1f
+
+================================================================================
+Quality Framework: Academic research-based metrics
+Data Source: Yahoo Finance (yfinance)
+Analysis Date: Real-time as of report generation
+================================================================================

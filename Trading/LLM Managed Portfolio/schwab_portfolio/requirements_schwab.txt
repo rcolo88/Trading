@@ -1,26 +1,32 @@
-# Schwab API Portfolio Scripts Requirements
-# Enhanced version with Schwab API integration
+# Quality Analysis System Requirements
+# Algorithmic quality scoring based on academic research
 
-# Core Python packages
+# Core data analysis
 pandas>=1.5.0
-numpy>=1.20.0
-matplotlib>=3.5.0
+numpy>=1.24.0
 
-# Schwab API integration
-schwab-py>=1.5.0
+# Financial data fetching
+yfinance>=0.2.0
 
-# Market data and time handling
+# Statistical analysis (for quality metrics)
+scipy>=1.10.0
+
+# Visualization (for quality persistence analysis)
+matplotlib>=3.7.0
+
+# Time zone handling
 pytz>=2022.1
-pandas-market-calendars>=4.0.0
 
-# JSON handling and HTTP requests
-requests>=2.28.0
-httpx>=0.24.0
+# HTTP requests (for S&P ticker fetching)
+requests>=2.31.0
 
-# Optional: Enhanced logging and debugging
+# HTML parsing (for Wikipedia S&P lists)
+lxml>=4.9.0
+html5lib>=1.1
+
+# Logging
 colorlog>=6.7.0
 
 # Development and testing
 pytest>=7.0.0
 pytest-cov>=4.0.0
-

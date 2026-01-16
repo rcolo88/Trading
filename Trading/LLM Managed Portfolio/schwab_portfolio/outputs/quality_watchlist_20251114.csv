@@ -1,6 +1,0 @@
-Ticker,Market_Cap,Quality_Score,Tier,Red_Flags,Gross_Profitability,ROE,ROIC,FCF_Yield,Operating_Profitability
-ADBE,139.74B,96.5,Elite,0,0.000,0.000,0.000,0.000,0.000
-AOS,9.31B,95.6,Elite,0,0.000,0.000,0.000,0.000,0.000
-ACN,153.82B,88.3,Elite,0,0.000,0.000,0.000,0.000,0.000
-ABBV,421.18B,70.3,Strong,1,0.000,0.000,0.000,0.000,0.000
-A,42.67B,70.1,Strong,0,0.000,0.000,0.000,0.000,0.000
