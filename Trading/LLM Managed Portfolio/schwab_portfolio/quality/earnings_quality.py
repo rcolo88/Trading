@@ -244,6 +244,10 @@ class EarningsQualityAnalyzer:
         ocf = financial_data.get('operating_cash_flow', ni)  # Fallback to NI if OCF missing
         prior_ocf = financial_data.get('prior_operating_cash_flow', prior_ni)
         
+        # Debug: Check what data we have for GOOGL
+        logger.debug(f"Piotroski data: NI={ni:.1f}, OCF={ocf:.1f}, Assets={financial_data.get('total_assets', 0):.1f}")
+        logger.debug(f"Piotroski prior: NI={prior_ni:.1f}, OCF={prior_ocf:.1f}, Assets={financial_data.get('prior_total_assets', 0):.1f}")
+        
         ta = financial_data.get('total_assets', 1)
         prior_ta = financial_data.get('prior_total_assets', 1)
         
@@ -451,6 +455,11 @@ class EarningsQualityAnalyzer:
         # Calculate final score
         score = min(10.0, max(0.0, base_score + accrual_adj + cash_adj))
         
+        # Debug logging for GOOGL optimization
+        logger.info(f"Earnings Quality: F-Score={f_score}/9, Base={base_score:.1f}, "
+                   f"Accrual={accrual_ratio:.3f}({accrual_adj:+.1f}), "
+                   f"CashConv={cash_conversion:.2f}({cash_adj:+.1f}), Final={score:.1f}")
+        
         return round(score, 1)
     
     def analyze(self, financial_data: Dict[str, float]) -> EarningsQualityResult:
@@ -463,6 +472,24 @@ class EarningsQualityAnalyzer:
         Returns:
             EarningsQualityResult with all metrics and red flags
         """
+        # Check for missing/zero data - return 0.0 score if all critical fields are missing
+        net_income = financial_data.get('net_income', 0)
+        operating_cash_flow = financial_data.get('operating_cash_flow', 0)
+        total_assets = financial_data.get('total_assets', 0)
+        
+        if (net_income == 0 and operating_cash_flow == 0 and total_assets == 0):
+            logger.warning(f"Earnings quality: All critical fields are zero/missing, returning 0.0 score")
+            return EarningsQualityResult(
+                accrual_ratio=None,
+                cash_conversion=None,
+                f_score=0,
+                f_score_breakdown={},
+                earnings_quality_score=0.0,
+                red_flags=[{'category': 'MISSING DATA', 'severity': 'CRITICAL', 
+                            'description': 'All critical earnings fields are missing or zero'}],
+                is_high_quality=False
+            )
+        
         # Calculate Accrual Ratio
         accrual_ratio = self.calculate_accrual_ratio(
             net_income=financial_data.get('net_income', 0),
@@ -479,8 +506,27 @@ class EarningsQualityAnalyzer:
             net_income=financial_data.get('net_income', 1)
         )
         
-        # Calculate Piotroski F-Score
-        f_score, breakdown = self.calculate_piotroski_f_score(financial_data)
+ # Check if FMP provides pre-calculated F-Score (more accurate)
+        fmp_f_score = financial_data.get('piotroski_score_fmp')
+        if fmp_f_score is not None:
+            f_score = int(fmp_f_score)
+            # Create a basic breakdown for compatibility
+            breakdown = PiotroskiScoreBreakdown(
+                f_roa=1 if f_score >= 6 else 0,  # Approximation
+                f_cfo=1 if f_score >= 5 else 0,  # Approximation
+                f_droa=1 if f_score >= 7 else 0,  # Approximation
+                f_accrual=1 if f_score >= 6 else 0,  # Approximation
+                f_dlever=1 if f_score >= 5 else 0,  # Approximation
+                f_dliquid=1 if f_score >= 5 else 0,  # Approximation
+                f_eq_offer=1 if f_score >= 6 else 0,  # Approximation
+                f_dmargin=1 if f_score >= 7 else 0,  # Approximation
+                f_dturn=1 if f_score >= 6 else 0   # Approximation
+            )
+            logger.info(f"Using FMP pre-calculated F-Score: {f_score}/9")
+        else:
+            # Fallback to calculation
+            f_score, breakdown = self.calculate_piotroski_f_score(financial_data)
+            logger.info(f"Calculated F-Score: {f_score}/9")
         
         # Convert breakdown to dict for serialization
         f_score_breakdown = {

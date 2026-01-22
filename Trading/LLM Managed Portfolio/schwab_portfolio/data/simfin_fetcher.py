@@ -12,6 +12,9 @@ Key Features:
 - Bulk download capabilities for efficiency
 """
 
+import warnings
+warnings.filterwarnings('ignore', category=FutureWarning)
+
 import simfin as sf
 import pandas as pd
 import numpy as np
@@ -22,6 +25,8 @@ import pickle
 import os
 from dataclasses import dataclass, asdict
 import json
+
+warnings.filterwarnings('ignore', category=FutureWarning, module='simfin.load')
 
 from .ticker_mapping import get_api_ticker, is_mapped_ticker
 
@@ -256,7 +261,8 @@ class SimFinDataFetcher:
                 
                 data.revenue = recent_income.get('Revenue')
                 data.cogs = recent_income.get('Cost of Revenue')
-                data.operating_income = recent_income.get('Operating Income')
+                # SimFin uses "Operating Income (Loss)" not "Operating Income"
+                data.operating_income = recent_income.get('Operating Income (Loss)')
                 data.net_income = recent_income.get('Net Income')
                 
                 # EBIT is same as Operating Income
@@ -266,6 +272,20 @@ class SimFinDataFetcher:
                 operating_expense = recent_income.get('Operating Expense')
                 if operating_expense and data.cogs:
                     data.sga = operating_expense - data.cogs
+                
+                # Get Interest Expense from income statement (SimFin uses "Interest Expense, Net")
+                interest_exp_raw = recent_income.get('Interest Expense, Net')
+                if interest_exp_raw is not None and not (isinstance(interest_exp_raw, float) and str(interest_exp_raw) == 'nan'):
+                    data.interest_expense = abs(float(interest_exp_raw))
+                
+                # Calculate EBITDA if not directly available
+                # EBITDA = Operating Income + Depreciation & Amortization
+                if data.ebit is not None:
+                    depreciation = recent_income.get('Depreciation & Amortization')
+                    if depreciation is not None and not (isinstance(depreciation, float) and str(depreciation) == 'nan'):
+                        data.ebitda = data.ebit + float(depreciation)
+                    else:
+                        data.ebitda = data.ebit * 1.15  # Estimate
             
             # Balance Sheet - use resolved ticker
             balance_data = balance_df.loc[simfin_ticker]
@@ -273,7 +293,7 @@ class SimFinDataFetcher:
                 recent_balance = balance_data.iloc[-1]
                 
                 data.total_assets = recent_balance.get('Total Assets')
-                data.shareholder_equity = recent_balance.get('Total Shareholder Equity')
+                data.shareholder_equity = recent_balance.get('Total Equity')
                 data.total_debt = recent_balance.get('Total Debt')
                 
                 # Working capital = Current Assets - Current Liabilities
@@ -290,8 +310,11 @@ class SimFinDataFetcher:
             if not cashflow_data.empty:
                 recent_cashflow = cashflow_data.iloc[-1]
                 
-                data.operating_cash_flow = recent_cashflow.get('Operating Cash Flow')
+                data.operating_cash_flow = recent_cashflow.get('Net Cash from Operating Activities')
                 data.free_cash_flow = recent_cashflow.get('Free Cash Flow')
+                
+                # Note: Interest expense is extracted from income statement, not cash flow
+                # See above section where we extract from recent_income.get('Interest Expense, Net')
                 
                 # Interest expense for coverage ratio
                 data.interest_expense = recent_cashflow.get('Interest Expense (Income)')
@@ -374,41 +397,72 @@ class SimFinDataFetcher:
 
             # Income statement history - use resolved ticker
             income_history = income_df.loc[simfin_ticker]
-            for year_data in income_history.itertuples():
-                historical_data['income'].append({
-                    'fiscal_year': getattr(year_data, 'Fiscal Year', None),
-                    'revenue': getattr(year_data, 'Revenue', None),
-                    'cogs': getattr(year_data, 'Cost of Revenue', None),
-                    'operating_income': getattr(year_data, 'Operating Income', None),
-                    'net_income': getattr(year_data, 'Net Income', None),
-                    'ebit': getattr(year_data, 'Operating Income', None),
-                    'operating_expense': getattr(year_data, 'Operating Expense', None)
-                })
+            if not income_history.empty:
+                for idx in range(len(income_history)):
+                    row = income_history.iloc[idx]
+                    historical_data['income'].append({
+                        'fiscal_year': row.get('Fiscal Year'),
+                        'revenue': row.get('Revenue'),
+                        'cogs': row.get('Cost of Revenue'),
+                        'operating_income': row.get('Operating Income'),
+                        'net_income': row.get('Net Income'),
+                        'ebit': row.get('Operating Income'),
+                        'operating_expense': row.get('Operating Expense')
+                    })
             
             # Balance sheet history - use resolved ticker
             balance_history = balance_df.loc[simfin_ticker]
-            for year_data in balance_history.itertuples():
-                historical_data['balance'].append({
-                    'fiscal_year': getattr(year_data, 'Fiscal Year', None),
-                    'total_assets': getattr(year_data, 'Total Assets', None),
-                    'shareholder_equity': getattr(year_data, 'Total Shareholder Equity', None),
-                    'total_debt': getattr(year_data, 'Total Debt', None),
-                    'current_assets': getattr(year_data, 'Total Current Assets', None),
-                    'current_liabilities': getattr(year_data, 'Total Current Liabilities', None),
-                    'retained_earnings': getattr(year_data, 'Retained Earnings', None),
-                    'working_capital': None  # Will be calculated
-                })
+            if not balance_history.empty:
+                for idx in range(len(balance_history)):
+                    row = balance_history.iloc[idx]
+                    historical_data['balance'].append({
+                        'fiscal_year': row.get('Fiscal Year'),
+                        'total_assets': row.get('Total Assets'),
+                        'shareholder_equity': row.get('Total Equity'),
+                        'total_debt': row.get('Total Debt'),
+                        'current_assets': row.get('Total Current Assets'),
+                        'current_liabilities': row.get('Total Current Liabilities'),
+                        'retained_earnings': row.get('Retained Earnings'),
+                        'working_capital': None  # Will be calculated
+                    })
             
             # Cash flow history - use resolved ticker
             cashflow_history = cashflow_df.loc[simfin_ticker]
-            for year_data in cashflow_history.itertuples():
-                historical_data['cash_flow'].append({
-                    'fiscal_year': getattr(year_data, 'Fiscal Year', None),
-                    'operating_cash_flow': getattr(year_data, 'Operating Cash Flow', None),
-                    'free_cash_flow': getattr(year_data, 'Free Cash Flow', None),
-                    'interest_expense': getattr(year_data, 'Interest Expense (Income)', None),
-                    'depreciation_amortization': getattr(year_data, 'Depreciation & Amortization', None)
-                })
+            if not cashflow_history.empty:
+                for idx in range(len(cashflow_history)):
+                    row = cashflow_history.iloc[idx]
+                    historical_data['cash_flow'].append({
+                        'fiscal_year': row.get('Fiscal Year'),
+                        'operating_cash_flow': row.get('Net Cash from Operating Activities'),
+                        'free_cash_flow': row.get('Free Cash Flow'),
+                        'interest_expense': None,  # From income statement below
+                        'depreciation_amortization': row.get('Depreciation & Amortization')
+                    })
+            
+            # Income statement history - use resolved ticker with correct field names
+            income_history = income_df.loc[simfin_ticker]
+            if not income_history.empty:
+                for idx in range(len(income_history)):
+                    income_row = income_history.iloc[idx]
+                    
+                    # Update the income entry with correct field names
+                    if idx < len(historical_data['income']):
+                        historical_data['income'][idx]['revenue'] = income_row.get('Revenue')
+                        historical_data['income'][idx]['cogs'] = income_row.get('Cost of Revenue')
+                        historical_data['income'][idx]['operating_income'] = income_row.get('Operating Income (Loss)')
+                        historical_data['income'][idx]['net_income'] = income_row.get('Net Income')
+                        historical_data['income'][idx]['ebit'] = income_row.get('Operating Income (Loss)')
+                    
+                    # Get interest expense from income statement
+                    ie_raw = income_row.get('Interest Expense, Net')
+                    if ie_raw is not None and not (isinstance(ie_raw, float) and str(ie_raw) == 'nan'):
+                        interest_expense = abs(float(ie_raw))
+                    else:
+                        interest_expense = None
+                    
+                    # Update the cash flow entry with interest expense from income statement
+                    if idx < len(historical_data['cash_flow']):
+                        historical_data['cash_flow'][idx]['interest_expense'] = interest_expense
             
             # Calculate working capital for balance sheet history
             for i, balance_year in enumerate(historical_data['balance']):

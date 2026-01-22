@@ -157,7 +157,7 @@ class FinancialDataFetcher:
         'retained_earnings': ['Retained Earnings', 'Accumulated Deficit', 'Retained Earnings (Accumulated Deficit)'],
         'ebit': ['Operating Income', 'EBIT', 'Operating Profit'],
         'ebitda': ['EBITDA', 'Normalized EBITDA'],
-        'interest_expense': ['Interest Expense', 'Interest Paid', 'Interest And Debt Expense'],
+        'interest_expense': ['Interest Expense', 'Interest Paid', 'Interest And Debt Expense', 'Interest Expense (Income)'],
         'current_assets': ['Current Assets', 'Total Current Assets'],
         'current_liabilities': ['Current Liabilities', 'Total Current Liabilities'],
         'depreciation_amortization': ['Depreciation And Amortization', 'Depreciation Amortization Depletion',

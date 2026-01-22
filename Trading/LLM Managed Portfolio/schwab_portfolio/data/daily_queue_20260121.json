@@ -1,0 +1,357 @@
+{
+  "session_date": "2026-01-21T09:48:37.505627",
+  "total_api_calls": 200,
+  "estimated_completion_minutes": 400.0,
+  "items": [
+    {
+      "ticker": "AAPL",
+      "tier": "mega_cap",
+      "api_calls_needed": 5,
+      "priority": 1,
+      "is_stale": true
+    },
+    {
+      "ticker": "AMZN",
+      "tier": "mega_cap",
+      "api_calls_needed": 5,
+      "priority": 1,
+      "is_stale": true
+    },
+    {
+      "ticker": "GOOG",
+      "tier": "mega_cap",
+      "api_calls_needed": 5,
+      "priority": 1,
+      "is_stale": true
+    },
+    {
+      "ticker": "GOOGL",
+      "tier": "mega_cap",
+      "api_calls_needed": 5,
+      "priority": 1,
+      "is_stale": true
+    },
+    {
+      "ticker": "A",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ABBV",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ABNB",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ABT",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ACGL",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ACN",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ADBE",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ADI",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ADM",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AEE",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AEP",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AES",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AFL",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AIG",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AIZ",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AJG",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AKAM",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ALB",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ALGN",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ALL",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ALLE",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AMAT",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AMCR",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AMD",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AME",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AMGN",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AMP",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AMT",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ANET",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AON",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AOS",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "APD",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "APH",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "APO",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "APP",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "APTV",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ARES",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "ATO",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AWK",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "AXP",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "LNT",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "MMM",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "MO",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "T",
+      "tier": "large_cap",
+      "api_calls_needed": 4,
+      "priority": 2,
+      "is_stale": true
+    },
+    {
+      "ticker": "APA",
+      "tier": "small_cap",
+      "api_calls_needed": 2,
+      "priority": 3,
+      "is_stale": true
+    },
+    {
+      "ticker": "ARE",
+      "tier": "small_cap",
+      "api_calls_needed": 2,
+      "priority": 3,
+      "is_stale": true
+    }
+  ]
+}

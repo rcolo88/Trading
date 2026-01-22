@@ -22,7 +22,6 @@ from .quality_metrics_calculator import (
     QualityTier,
     MetricScore,
     RedFlag,
-    DimensionScore,
     format_quality_report
 )
 
@@ -73,7 +72,6 @@ __all__ = [
     'QualityTier',
     'MetricScore',
     'RedFlag',
-    'DimensionScore',
     'format_quality_report',
     'EarningsQualityAnalyzer',
     'EarningsQualityResult',

@@ -1,0 +1,706 @@
+"""
+Enhanced Hybrid Data Fetcher v3.0
+
+Integrates yfinance + FMP + SimFin with automatic foreign company detection.
+
+Strategy:
+- US companies: SimFin (complete 20+ years, USD)
+- Foreign companies: yfinance with currency conversion (TWD, JPY, etc.)
+- FMP: Pre-calculated ratios when available (limited free tier)
+- Automatic detection and routing based on company origin
+
+Features:
+- Automatic US vs Foreign company detection
+- Live currency conversion for foreign companies
+- Triple-source integration with intelligent fallback
+- Source tagging for comparison and validation
+- Cost optimization (FREE tier priority)
+"""
+
+from .financial_data_fetcher import FinancialDataFetcher, FinancialData
+from .fmp_fetcher import FMPDataFetcher, get_fmp_limit_by_market_cap
+from .fmp_cache_tracker import FMPCacheTracker
+from .simfin_fetcher import SimFinDataFetcher
+from .ratio_calculator import FinancialRatioCalculator
+from .company_detector import CompanyDetector, CompanyProfile
+from .yfinance_fetcher import YFinanceDataFetcher, YFinanceFinancialData
+from .currency_converter import CurrencyConversionError
+from typing import Dict, Optional, List, Any
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class EnhancedHybridDataFetcher:
+    """
+    Enhanced hybrid data fetcher with automatic foreign company detection.
+    
+    Usage:
+        fetcher = EnhancedHybridDataFetcher(fmp_api_key='YOUR_FMP_KEY')
+        data = fetcher.fetch_complete_data('GOOGL')  # US company → SimFin
+        data = fetcher.fetch_complete_data('TSM')    # Foreign → yfinance + currency conversion
+    
+    Features:
+    - Automatic US vs Foreign company detection
+    - Live currency conversion for foreign companies
+    - Triple-source integration (yfinance + FMP + SimFin)
+    - Intelligent routing based on company origin
+    - Source tagging for comparison and validation
+    """
+
+    def __init__(
+        self,
+        fmp_api_key: str,
+        simfin_api_key: Optional[str] = None,
+        fmp_cache_file: str = "fmp_cache_tracker.json",
+        simfin_cache_file: str = "simfin_cache.pkl",
+        api_tier: str = 'FREE',
+        enable_simfin: bool = True
+    ):
+        """
+        Initialize enhanced hybrid data fetcher with foreign detection.
+        
+        Args:
+            fmp_api_key: FMP API key (get free at financialmodelingprep.com)
+            simfin_api_key: SimFin API key (optional, for enhanced US company data)
+            fmp_cache_file: Path to FMP cache file
+            simfin_cache_file: Path to SimFin cache file
+            api_tier: FMP API tier configuration
+            enable_simfin: Whether to enable SimFin integration
+        """
+        self.yf_fetcher = FinancialDataFetcher()
+        self.yf_fetcher_foreign = YFinanceDataFetcher()
+        self.company_detector = CompanyDetector()
+        self.cache_tracker = FMPCacheTracker(cache_file=fmp_cache_file, api_tier=api_tier)
+        self.fmp_fetcher = FMPDataFetcher(fmp_api_key, self.cache_tracker)
+        
+        self.enable_simfin = enable_simfin
+        if enable_simfin and simfin_api_key:
+            self.simfin_fetcher = SimFinDataFetcher(
+                api_key=simfin_api_key,
+                cache_file=simfin_cache_file
+            )
+            self.ratio_calculator = FinancialRatioCalculator()
+        elif enable_simfin:
+            self.simfin_fetcher = SimFinDataFetcher(cache_file=simfin_cache_file)
+            self.ratio_calculator = FinancialRatioCalculator()
+        
+        logger.info("EnhancedHybridDataFetcher v3.0 initialized (auto-routing foreign companies)")
+
+    def fetch_complete_data(
+        self,
+        ticker: str,
+        include_fmp: bool = True,
+        include_simfin: bool = True,
+        force_refresh_fmp: bool = False,
+        force_refresh_simfin: bool = False
+    ) -> Dict:
+        """
+        Fetch complete dataset with automatic foreign company detection and routing.
+        
+        Strategy:
+        - US companies: yfinance (current) + SimFin (historical, USD)
+        - Foreign companies: yfinance with currency conversion (TWD, JPY, etc.)
+        - FMP: Pre-calculated ratios when available
+        
+        Args:
+            ticker: Stock ticker symbol
+            include_fmp: Whether to fetch FMP data (default True)
+            include_simfin: Whether to fetch SimFin data (default True)
+            force_refresh_fmp: Force refresh FMP cache
+            force_refresh_simfin: Force refresh SimFin cache
+            
+        Returns:
+            Dict with merged data from all sources with source tagging
+        """
+        ticker = ticker.upper().strip()
+        logger.info(f"Fetching enhanced complete data for {ticker}")
+        
+        # Step 1: Detect company origin and determine routing
+        company_profile = self.company_detector.detect(ticker)
+        
+        if company_profile.is_us_company:
+            logger.info(f"{ticker}: Detected as US company → Using SimFin for historical data")
+            return self._fetch_us_company_data(
+                ticker, company_profile, include_fmp, include_simfin,
+                force_refresh_fmp, force_refresh_simfin
+            )
+        else:
+            logger.info(
+                f"{ticker}: Detected as foreign company ({company_profile.country}) "
+                f"→ Using yfinance with {company_profile.currency} → USD conversion"
+            )
+            return self._fetch_foreign_company_data(
+                ticker, company_profile, include_fmp, include_simfin,
+                force_refresh_fmp, force_refresh_simfin
+            )
+    
+    def _fetch_us_company_data(
+        self,
+        ticker: str,
+        company_profile: CompanyProfile,
+        include_fmp: bool,
+        include_simfin: bool,
+        force_refresh_fmp: bool,
+        force_refresh_simfin: bool
+    ) -> Dict:
+        """Fetch data for US company using SimFin"""
+        
+        # Step 1: Get current fundamentals from yfinance (always free)
+        logger.debug(f"{ticker}: Fetching current data from yfinance...")
+        current_data = self.yf_fetcher.fetch_financial_data(ticker)
+        
+        if not current_data or not hasattr(current_data, 'to_dict'):
+            logger.error(f"Failed to fetch yfinance data for {ticker}")
+            return {}
+        
+        current_dict = current_data.to_dict()
+        current_dict['company_profile'] = company_profile.to_dict()
+        
+        # Step 2: Get SimFin data (if enabled) - PRIMARY source for US companies
+        # FMP is skipped as it's not reliable (premium limitations, errors)
+        simfin_data = {}
+        simfin_ratios = {}
+        if include_simfin and self.enable_simfin:
+            logger.debug(f"{ticker}: Fetching data from SimFin...")
+            
+            simfin_current = self.simfin_fetcher.fetch_financial_data(ticker)
+            if simfin_current:
+                simfin_dict = simfin_current.to_dict()
+                simfin_data = simfin_dict
+                
+                # Calculate ratios from SimFin raw data
+                simfin_ratios = self._calculate_simfin_ratios(simfin_current)
+                
+                # Get historical data for growth calculations
+                simfin_historical = self.simfin_fetcher.fetch_historical_financials(ticker)
+                if simfin_historical:
+                    simfin_data['simfin_historical'] = simfin_historical
+            else:
+                logger.warning(f"{ticker}: SimFin data not available, will use yfinance historical data")
+        
+        # FMP is disabled - SimFin is primary for US companies
+        fmp_data = {}
+        
+        # Step 3: If SimFin historical data is missing, fall back to yfinance historical
+        yfinance_historical = {}
+        if not simfin_data.get('simfin_historical'):
+            logger.debug(f"{ticker}: Fetching historical data from yfinance (SimFin fallback)...")
+            yfinance_historical = self.yf_fetcher_foreign.fetch_historical_financials(ticker, years=5)
+            if yfinance_historical:
+                simfin_data['yfinance_historical'] = yfinance_historical
+        
+        # Step 4: Merge all datasets
+        merged_data = self._merge_enhanced_data(
+            current_dict, fmp_data, simfin_data, simfin_ratios, ticker
+        )
+        
+        # Add company profile info
+        merged_data['is_foreign_company'] = False
+        merged_data['company_country'] = 'US'
+        merged_data['data_source'] = 'yfinance + SimFin'
+        
+        return merged_data
+    
+    def _fetch_foreign_company_data(
+        self,
+        ticker: str,
+        company_profile: CompanyProfile,
+        include_fmp: bool,
+        include_simfin: bool,
+        force_refresh_fmp: bool,
+        force_refresh_simfin: bool
+    ) -> Dict:
+        """Fetch data for foreign company using yfinance with currency conversion"""
+        
+        # Step 1: Get current fundamentals from yfinance (with currency conversion)
+        logger.debug(f"{ticker}: Fetching data from yfinance with {company_profile.currency} → USD conversion...")
+        yf_data = self.yf_fetcher_foreign.fetch_financial_data(ticker)
+        
+        if not yf_data or not hasattr(yf_data, 'to_dict'):
+            logger.error(f"Failed to fetch yfinance data for {ticker}")
+            return {}
+        
+        current_dict = yf_data.to_dict()
+        current_dict['company_profile'] = company_profile.to_dict()
+        
+        # Add exchange rate info
+        current_dict['exchange_rate'] = yf_data.exchange_rate_used
+        current_dict['source_currency'] = yf_data.source_currency
+        
+        # Step 2: Get FMP historical data (if enabled)
+        fmp_data = {}
+        if include_fmp:
+            market_cap = current_dict.get('market_cap')
+            if market_cap:
+                logger.debug(
+                    f"{ticker}: Market cap ${market_cap:,.0f}, "
+                    f"fetching {get_fmp_limit_by_market_cap(market_cap)} years from FMP"
+                )
+            
+            fmp_data = self.fmp_fetcher.fetch_historical_financials(
+                ticker=ticker,
+                market_cap=market_cap,
+                force_refresh=force_refresh_fmp
+            )
+        
+        # Step 3: Get historical data from yfinance (with currency conversion)
+        yf_historical = {}
+        if include_simfin:
+            logger.debug(f"{ticker}: Fetching historical data from yfinance...")
+            yf_historical = self.yf_fetcher_foreign.fetch_historical_financials(ticker, years=5)
+            if yf_historical:
+                current_dict['yfinance_historical'] = yf_historical
+        
+        # Step 4: Skip SimFin for foreign companies (they typically don't have data)
+        simfin_data = {}
+        simfin_ratios = {}
+        
+        # Step 5: Merge all datasets
+        merged_data = self._merge_enhanced_data(
+            current_dict, fmp_data, simfin_data, simfin_ratios, ticker
+        )
+        
+        # Add company profile info
+        merged_data['is_foreign_company'] = True
+        merged_data['company_country'] = company_profile.country
+        merged_data['data_source'] = f'yfinance ({company_profile.currency} → USD)'
+        merged_data['currency'] = company_profile.currency
+        merged_data['exchange_rate'] = yf_data.exchange_rate_used
+        
+        logger.info(
+            f"{ticker}: Foreign company data complete "
+            f"({company_profile.currency} → USD at rate {yf_data.exchange_rate_used:.4f})"
+        )
+        
+        return merged_data
+
+    def _calculate_simfin_ratios(self, simfin_data) -> Dict[str, Any]:
+        """
+        Calculate ratios from SimFin raw data
+        
+        Args:
+            simfin_data: SimFinFinancialData object
+            
+        Returns:
+            Dict of calculated ratios with source tagging
+        """
+        if not simfin_data:
+            return {}
+        
+        try:
+            # Calculate all ratios using the ratio calculator
+            calculated_ratios = self.ratio_calculator.calculate_all_ratios(
+                revenue=simfin_data.revenue,
+                cogs=simfin_data.cogs,
+                operating_income=simfin_data.operating_income,
+                net_income=simfin_data.net_income,
+                total_assets=simfin_data.total_assets,
+                shareholder_equity=simfin_data.shareholder_equity,
+                total_debt=simfin_data.total_debt,
+                retained_earnings=simfin_data.retained_earnings,
+                working_capital=simfin_data.working_capital,
+                ebit=simfin_data.ebit,
+                ebitda=simfin_data.ebitda,
+                interest_expense=simfin_data.interest_expense,
+                operating_cash_flow=simfin_data.operating_cash_flow,
+                free_cash_flow=simfin_data.free_cash_flow
+            )
+            
+            # Convert to dict with source tagging
+            ratios_dict = calculated_ratios.to_dict()
+            
+            logger.debug(f"Calculated {sum(1 for v in ratios_dict.values() if v is not None)} SimFin ratios")
+            return ratios_dict
+            
+        except Exception as e:
+            logger.error(f"Failed to calculate SimFin ratios: {e}")
+            return {}
+
+    def _merge_enhanced_data(
+        self,
+        current: Dict,
+        fmp_historical: Dict,
+        simfin_data: Dict,
+        simfin_ratios: Dict,
+        ticker: str
+    ) -> Dict:
+        """
+        Merge data from all three sources with intelligent source tagging
+        
+        Priority and Strategy:
+        1. yfinance: Current year fundamentals (always primary)
+        2. FMP: Pre-calculated ratios and historical trends (when available)
+        3. SimFin: Raw data backup + calculated ratios (fallback/comparison)
+        4. Source tagging: All metrics tagged with source for comparison
+        
+        Args:
+            current: yfinance current data dict
+            fmp_historical: FMP historical data dict
+            simfin_data: SimFin current data dict
+            simfin_ratios: SimFin calculated ratios dict
+            ticker: Stock ticker for logging
+            
+        Returns:
+            Enhanced merged dataset with source tagging
+        """
+        # Start with yfinance current data as base
+        merged = current.copy()
+        
+        # Add metadata
+        merged['data_sources'] = []
+        merged['fetch_timestamp'] = datetime.now().isoformat()
+        
+        # Add yfinance to sources
+        merged['data_sources'].append('yfinance')
+        
+        # Step 1: Add FMP historical data with source tagging
+        if fmp_historical:
+            merged['data_sources'].append('FMP')
+            
+            # Add FMP historical trends
+            ratios_data = fmp_historical.get('ratios', [])
+            score_data = fmp_historical.get('score', {})
+            income_data = fmp_historical.get('income', [])
+            balance_data = fmp_historical.get('balance', [])
+            cash_flow_data = fmp_historical.get('cash_flow', [])
+            
+            # Extract historical trends from FMP
+            merged.update(self._extract_fmp_historical_trends(
+                ratios_data, score_data, income_data, balance_data, cash_flow_data
+            ))
+            
+            # Add FMP pre-calculated scores with source tagging
+            if isinstance(score_data, list) and len(score_data) > 0:
+                score_data = score_data[0]
+            
+            merged['fmp_piotroski_score'] = score_data.get('piotroskiScore')
+            merged['fmp_altman_z_score'] = score_data.get('altmanZScore')
+        
+        # Step 2: Add SimFin data with source tagging
+        if simfin_data:
+            merged['data_sources'].append('SimFin')
+
+            # Add SimFin-specific metadata
+            merged['simfin_years_available'] = simfin_data.get('years_available', 0)
+            merged['simfin_data_quality'] = simfin_data.get('data_quality', 'unknown')
+            merged['simfin_fiscal_year'] = simfin_data.get('fiscal_year')
+
+            # Add key SimFin financial metrics with source tagging
+            simfin_metrics = [
+                'revenue', 'net_income', 'total_assets', 'shareholder_equity',
+                'total_debt', 'ebit', 'ebitda', 'interest_expense',
+                'operating_cash_flow', 'free_cash_flow', 'retained_earnings',
+                'working_capital', 'operating_income'
+            ]
+            for metric in simfin_metrics:
+                if simfin_data.get(metric) is not None:
+                    merged[f'simfin_{metric}'] = simfin_data.get(metric)
+
+            # Add SimFin calculated ratios with source tagging
+            if simfin_ratios:
+                merged.update(simfin_ratios)
+                
+                # Add comparison ratios (FMP vs SimFin) if both available
+                comparison = self._create_ratio_comparison(merged, simfin_ratios)
+                if comparison:
+                    merged['ratio_comparison'] = comparison
+
+            # Extract SimFin historical trends for ROE persistence analysis
+            # This is used when FMP data is not available (premium symbols)
+            if simfin_data and not merged.get('roe_history'):
+                simfin_historical = simfin_data.get('simfin_historical', {})
+                if simfin_historical:
+                    simfin_trends = self._extract_simfin_historical_trends(simfin_historical)
+                    merged.update(simfin_trends)
+        
+        # Step 3: Add data quality and validation metadata
+        merged['data_quality_score'] = self._calculate_data_quality_score(merged)
+        merged['has_historical_data'] = bool(
+            merged.get('roe_history') or merged.get('simfin_historical')
+        )
+        
+        # Step 4: Add fallback indicators
+        merged['simfin_used_as_fallback'] = (
+            'SimFin' in merged['data_sources'] and 
+            'FMP' not in merged['data_sources']
+        )
+        
+        logger.debug(
+            f"{ticker}: Enhanced merge complete with {len(merged['data_sources'])} sources, "
+            f"quality score: {merged.get('data_quality_score', 'N/A')}"
+        )
+        
+        return merged
+
+    def _extract_fmp_historical_trends(
+        self,
+        ratios_data: List,
+        score_data: Dict,
+        income_data: List,
+        balance_data: List,
+        cash_flow_data: List
+    ) -> Dict:
+        """Extract historical trends from FMP data"""
+        trends = {}
+        
+        # Process ratios data for historical trends
+        roe_history = []
+        margin_history = []
+        net_margin_history = []
+        current_ratio_history = []
+        debt_to_equity_history = []
+        interest_coverage_history = []
+        revenue_growth_history = []
+        
+        for year_data in ratios_data:
+            # FMP ratios don't include ROE, use proxy
+            net_margin = year_data.get('netProfitMargin', 0)
+            roe_proxy = net_margin * 3 if net_margin else 0
+            roe_history.append(roe_proxy)
+            
+            margin_history.append(year_data.get('grossProfitRatio', year_data.get('grossProfitMargin', 0)))
+            net_margin_history.append(year_data.get('netProfitMargin', 0))
+            current_ratio_history.append(year_data.get('currentRatio', 0))
+            debt_to_equity_history.append(year_data.get('debtToEquityRatio', 0))
+            interest_coverage_history.append(year_data.get('interestCoverageRatio', 0))
+            revenue_growth_history.append(year_data.get('revenueGrowth', 0))
+        
+        # Add historical trends to merged data
+        trends.update({
+            'fmp_roe_history': roe_history,
+            'fmp_gross_margin_history': margin_history,
+            'fmp_net_margin_history': net_margin_history,
+            'fmp_current_ratio_history': current_ratio_history,
+            'fmp_debt_to_equity_history': debt_to_equity_history,
+            'fmp_interest_coverage_history': interest_coverage_history,
+            'fmp_revenue_growth_history': revenue_growth_history,
+        })
+        
+        # Add revenue and assets history from statements
+        revenue_history = [year.get('revenue', 0) for year in income_data]
+        assets_history = [year.get('totalAssets', 0) for year in balance_data]
+        
+        trends.update({
+            'fmp_revenue_history': revenue_history,
+            'fmp_assets_history': assets_history,
+        })
+        
+        return trends
+
+    def _create_ratio_comparison(self, merged: Dict, simfin_ratios: Dict) -> Optional[Dict]:
+        """Create comparison between FMP and SimFin calculated ratios"""
+        comparison = {}
+        
+        # Compare key ratios if both sources available
+        key_ratios = [
+            ('roe', 'simfin_roe'),
+            ('altman_z_score', 'simfin_altman_z_score'),
+            ('debt_to_equity', 'simfin_debt_to_equity'),
+            ('interest_coverage', 'simfin_interest_coverage'),
+        ]
+        
+        for fmp_key, simfin_key in key_ratios:
+            fmp_value = merged.get(fmp_key)
+            simfin_value = simfin_ratios.get(simfin_key)
+            
+            if fmp_value is not None and simfin_value is not None:
+                diff = abs(fmp_value - simfin_value)
+                pct_diff = (diff / max(abs(fmp_value), abs(simfin_value), 0.001)) * 100
+                
+                comparison[f"{fmp_key}_vs_simfin"] = {
+                    'fmp_value': fmp_value,
+                    'simfin_value': simfin_value,
+                    'difference': diff,
+                    'percent_difference': pct_diff,
+                    'significant_difference': pct_diff > 10  # Flag >10% differences
+                }
+        
+        return comparison if comparison else None
+
+    def _calculate_data_quality_score(self, merged: Dict) -> float:
+        """Calculate overall data quality score (0-100)"""
+        score = 0.0
+        
+        # Base score for having yfinance data
+        if merged.get('ticker'):
+            score += 30
+        
+        # Bonus for FMP historical data
+        if 'FMP' in merged.get('data_sources', []):
+            score += 25
+            if merged.get('fmp_piotroski_score') is not None:
+                score += 10
+            if merged.get('fmp_altman_z_score') is not None:
+                score += 10
+        
+        # Bonus for SimFin data
+        if 'SimFin' in merged.get('data_sources', []):
+            score += 15
+            if merged.get('simfin_years_available', 0) >= 3:
+                score += 10
+        
+        # Bonus for having both sources (validation capability)
+        if len(merged.get('data_sources', [])) >= 2:
+            score += 10
+        
+        return min(score, 100.0)
+
+    def batch_fetch_enhanced(
+        self,
+        tickers: List[str],
+        include_fmp: bool = True,
+        include_simfin: bool = True,
+        max_workers: int = 5
+    ) -> Dict[str, Dict]:
+        """
+        Batch fetch enhanced data for multiple tickers
+        
+        Args:
+            tickers: List of ticker symbols
+            include_fmp: Whether to include FMP data
+            include_simfin: Whether to include SimFin data
+            max_workers: Number of parallel workers
+            
+        Returns:
+            Dict mapping ticker -> enhanced merged data
+        """
+        results = {}
+        
+        logger.info(f"Starting enhanced batch fetch for {len(tickers)} tickers")
+        
+        for i, ticker in enumerate(tickers):
+            logger.info(f"Enhanced batch fetch {i+1}/{len(tickers)}: {ticker}")
+            
+            try:
+                data = self.fetch_complete_data(
+                    ticker=ticker,
+                    include_fmp=include_fmp,
+                    include_simfin=include_simfin
+                )
+                results[ticker] = data
+                
+            except Exception as e:
+                logger.error(f"Failed to fetch enhanced data for {ticker}: {e}")
+                results[ticker] = {}
+        
+        # Calculate statistics
+        successful = sum(1 for data in results.values() if data)
+        fmp_available = sum(1 for data in results.values() if 'FMP' in data.get('data_sources', []))
+        simfin_available = sum(1 for data in results.values() if 'SimFin' in data.get('data_sources', []))
+        
+        logger.info(
+            f"Enhanced batch fetch complete: {successful}/{len(tickers)} successful, "
+            f"FMP: {fmp_available}, SimFin: {simfin_available}"
+        )
+        
+        return results
+
+    def get_data_source_summary(self, tickers: List[str]) -> Dict[str, Any]:
+        """
+        Get summary of data sources for a list of tickers
+        
+        Args:
+            tickers: List of ticker symbols to analyze
+            
+        Returns:
+            Summary of data source coverage and quality
+        """
+        summary = {
+            'total_tickers': len(tickers),
+            'yfinance_coverage': 0,
+            'fmp_coverage': 0,
+            'simfin_coverage': 0,
+            'dual_source_coverage': 0,
+            'triple_source_coverage': 0,
+            'average_quality_score': 0.0,
+            'blocked_symbols_fmp': [],
+            'blocked_symbols_simfin': []
+        }
+        
+        # This would require actual fetching - for now return structure
+        return summary
+
+    def _extract_simfin_historical_trends(self, historical_data: Dict) -> Dict:
+        """
+        Extract historical trends from SimFin balance/income data.
+        
+        This is used when FMP data is not available (premium-only symbols like FISV)
+        to provide ROE history for persistence analysis.
+        
+        Args:
+            historical_data: SimFin historical data dict with 'balance' and 'income' keys
+            
+        Returns:
+            Dict with 'roe_history' and other historical trends
+        """
+        trends = {}
+        
+        balance_data = historical_data.get('balance', [])
+        income_data = historical_data.get('income', [])
+        
+        # Create lookup for net income by fiscal year
+        net_income_by_year = {}
+        for year_data in income_data:
+            fiscal_year = year_data.get('fiscal_year')
+            net_income = year_data.get('net_income')
+            if fiscal_year and net_income is not None:
+                net_income_by_year[fiscal_year] = net_income
+        
+        # Calculate ROE: net_income / shareholder_equity
+        roe_history = []
+        for year_data in balance_data:
+            equity = year_data.get('shareholder_equity', 0)
+            fiscal_year = year_data.get('fiscal_year')
+            net_income = net_income_by_year.get(fiscal_year, 0) if fiscal_year else 0
+            
+            if equity and equity > 0 and net_income:
+                roe_history.append(net_income / equity)
+        
+        trends['roe_history'] = roe_history
+        
+        # Extract revenue history from income statements
+        revenue_history = [
+            year.get('revenue', 0)
+            for year in income_data
+        ]
+        trends['revenue_history'] = revenue_history
+        
+        logger.debug(f"Extracted {len(roe_history)} years of ROE from SimFin historical data")
+        
+        return trends
+
+
+# Example usage
+if __name__ == "__main__":
+    # Initialize enhanced fetcher
+    fetcher = EnhancedHybridDataFetcher(
+        fmp_api_key='YOUR_FMP_KEY',
+        simfin_api_key='YOUR_SIMFIN_KEY'  # Optional
+    )
+    
+    # Example 1: Fetch enhanced data for a single ticker
+    print("\n" + "="*60)
+    print("Example: Enhanced data fetch for AAPL")
+    print("="*60)
+    
+    data = fetcher.fetch_complete_data('AAPL')
+    print(f"Data Sources: {data.get('data_sources', [])}")
+    print(f"Quality Score: {data.get('data_quality_score', 'N/A')}")
+    print(f"SimFin Years: {data.get('simfin_years_available', 'N/A')}")
+    print(f"FMP ROE History: {len(data.get('fmp_roe_history', []))} years")
+    print(f"SimFin ROE: {data.get('simfin_roe', 'N/A')}")
+    
+    # Example 2: Batch fetch with enhanced data
+    print("\n" + "="*60)
+    print("Example: Enhanced batch fetch")
+    print("="*60)
+    
+    tickers = ['AAPL', 'MSFT', 'GOOGL']
+    results = fetcher.batch_fetch_enhanced(tickers)
+    
+    for ticker, data in results.items():
+        sources = data.get('data_sources', [])
+        quality = data.get('data_quality_score', 0)
+        print(f"  {ticker}: {' + '.join(sources)} (Quality: {quality:.0f})")

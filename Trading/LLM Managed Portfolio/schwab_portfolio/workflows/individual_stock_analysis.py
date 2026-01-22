@@ -21,7 +21,9 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 
 from data.financial_data_fetcher import FinancialDataFetcher, FinancialData
+from data.enhanced_hybrid_fetcher import EnhancedHybridDataFetcher
 from quality.quality_metrics_calculator import QualityMetricsCalculator, QualityAnalysisResult
+from quality.lookback_calculator import LookbackCalculator, DEFAULT_LOOKBACKS, QUALITY_DIMENSIONS, SECTOR_ADJUSTMENTS
 from quality.market_cap_classifier import MarketCapClassifier
 from components.quality_persistence_analyzer import QualityPersistenceAnalyzer
 
@@ -42,21 +44,39 @@ class IndividualStockAnalysis:
     5. Generate detailed report with investment recommendation
     """
 
-    def __init__(self, ticker: str):
+    def __init__(self, ticker: str, use_enhanced: bool = True):
         """
         Initialize individual stock analysis
 
         Args:
             ticker: Stock ticker symbol (e.g., 'AAPL')
+            use_enhanced: Whether to use EnhancedHybridDataFetcher with FMP + SimFin (default True)
         """
         self.ticker = ticker.upper()
-        self.fetcher = FinancialDataFetcher(enable_cache=True)
+        self.use_enhanced = use_enhanced
+
+        # Initialize enhanced hybrid data fetcher with FMP + SimFin support
+        if use_enhanced:
+            fmp_api_key = os.getenv('FMP_API_KEY', '2t0zX99cGTRZpm3NOBy0gKYZBNpVr247')
+            simfin_api_key = '9916893d-f20d-45b7-b4ac-4449607d5128'
+            self.fetcher = EnhancedHybridDataFetcher(
+                fmp_api_key=fmp_api_key,
+                simfin_api_key=simfin_api_key,
+                enable_simfin=True
+            )
+            self.yf_fetcher = self.fetcher.yf_fetcher
+            logger.info(f"Using EnhancedHybridDataFetcher (yfinance + FMP + SimFin)")
+        else:
+            self.fetcher = FinancialDataFetcher(enable_cache=True)
+            self.yf_fetcher = self.fetcher
+            logger.info(f"Using FinancialDataFetcher (yfinance only)")
+
         self.quality_calculator = QualityMetricsCalculator()
         self.market_cap_classifier = MarketCapClassifier()
         self.roe_analyzer = QualityPersistenceAnalyzer()
 
         # Results storage
-        self.financial_data: Optional[FinancialData] = None
+        self.financial_data: Optional[Dict] = None  # Changed from FinancialData to Dict for hybrid
         self.quality_result: Optional[QualityAnalysisResult] = None
         self.market_cap_tier: Optional[str] = None
         self.roe_persistence: Optional[Dict] = None
@@ -70,22 +90,55 @@ class IndividualStockAnalysis:
         """
         logger.info(f"Fetching financial data for {self.ticker}")
 
-        self.financial_data = self.fetcher.fetch_financial_data(self.ticker)
+        if self.use_enhanced:
+            # Use EnhancedHybridDataFetcher (returns Dict with FMP + SimFin)
+            try:
+                self.financial_data = self.fetcher.fetch_complete_data(
+                    ticker=self.ticker,
+                    include_fmp=True,
+                    include_simfin=True,
+                    force_refresh_fmp=False
+                )
+            except AttributeError as e:
+                logger.error(f"EnhancedHybridDataFetcher method not available: {e}")
+                # Fallback to yfinance only
+                financial_obj = self.yf_fetcher.fetch_financial_data(self.ticker)
+                if financial_obj and hasattr(financial_obj, 'to_dict'):
+                    self.financial_data = financial_obj.to_dict()
+                else:
+                    self.financial_data = None
+        else:
+            # Use yfinance-only fetcher (returns FinancialData object)
+            financial_obj = self.fetcher.fetch_financial_data(self.ticker)
+            if financial_obj and hasattr(financial_obj, 'to_dict'):
+                self.financial_data = financial_obj.to_dict()
+            else:
+                self.financial_data = None
 
         if not self.financial_data:
             logger.error(f"Failed to fetch financial data for {self.ticker}")
             return False
 
-        if self.financial_data.data_quality == "insufficient":
+        # Check data quality
+        data_quality = self.financial_data.get('data_quality', 'unknown')
+        if data_quality == "insufficient":
             logger.warning(f"Insufficient financial data for {self.ticker}")
             return False
 
-        logger.info(f"Successfully fetched {self.financial_data.data_quality} quality data for {self.ticker}")
+        logger.info(f"Successfully fetched {data_quality} quality data for {self.ticker}")
+        if self.use_enhanced:
+            fmp_years = self.financial_data.get('fmp_years_fetched', 0)
+            simfin_years = self.financial_data.get('simfin_years_available', 0)
+            data_sources = self.financial_data.get('data_sources', [])
+            if 'SimFin' in data_sources:
+                logger.info(f"SimFin historical data: {simfin_years} years")
+            elif fmp_years > 0:
+                logger.info(f"FMP historical data: {fmp_years} years")
         return True
 
     def calculate_quality_metrics(self) -> bool:
         """
-        Calculate quality metrics using the 5-metric framework
+        Calculate quality metrics using the NEW_5FACTOR framework
 
         Returns:
             True if calculation successful, False otherwise
@@ -96,28 +149,33 @@ class IndividualStockAnalysis:
         logger.info(f"Calculating quality metrics for {self.ticker}")
 
         try:
-            # Prepare data for calculator
+            # financial_data is now a Dict (from HybridDataFetcher or converted FinancialData)
+            # Pass it directly to calculator (which expects Dict)
             calculator_input = {
                 'ticker': self.ticker,
-                'revenue': self.financial_data.revenue,
-                'cogs': self.financial_data.cogs,
-                'sga': self.financial_data.sga,
-                'total_assets': self.financial_data.total_assets,
-                'net_income': self.financial_data.net_income,
-                'shareholder_equity': self.financial_data.shareholder_equity,
-                'free_cash_flow': self.financial_data.free_cash_flow,
-                'market_cap': self.financial_data.market_cap,
-                'total_debt': self.financial_data.total_debt,
-                'nopat': self.financial_data.nopat
             }
+            
+            # Safely unpack financial_data fields, handling None values
+            if self.financial_data:
+                for key, value in self.financial_data.items():
+                    calculator_input[key] = value
 
-            self.quality_result = self.quality_calculator.calculate_quality_metrics(calculator_input)
+            # Use NEW_5FACTOR framework for comprehensive multi-dimensional scoring
+            self.quality_result = self.quality_calculator.calculate_quality_metrics(
+                calculator_input,
+                framework='NEW_5FACTOR'
+            )
 
-            logger.info(f"Calculated quality metrics for {self.ticker}: score {self.quality_result.composite_score:.1f}")
+            if self.quality_result and self.quality_result.composite_score is not None:
+                logger.info(f"Calculated quality metrics for {self.ticker}: score {self.quality_result.composite_score:.1f}")
+            else:
+                logger.warning(f"Could not calculate quality metrics for {self.ticker}")
             return True
 
         except Exception as e:
             logger.error(f"Failed to calculate quality metrics for {self.ticker}: {e}")
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error details: {str(e)}")
             return False
 
     def classify_market_cap(self) -> bool:
@@ -127,7 +185,7 @@ class IndividualStockAnalysis:
         Returns:
             True if classification successful, False otherwise
         """
-        if not self.financial_data or not self.financial_data.market_cap:
+        if not self.financial_data or not self.financial_data.get('market_cap'):
             logger.warning(f"No market cap data available for {self.ticker}")
             self.market_cap_tier = "Unknown"
             return True
@@ -161,19 +219,35 @@ class IndividualStockAnalysis:
         try:
             logger.info(f"Analyzing ROE persistence for {self.ticker}")
 
-            # Fetch historical financial data
-            historical_data = self.fetcher.fetch_historical_financials(self.ticker, years=10)
+            # Check for ROE history from FMP first, then SimFin
+            roe_history = self.financial_data.get('roe_history', [])
 
-            if historical_data is None or len(historical_data) < 2:
-                logger.info(f"Insufficient historical data for ROE persistence analysis of {self.ticker}")
+            # If no ROE history from FMP, try SimFin historical data
+            if not roe_history and self.use_enhanced:
+                simfin_historical = self.financial_data.get('simfin_historical', {})
+                if simfin_historical:
+                    roe_history = self._extract_simfin_roe(simfin_historical)
+
+            # If still no ROE history, calculate from yfinance historical data
+            if not roe_history:
+                historical_data = self.yf_fetcher.fetch_historical_financials(self.ticker, years=10)
+                if historical_data is not None and len(historical_data) >= 2:
+                    # Calculate ROE from net_income / shareholder_equity
+                    roe_history = []
+                    for _, row in historical_data.iterrows():
+                        equity = row.get('shareholder_equity', 0)
+                        net_income = row.get('net_income', 0)
+                        if equity and equity > 0 and net_income:
+                            roe_history.append(net_income / equity)
+
+            if len(roe_history) >= 3:
+                persistence_result = self.roe_analyzer.analyze_roe_history(roe_history, ticker=self.ticker)
+            else:
+                logger.info(f"Insufficient historical ROE data for {self.ticker}")
                 self.roe_persistence = None
                 return True
 
-            # Analyze persistence
-            persistence_result = self.roe_analyzer.analyze_company(historical_data, ticker=self.ticker)
-
             if persistence_result:
-                # Extract key metrics
                 incremental_roce = persistence_result.trend_analysis.get('incremental_roce_advantage', 0.0) if persistence_result.trend_analysis else 0.0
 
                 self.roe_persistence = {
@@ -196,6 +270,39 @@ class IndividualStockAnalysis:
             logger.error(f"Failed to analyze ROE persistence for {self.ticker}: {e}")
             self.roe_persistence = None
             return True
+
+    def _extract_simfin_roe(self, simfin_data: Dict) -> list:
+        """
+        Extract ROE history from SimFin historical data
+
+        Args:
+            simfin_data: SimFin historical data dict with 'balance' and 'income' keys
+
+        Returns:
+            List of ROE values (net_income / shareholder_equity)
+        """
+        roe_history = []
+        balance_data = simfin_data.get('balance', [])
+        income_data = simfin_data.get('income', [])
+
+        # Create a lookup for net income by fiscal year
+        net_income_by_year = {}
+        for year_data in income_data:
+            fiscal_year = year_data.get('fiscal_year')
+            net_income = year_data.get('net_income')
+            if fiscal_year and net_income is not None:
+                net_income_by_year[fiscal_year] = net_income
+
+        # Calculate ROE for each year
+        for year_data in balance_data:
+            equity = year_data.get('shareholder_equity', 0)
+            fiscal_year = year_data.get('fiscal_year')
+            net_income = net_income_by_year.get(fiscal_year, 0) if fiscal_year else 0
+
+            if equity and equity > 0 and net_income:
+                roe_history.append(net_income / equity)
+
+        return roe_history
 
     def generate_investment_recommendation(self) -> str:
         """
@@ -262,12 +369,13 @@ class IndividualStockAnalysis:
         report.append("🏢 COMPANY OVERVIEW")
         report.append("-"*40)
         report.append(f"Ticker: {self.ticker}")
-        if self.financial_data.sector:
-            report.append(f"Sector: {self.financial_data.sector}")
-        if self.financial_data.industry:
-            report.append(f"Industry: {self.financial_data.industry}")
-        if self.financial_data.market_cap:
-            market_cap_str = f"${self.financial_data.market_cap / 1e9:.2f}B" if self.financial_data.market_cap >= 1e9 else f"${self.financial_data.market_cap / 1e6:.2f}M"
+        if self.financial_data.get('sector'):
+            report.append(f"Sector: {self.financial_data.get('sector')}")
+        if self.financial_data.get('industry'):
+            report.append(f"Industry: {self.financial_data.get('industry')}")
+        if self.financial_data.get('market_cap'):
+            market_cap = self.financial_data.get('market_cap')
+            market_cap_str = f"${market_cap / 1e9:.2f}B" if market_cap >= 1e9 else f"${market_cap / 1e6:.2f}M"
             report.append(f"Market Cap: {market_cap_str}")
         if self.market_cap_tier:
             report.append(f"Market Cap Tier: {self.market_cap_tier}")
@@ -279,7 +387,7 @@ class IndividualStockAnalysis:
         report.append(f"Quality Score: {self.quality_result.composite_score:.1f}/100")
         report.append(f"Tier: {self.quality_result.tier.value}")
         report.append(f"Red Flags: {len(self.quality_result.red_flags)}")
-        report.append(f"Data Quality: {self.financial_data.data_quality}")
+        report.append(f"Data Quality: {self.financial_data.get('data_quality', 'unknown')}")
         report.append("")
 
         # Investment Recommendation
@@ -293,7 +401,22 @@ class IndividualStockAnalysis:
         report.append("📈 DETAILED QUALITY METRICS")
         report.append("-"*40)
         for metric in self.quality_result.metric_scores:
-            report.append(f"{metric.name}: {metric.value:.2f} (Score: {metric.score:.1f})")
+            # DimensionScore has name, score, metrics dict
+            if hasattr(metric, 'metrics') and metric.metrics:
+                # Show key metric value if available
+                key_metric = list(metric.metrics.keys())[0] if metric.metrics else None
+                metric_value = metric.metrics.get(key_metric, 'N/A') if key_metric != 'N/A' else 'N/A'
+                if isinstance(metric_value, (int, float)):
+                    report.append(f"{metric.name}: {metric_value:.2f} (Score: {metric.score:.1f})")
+                else:
+                    report.append(f"{metric.name}: {metric_value} (Score: {metric.score:.1f})")
+            else:
+                # Fallback for MetricScore objects with .value attribute
+                metric_value = getattr(metric, 'value', 'N/A')
+                if isinstance(metric_value, (int, float)):
+                    report.append(f"{metric.name}: {metric_value:.2f} (Score: {metric.score:.1f})")
+                else:
+                    report.append(f"{metric.name}: {metric_value} (Score: {metric.score:.1f})")
         report.append("")
 
         # Red Flags
@@ -316,26 +439,26 @@ class IndividualStockAnalysis:
         report.append("-"*40)
         data = self.financial_data
 
-        if data.revenue:
-            report.append(f"Revenue: ${data.revenue / 1e9:.2f}B")
-        if data.net_income:
-            report.append(f"Net Income: ${data.net_income / 1e9:.2f}B")
-        if data.free_cash_flow:
-            report.append(f"Free Cash Flow: ${data.free_cash_flow / 1e9:.2f}B")
-        if data.total_assets:
-            report.append(f"Total Assets: ${data.total_assets / 1e9:.2f}B")
-        if data.shareholder_equity:
-            report.append(f"Shareholder Equity: ${data.shareholder_equity / 1e9:.2f}B")
-        if data.total_debt:
-            report.append(f"Total Debt: ${data.total_debt / 1e9:.2f}B")
+        if data.get('revenue'):
+            report.append(f"Revenue: ${data.get('revenue') / 1e9:.2f}B")
+        if data.get('net_income'):
+            report.append(f"Net Income: ${data.get('net_income') / 1e9:.2f}B")
+        if data.get('free_cash_flow'):
+            report.append(f"Free Cash Flow: ${data.get('free_cash_flow') / 1e9:.2f}B")
+        if data.get('total_assets'):
+            report.append(f"Total Assets: ${data.get('total_assets') / 1e9:.2f}B")
+        if data.get('shareholder_equity'):
+            report.append(f"Shareholder Equity: ${data.get('shareholder_equity') / 1e9:.2f}B")
+        if data.get('total_debt'):
+            report.append(f"Total Debt: ${data.get('total_debt') / 1e9:.2f}B")
 
         # Profitability ratios
-        if data.revenue and data.cogs and data.revenue > 0:
-            gross_margin = (data.revenue - (data.cogs or 0)) / data.revenue
+        if data.get('revenue') and data.get('cogs') and data.get('revenue') > 0:
+            gross_margin = (data.get('revenue') - (data.get('cogs') or 0)) / data.get('revenue')
             report.append(f"Gross Margin: {gross_margin:.1%}")
 
-        if data.net_income and data.shareholder_equity and data.shareholder_equity > 0:
-            roe = data.net_income / data.shareholder_equity
+        if data.get('net_income') and data.get('shareholder_equity') and data.get('shareholder_equity') > 0:
+            roe = data.get('net_income') / data.get('shareholder_equity')
             report.append(f"Return on Equity: {roe:.1%}")
         report.append("")
 
@@ -356,6 +479,40 @@ class IndividualStockAnalysis:
             report.append("-"*40)
             report.append("Insufficient historical data for ROE persistence analysis.")
             report.append("Need at least 2 years of historical financials.")
+            report.append("")
+
+        # Lookback Periods Summary
+        report.append("📐 LOOKBACK PERIODS SUMMARY")
+        report.append("-"*40)
+
+        market_cap = self.financial_data.get('market_cap', 0) if self.financial_data else 0
+        sector = self.financial_data.get('sector', 'Unknown') if self.financial_data else 'Unknown'
+
+        if market_cap > 0:
+            tier = LookbackCalculator.classify_market_cap(market_cap)
+            tier_name = tier.value if hasattr(tier, 'value') else str(tier)
+            report.append(f"Market Cap Tier: {tier_name}")
+
+            multiplier = LookbackCalculator.MARKET_CAP_MULTIPLIERS.get(tier, 1.0)
+            sector_adj = SECTOR_ADJUSTMENTS.get(sector, 1.0)
+            report.append(f"Market Cap Multiplier: {multiplier:.2f}x")
+            report.append(f"Sector Adjustment: {sector_adj:.2f}x")
+            report.append("")
+
+            report.append("Quality Dimension Lookback Periods:")
+            report.append("-"*40)
+
+            for dimension, config in QUALITY_DIMENSIONS.items():
+                base_lookback = config['default_lookback']
+                adjusted = base_lookback * multiplier * sector_adj
+                adjusted = max(config['min_lookback'], min(adjusted, config['max_lookback']))
+                report.append(f"  {dimension.title().replace('_', ' ')}: {adjusted:.1f} years (base: {base_lookback})")
+
+            report.append("")
+            report.append("Formula: Adjusted Lookback = Base × Market Cap Multiplier × Sector Adjustment")
+            report.append("")
+        else:
+            report.append("Market Cap data not available for lookback calculation.")
             report.append("")
 
         # Footer

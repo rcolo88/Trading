@@ -316,7 +316,8 @@ class SafetyAnalyzer:
         retained_earnings: float,
         ebit: float,
         sales: float,
-        working_capital: float = None
+        working_capital: float = None,
+        market_cap: float = None
     ) -> Optional[float]:
         """
         Calculate Altman Z-Score for manufacturing companies.
@@ -337,17 +338,23 @@ class SafetyAnalyzer:
 
         Args:
             total_assets: Total assets
-            total_equity: Total shareholder equity
+            total_equity: Total shareholder equity (book value)
             retained_earnings: Accumulated retained earnings
             ebit: Earnings before interest and taxes
             sales: Total sales/revenue
             working_capital: Current assets - Current liabilities
+            market_cap: Market capitalization (preferred for X4 calculation)
 
         Returns:
             Altman Z-Score
             None if calculation not possible
         """
         try:
+            # Validate required inputs - use None checks to distinguish missing vs zero
+            if total_assets is None or total_equity is None:
+                logger.warning("Cannot calculate Z-Score: missing total_assets or total_equity")
+                return None
+
             if total_assets <= 0:
                 logger.warning("Cannot calculate Z-Score: total assets <= 0")
                 return None
@@ -357,11 +364,23 @@ class SafetyAnalyzer:
                 logger.warning("Cannot calculate Z-Score: total liabilities <= 0")
                 return None
 
+            # Handle missing optional fields with defaults
             if working_capital is None:
-                # Estimate working capital as 0 if not provided
                 working_capital = 0
+            if retained_earnings is None:
+                retained_earnings = 0
+            if ebit is None:
+                ebit = 0
+            if sales is None:
+                sales = 0
 
-            market_value_equity = total_equity  # Use book value as proxy
+            # Use market cap if available (preferred), otherwise fall back to book value
+            if market_cap is not None and market_cap > 0:
+                market_value_equity = market_cap
+                logger.debug(f"Using market cap for Z-Score: ${market_cap:,.0f}")
+            else:
+                market_value_equity = total_equity  # Fallback to book value
+                logger.debug(f"Using book value for Z-Score (market cap not available): ${total_equity:,.0f}")
 
             # Calculate Z-Score components
             x1 = working_capital / total_assets
@@ -394,7 +413,11 @@ class SafetyAnalyzer:
             Score from 0-10
         """
         if z_score is None:
-            return 5.0
+            return 5.0  # Neutral score when data is unavailable (don't penalize for missing data)
+
+        # Return low score for near-zero Z-Score (critical bankruptcy risk)
+        if z_score < 0.5:
+            return 1.0  # Critical bankruptcy risk = minimum score
 
         # Excellent: >3.0
         if z_score >= self.Z_SCORE_EXCELLENT:
@@ -499,8 +522,8 @@ class SafetyAnalyzer:
 
     def calculate_interest_coverage(
         self,
-        ebit: float,
-        interest_expense: float
+        ebit: Optional[float],
+        interest_expense: Optional[float]
     ) -> Optional[float]:
         """
         Calculate Interest Coverage Ratio.
@@ -513,6 +536,7 @@ class SafetyAnalyzer:
         - 3-6x: Acceptable but concerning
         - 1-3x: Risky
         - <1x: Danger (cannot cover interest)
+        - N/A: Not applicable (company has net interest income or data unavailable)
 
         Args:
             ebit: Earnings before interest and taxes
@@ -520,15 +544,30 @@ class SafetyAnalyzer:
 
         Returns:
             Interest coverage ratio (times)
-            None if calculation not possible
+            None if calculation not possible (e.g., net interest income)
         """
         try:
-            if interest_expense <= 0:
-                if ebit > 0:
-                    return 15.0  # No debt or very low interest
+            # Handle missing data gracefully
+            if interest_expense is None or interest_expense == 0:
+                # Many tech companies (AAPL, MSFT) have net interest income, not expense
+                # For these companies, interest coverage is not applicable (they're financially strong)
+                # Return 15.0 (excellent) and log that coverage is not applicable
+                if ebit is not None and ebit > 0:
+                    logger.debug(f"Interest coverage: Not applicable (company has net interest income or no debt burden)")
+                    return 15.0  # Excellent - company has no meaningful interest expense
                 else:
                     return None
-
+            
+            if interest_expense < 0:
+                # Negative interest expense = net interest income
+                # This means the company earns more in interest than it pays
+                # This is financially healthy, so mark as excellent
+                logger.debug(f"Interest coverage: Net interest income (financially healthy)")
+                return 15.0
+            
+            if ebit is None or ebit <= 0:
+                return None
+            
             coverage = ebit / interest_expense
 
             logger.debug(f"Interest Coverage: {coverage:.2f}x")
@@ -706,26 +745,27 @@ class SafetyAnalyzer:
 
         # Calculate Altman Z-Score
         z_score = self.calculate_altman_z_score(
-            total_assets=financial_data.get('total_assets', 0),
-            total_equity=financial_data.get('total_equity', 0),
-            retained_earnings=financial_data.get('retained_earnings', 0),
-            ebit=financial_data.get('ebit', 0),
-            sales=financial_data.get('sales', 0),
-            working_capital=financial_data.get('working_capital', None)
+            total_assets=financial_data.get('total_assets'),
+            total_equity=financial_data.get('total_equity'),
+            retained_earnings=financial_data.get('retained_earnings'),
+            ebit=financial_data.get('ebit'),
+            sales=financial_data.get('sales'),
+            working_capital=financial_data.get('working_capital'),
+            market_cap=financial_data.get('market_cap')
         )
         z_score_score = self.calculate_z_score_score(z_score)
 
         # Calculate Debt/EBITDA
         debt_ebitda = self.calculate_debt_to_ebitda(
-            total_debt=financial_data.get('total_debt', 0),
-            ebitda=financial_data.get('ebitda', 0)
+            total_debt=financial_data.get('total_debt'),
+            ebitda=financial_data.get('ebitda')
         )
         leverage_score = self.calculate_leverage_score(debt_ebitda)
 
         # Calculate Interest Coverage
         interest_coverage = self.calculate_interest_coverage(
-            ebit=financial_data.get('ebit', 0),
-            interest_expense=financial_data.get('interest_expense', 0)
+            ebit=financial_data.get('ebit'),
+            interest_expense=financial_data.get('interest_expense')
         )
         interest_coverage_score = self.calculate_interest_coverage_score(interest_coverage)
 
@@ -751,10 +791,11 @@ class SafetyAnalyzer:
         is_safe = safety_score >= 7.0
 
         logger.info(
-            f"Safety analysis: Z-Score={z_score:.2f}" if z_score else "N/A",
-            f"Debt/EBITDA={debt_ebitda:.1f}x" if debt_ebitda else "N/A",
-            f"Score={safety_score:.1f}/10, "
-            f"Red Flags={len(red_flags)}"
+            "Safety analysis: Z-Score=%s, Debt/EBITDA=%s, Score=%.1f/10, Red Flags=%d",
+            f"{z_score:.2f}" if z_score else "N/A",
+            f"{debt_ebitda:.1f}x" if debt_ebitda else "N/A",
+            safety_score,
+            len(red_flags)
         )
 
         return SafetyMetricsResult(

@@ -114,7 +114,8 @@ class WatchlistGenerator:
             completed = 0
             for future in as_completed(futures):
                 ticker, data = future.result()
-                if data and data.data_quality != "insufficient":
+                data_quality = data.get('data_quality') if isinstance(data, dict) else getattr(data, 'data_quality', None)
+                if data and data_quality != "insufficient":
                     results[ticker] = data
 
                 completed += 1

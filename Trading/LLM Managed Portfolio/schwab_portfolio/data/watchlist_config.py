@@ -65,10 +65,11 @@ class WatchlistIndex(Enum):
         SP400: S&P MidCap 400 (mid cap $2B-$50B, ~400 tickers)
         SP600: S&P SmallCap 600 (small cap $500M-$2B, ~600 tickers)
         NASDAQ100: NASDAQ-100 (tech-focused large cap, ~100 tickers)
-        RUSSELL1000: Russell 1000 (large/mid cap, ~1000 tickers)
-        RUSSELL2000: Russell 2000 (small cap, ~2000 tickers)
-        RUSSELL3000: Russell 3000 (broad market, ~3000 tickers)
+        RUSSELL1000: Russell 1000 approximation (~900 tickers)
+        RUSSELL2000: S&P 600 as Russell 2000 approximation (~600 tickers)
+        RUSSELL3000: Russell 3000 approximation (~1500 tickers)
         COMBINED_SP: S&P Composite 1500 (SP500 + SP400 + SP600, ~1500 tickers)
+        MULTI: Multiple indices combined (custom combination)
         CUSTOM: Custom ticker list provided by user
 
     Market Cap Tiers:
@@ -77,22 +78,11 @@ class WatchlistIndex(Enum):
         - Small Cap: $500M-$2B (dominates SP600, Russell 2000)
         - Micro Cap: <$500M (not included in major indexes)
 
-    Performance Expectations:
-        - SP500 (~500 tickers): 12-17 minutes with ThreadPoolExecutor
-        - SP400 (~400 tickers): 10-14 minutes
-        - SP600 (~600 tickers): 15-20 minutes
-        - NASDAQ100 (~100 tickers): 3-5 minutes
-        - RUSSELL1000 (~1000 tickers): 30-40 minutes
-        - RUSSELL2000 (~2000 tickers): 60-80 minutes
-        - RUSSELL3000 (~3000 tickers): 90-120 minutes
-        - COMBINED_SP (~1500 tickers): 45-60 minutes
-        - CUSTOM: Depends on list size
-
     Use Cases:
         - Daily screening: SP500 with limit=50 (2-5 min, uses cache)
         - Weekly screening: SP500 full (12-17 min, refresh data)
         - Monthly screening: COMBINED_SP (45-60 min, find small cap opportunities)
-        - Broad market: RUSSELL3000 (90-120 min, comprehensive coverage)
+        - Custom combination: MULTI with sp500,sp400,sp600
         - Tech focus: NASDAQ100 (3-5 min, tech sector analysis)
         - Large/Mid cap focus: RUSSELL1000 (30-40 min, covers top 1000)
         - Small cap focus: RUSSELL2000 (60-80 min, pure small cap)
@@ -106,6 +96,7 @@ class WatchlistIndex(Enum):
     RUSSELL2000 = "russell2000"
     RUSSELL3000 = "russell3000"
     COMBINED_SP = "combined_sp"
+    MULTI = "multi"
     CUSTOM = "custom"
 
 
@@ -117,6 +108,7 @@ class WatchlistConfig:
         index: Which index to screen (WatchlistIndex enum)
         custom_tickers: List of tickers (only used if index=CUSTOM)
         limit: Optional limit for number of tickers (for performance)
+        multi_indices: List of indices to combine (only used if index=MULTI)
 
     Examples:
         # Screen top 50 from S&P 500 (daily quick check)
@@ -134,14 +126,49 @@ class WatchlistConfig:
             custom_tickers=['NVDA', 'GOOGL', 'MSFT', 'AMZN']
         )
 
+        # Screen multiple indices (e.g., SP500 + SP400 + SP600)
+        # Note: Use the string "multi" as index and provide multi_indices list
+        config = WatchlistConfig(
+            index=WatchlistIndex["multi"],
+            multi_indices=[WatchlistIndex.SP500, WatchlistIndex.SP400, WatchlistIndex.SP600]
+        )
+
     Validation:
         - If index=CUSTOM, custom_tickers must be provided
-        - If limit is set, it applies AFTER deduplication for COMBINED_SP
+        - If index=MULTI, multi_indices must be provided with at least 2 indices
+        - If limit is set, it applies AFTER deduplication for COMBINED_SP/MULTI
         - Empty ticker lists will log warning but not raise error
     """
     index: WatchlistIndex
     custom_tickers: Optional[List[str]] = None
     limit: Optional[int] = None
+    multi_indices: Optional[List[WatchlistIndex]] = None
+
+    def _get_tickers_for_index(self, idx: WatchlistIndex) -> List[str]:
+        """Get tickers for a single index"""
+        if idx == WatchlistIndex.SP500:
+            return get_sp500_tickers()
+        elif idx == WatchlistIndex.SP400:
+            return get_sp400_tickers()
+        elif idx == WatchlistIndex.SP600:
+            return get_sp600_tickers()
+        elif idx == WatchlistIndex.NASDAQ100:
+            return get_nasdaq100_tickers()
+        elif idx == WatchlistIndex.RUSSELL1000:
+            return get_russell1000_tickers()
+        elif idx == WatchlistIndex.RUSSELL2000:
+            return get_russell2000_tickers()
+        elif idx == WatchlistIndex.RUSSELL3000:
+            return get_russell3000_tickers()
+        elif idx == WatchlistIndex.COMBINED_SP:
+            sp500 = get_sp500_tickers()
+            sp400 = get_sp400_tickers()
+            sp600 = get_sp600_tickers()
+            return list(set(sp500) | set(sp400) | set(sp600))
+        elif idx == WatchlistIndex.CUSTOM:
+            return self.custom_tickers or []
+        else:
+            return []
 
     def get_tickers(self) -> List[str]:
         """Get ticker list based on configuration
@@ -151,11 +178,12 @@ class WatchlistConfig:
 
         Raises:
             ValueError: If index=CUSTOM but custom_tickers not provided
+            ValueError: If index=MULTI but multi_indices not provided
 
         Process:
             1. Validate configuration
-            2. Fetch ticker list from appropriate source
-            3. Deduplicate (important for COMBINED_SP)
+            2. Fetch ticker list from appropriate source(s)
+            3. Deduplicate (important for COMBINED_SP/MULTI)
             4. Apply limit if specified
             5. Log statistics
 
@@ -166,7 +194,7 @@ class WatchlistConfig:
         """
         logger.info(f"Fetching watchlist tickers for index: {self.index.value}")
 
-        # Validate custom ticker configuration
+        # Validate and get tickers based on index type
         if self.index == WatchlistIndex.CUSTOM:
             if not self.custom_tickers:
                 raise ValueError(
@@ -175,42 +203,28 @@ class WatchlistConfig:
             tickers = self.custom_tickers
             logger.info(f"Using custom ticker list with {len(tickers)} tickers")
 
-        # Fetch from appropriate index
-        elif self.index == WatchlistIndex.SP500:
-            tickers = get_sp500_tickers()
-            logger.info(f"Fetched {len(tickers)} tickers from S&P 500")
+        elif self.index == WatchlistIndex.MULTI:
+            if not self.multi_indices or len(self.multi_indices) < 2:
+                raise ValueError(
+                    "multi_indices must be provided with at least 2 indices when index=MULTI"
+                )
+            index_names = [idx.value for idx in self.multi_indices]
+            logger.info(f"Combining {len(self.multi_indices)} indices: {index_names}")
 
-        elif self.index == WatchlistIndex.SP400:
-            tickers = get_sp400_tickers()
-            logger.info(f"Fetched {len(tickers)} tickers from S&P MidCap 400")
+            all_tickers: Set[str] = set()
+            for idx in self.multi_indices:
+                idx_tickers = self._get_tickers_for_index(idx)
+                all_tickers.update(idx_tickers)
+                logger.info(f"  {idx.value}: {len(idx_tickers)} tickers")
 
-        elif self.index == WatchlistIndex.SP600:
-            tickers = get_sp600_tickers()
-            logger.info(f"Fetched {len(tickers)} tickers from S&P SmallCap 600")
-
-        elif self.index == WatchlistIndex.NASDAQ100:
-            tickers = get_nasdaq100_tickers()
-            logger.info(f"Fetched {len(tickers)} tickers from NASDAQ-100")
-
-        elif self.index == WatchlistIndex.RUSSELL1000:
-            tickers = get_russell1000_tickers()
-            logger.info(f"Fetched {len(tickers)} tickers from Russell 1000")
-
-        elif self.index == WatchlistIndex.RUSSELL2000:
-            tickers = get_russell2000_tickers()
-            logger.info(f"Fetched {len(tickers)} tickers from Russell 2000")
-
-        elif self.index == WatchlistIndex.RUSSELL3000:
-            tickers = get_russell3000_tickers()
-            logger.info(f"Fetched {len(tickers)} tickers from Russell 3000")
+            tickers = list(all_tickers)
+            logger.info(f"Combined total (deduplicated): {len(tickers)} tickers")
 
         elif self.index == WatchlistIndex.COMBINED_SP:
-            # Combine all three S&P indexes
             sp500 = get_sp500_tickers()
             sp400 = get_sp400_tickers()
             sp600 = get_sp600_tickers()
 
-            # Deduplicate using set (some tickers may appear in multiple indexes)
             tickers_set: Set[str] = set(sp500) | set(sp400) | set(sp600)
             tickers = list(tickers_set)
 
@@ -220,15 +234,20 @@ class WatchlistConfig:
                 f"Total (deduplicated)={len(tickers)}"
             )
 
+        elif self.index in [WatchlistIndex.SP500, WatchlistIndex.SP400, WatchlistIndex.SP600,
+                           WatchlistIndex.NASDAQ100, WatchlistIndex.RUSSELL1000,
+                           WatchlistIndex.RUSSELL2000, WatchlistIndex.RUSSELL3000]:
+            tickers = self._get_tickers_for_index(self.index)
+            logger.info(f"Fetched {len(tickers)} tickers from {self.index.value}")
+
         else:
-            # Should never reach here due to enum validation
             raise ValueError(f"Unknown index type: {self.index}")
 
         # Normalize tickers (uppercase, strip whitespace)
         tickers = [ticker.strip().upper() for ticker in tickers if ticker]
 
         # Remove duplicates (in case source data has duplicates)
-        tickers = list(dict.fromkeys(tickers))  # Preserves order, removes duplicates
+        tickers = list(dict.fromkeys(tickers))
 
         # Apply limit if specified
         if self.limit:

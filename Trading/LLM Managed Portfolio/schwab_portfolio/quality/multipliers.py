@@ -186,7 +186,7 @@ class MultiplierCalculator:
         # Enforce bounds
         safety_multiplier = max(0.70, min(1.00, safety_multiplier))
 
-        logger.debug(
+        logger.info(
             f"Safety Multiplier: {safety_multiplier:.3f} "
             f"(Z={z_score_factor:.2f}, L={leverage_factor:.2f}, "
             f"V={volatility_factor:.2f}, I={interest_factor:.2f})"
@@ -310,7 +310,7 @@ class MultiplierCalculator:
 
     def calculate_multipliers(
         self,
-        safety_metrics: Optional[Dict[str, float]] = None,
+        safety_metrics: Optional[Dict[str, Optional[float]]] = None,
         data_years: int = 5,
         required_years: int = 5,
         data_completeness: float = 1.0,

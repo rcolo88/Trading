@@ -17,6 +17,18 @@
 **/personal_trades.json
 **/trade_history_*.json
 
+# API Keys (all variations)
+*api_key*
+*apikey*
+*.key
+.env
+.env.local
+secrets.json
+tokens.json
+fmp_api_key*
+simfin_api_key*
+api_key_*.txt
+
 # ============================================
 # Python
 # ============================================
@@ -93,6 +105,14 @@ local_config.json
 test_credentials.json
 .env
 .env.local
+
+# Cache Files
+*.pkl
+fmp_cache_tracker.json
+simfin_cache.pkl
+*.cache/
+data/*.pkl
+data/*.json
 
 # ============================================
 # Jupyter Notebooks (checkpoints)

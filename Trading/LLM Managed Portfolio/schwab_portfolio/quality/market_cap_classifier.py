@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-Market Cap Classifier - Tier Classification for 4-Tier Framework
+Market Cap Classifier - Tier Classification for Quality Analysis Framework
 
 Classifies stocks into market cap tiers based on research guidelines from
-quality_investing_thresholds_research.md.
+UPDATES.md and lookback_calculator.py for consistent tier definitions.
 
-Tiers:
-- Large Cap: ≥$50B (Core Holdings 65-70%)
-- Mid Cap: $2B-$50B (Growth Quality 15-20%)
-- Small Cap: $500M-$2B (Opportunistic Quality 10-15%)
-- Micro Cap: <$500M (Not eligible for portfolio)
+Tiers (matching lookback_calculator.py):
+- Mega Cap: > $200B (1.25x lookback multiplier)
+- Large Cap: $10B - $200B (1.0x baseline multiplier)
+- Mid Cap: $2B - $10B (0.75x multiplier)
+- Small Cap: $300M - $2B (0.5x multiplier)
+- Micro Cap: < $300M (0.35x multiplier, not eligible for portfolio)
 
 Features:
-- Market cap classification with clear tier boundaries
+- Market cap classification with consistent tier boundaries
 - Batch ticker processing via yfinance
 - 4-hour caching for efficiency
 - JSON export capability
@@ -41,17 +42,19 @@ logger = logging.getLogger(__name__)
 
 
 class MarketCapTier(Enum):
-    """Market capitalization tier classification"""
-    LARGE_CAP = "Large Cap"      # ≥$50B
-    MID_CAP = "Mid Cap"          # $2B-$50B
-    SMALL_CAP = "Small Cap"      # $500M-$2B
-    MICRO_CAP = "Micro Cap"      # <$500M (not eligible)
+    """Market capitalization tier classification with lookback multipliers."""
+    MEGA_CAP = "Mega Cap"      # > $200B
+    LARGE_CAP = "Large Cap"    # $10B - $200B
+    MID_CAP = "Mid Cap"        # $2B - $10B
+    SMALL_CAP = "Small Cap"    # $300M - $2B
+    MICRO_CAP = "Micro Cap"    # < $300M (not eligible)
 
 
-# Market cap tier thresholds (in dollars)
-LARGE_CAP_THRESHOLD = 50_000_000_000   # $50 billion
+# Market cap tier thresholds (in dollars) - matching lookback_calculator.py
+MEGA_CAP_THRESHOLD = 200_000_000_000   # $200 billion
+LARGE_CAP_THRESHOLD = 10_000_000_000   # $10 billion
 MID_CAP_THRESHOLD = 2_000_000_000      # $2 billion
-SMALL_CAP_THRESHOLD = 500_000_000      # $500 million
+SMALL_CAP_THRESHOLD = 300_000_000      # $300 million
 
 
 @dataclass
@@ -200,11 +203,12 @@ class MarketCapClassifier:
         """
         Classify market cap value into tier.
 
-        Tier boundaries:
-        - Large Cap: ≥$50B
-        - Mid Cap: $2B-$50B
-        - Small Cap: $500M-$2B
-        - Micro Cap: <$500M
+        Tier boundaries (matching lookback_calculator.py):
+        - Mega Cap: > $200B
+        - Large Cap: $10B - $200B
+        - Mid Cap: $2B - $10B
+        - Small Cap: $300M - $2B
+        - Micro Cap: < $300M
 
         Args:
             market_cap: Market capitalization in dollars
@@ -216,13 +220,15 @@ class MarketCapClassifier:
             ValueError: If market_cap is negative or zero
 
         Example:
-            >>> MarketCapClassifier.classify_by_market_cap(100_000_000_000)
-            <MarketCapTier.LARGE_CAP: 'Large Cap'>
+            >>> MarketCapClassifier.classify_by_market_cap(446_300_000_000_000)
+            <MarketCapTier.MEGA_CAP: 'Mega Cap'>
         """
         if market_cap <= 0:
             raise ValueError(f"Market cap must be positive, got {market_cap}")
 
-        if market_cap >= LARGE_CAP_THRESHOLD:
+        if market_cap >= MEGA_CAP_THRESHOLD:
+            return MarketCapTier.MEGA_CAP
+        elif market_cap >= LARGE_CAP_THRESHOLD:
             return MarketCapTier.LARGE_CAP
         elif market_cap >= MID_CAP_THRESHOLD:
             return MarketCapTier.MID_CAP

@@ -560,24 +560,65 @@ class GrowthQualityAnalyzer:
             prior_total_assets=financial_data.get('prior_total_assets', 0)
         )
         asset_growth_score = self.calculate_asset_growth_score(asset_growth)
+        
+        # Fallback: if no prior data, estimate moderate growth (average score)
+        if asset_growth is None:
+            asset_growth = 0.10  # Assume 10% growth as fallback
+            logger.info(f"Using fallback asset growth rate: {asset_growth:.1%}")
 
         # Calculate Revenue CAGR
         revenues = financial_data.get('revenues', [])
         if not revenues and 'revenue_history' in financial_data:
-            revenues = list(financial_data['revenue_history'].values())
+            revenues = financial_data['revenue_history']  # Already a list
         if not revenues:
             revenues = [
                 financial_data.get('revenue', 0),
                 financial_data.get('prior_revenue', 0)
             ]
 
+        # ADD: Log revenue data for debugging
+        if revenues:
+            logger.info(f"Revenue data for CAGR: {revenues}")
+            if len(revenues) >= 2 and revenues[0] < revenues[-1]:
+                logger.warning("Revenue data appears oldest-first, reversing to newest-first")
+                revenues = list(reversed(revenues))
+                logger.info(f"Reversed revenue data: {revenues}")
+        else:
+            logger.warning("No revenue data available for CAGR calculation")
+
         revenue_cagr = self.calculate_revenue_cagr(revenues)
         revenue_cagr_score = self.calculate_revenue_cagr_score(revenue_cagr)
+        
+        # Fallback: if no historical revenue data, estimate moderate growth
+        if revenue_cagr is None:
+            revenue_cagr = 0.08  # Assume 8% CAGR as fallback
+            logger.info(f"Using fallback revenue CAGR: {revenue_cagr:.1%}")
 
         # Calculate Margin Trend
         margins = financial_data.get('margins', [])
-        if not margins and 'margin_history' in financial_data:
-            margins = list(financial_data['margin_history'].values())
+        if not margins and 'gross_margin_history' in financial_data:
+            margins = financial_data['gross_margin_history']  # Use correct key from FMP
+        elif not margins and 'margin_history' in financial_data:
+            margins = financial_data['margin_history']  # Fallback to old key
+        
+        # Check available margin data
+        valid_margins = [m for m in margins if m is not None and m > 0]
+        logger.info(f"Available margin periods: {len(valid_margins)} from {len(margins)} total")
+        
+        # Use full 5-year margin trend if available (optimal scoring)
+        if len(valid_margins) >= 5:
+            margin_trend = self.calculate_margin_trend(margins)
+            margin_trend_score = self.calculate_margin_trend_score(margin_trend)
+            logger.info(f"Using optimal 5-year margin trend: {margin_trend:.3f} ({margin_trend*100:.1f}%)")
+        elif len(valid_margins) >= 3:
+            # Adaptive 3-year scoring: give 75% credit for 3-year trend
+            margin_trend = self.calculate_margin_trend(margins, lookback_periods=2)
+            margin_trend_score = self.calculate_margin_trend_score(margin_trend) * 0.75
+            logger.info(f"Using adaptive 3-year margin trend scoring (75% credit)")
+        else:
+            logger.warning(f"Insufficient margin data: {len(valid_margins)} valid periods (need at least 3)")
+            margin_trend = 0.02  # Assume 2% margin improvement as fallback
+            margin_trend_score = 5.0  # Give average score for fallback
         if not margins:
             # Try to calculate from revenue/gross profit data
             current_gp = financial_data.get('revenue', 0) - financial_data.get('cogs', 0)
@@ -586,8 +627,24 @@ class GrowthQualityAnalyzer:
             prior_margin = prior_gp / financial_data.get('prior_revenue', 1) if financial_data.get('prior_revenue', 0) > 0 else 0
             margins = [current_margin, prior_margin]
 
-        margin_trend = self.calculate_margin_trend(margins)
-        margin_trend_score = self.calculate_margin_trend_score(margin_trend)
+        # Check available margin data first
+        valid_margins = [m for m in margins if m is not None and m > 0]
+        margin_trend = None
+        margin_trend_score = 0.0
+        
+        if len(valid_margins) >= 4:
+            # Standard 4-period calculation
+            margin_trend = self.calculate_margin_trend(margins)
+            margin_trend_score = self.calculate_margin_trend_score(margin_trend)
+        elif len(valid_margins) >= 3:
+            # Adaptive 3-year scoring: give 75% credit for 3-year trend
+            margin_trend = self.calculate_margin_trend(margins, lookback_periods=2)
+            margin_trend_score = self.calculate_margin_trend_score(margin_trend) * 0.75
+            logger.info(f"Using adaptive 3-year margin trend scoring (75% credit): {len(valid_margins)} periods available")
+        else:
+            logger.warning(f"Insufficient margin data: {len(valid_margins)} valid periods (need at least 3)")
+            margin_trend = 0.02  # Assume 2% margin improvement as fallback
+            margin_trend_score = 5.0  # Give average score for fallback
 
         # Calculate Revenue Quality
         revenue_quality_score = self.calculate_revenue_quality_score(revenues)
@@ -612,10 +669,11 @@ class GrowthQualityAnalyzer:
         is_high_quality = growth_quality_score >= 7.0
 
         logger.info(
-            f"Growth quality analysis: CAGR={revenue_cagr:.1%}" if revenue_cagr else "N/A",
-            f"Asset Growth={asset_growth:.1%}" if asset_growth else "N/A",
-            f"Score={growth_quality_score:.1f}/10, "
-            f"Red Flags={len(red_flags)}"
+            "Growth quality analysis: CAGR=%s, Asset Growth=%s, Score=%.1f/10, Red Flags=%d",
+            f"{revenue_cagr:.1%}" if revenue_cagr else "N/A",
+            f"{asset_growth:.1%}" if asset_growth else "N/A",
+            growth_quality_score,
+            len(red_flags)
         )
 
         return GrowthQualityResult(

@@ -19,6 +19,8 @@ Date: 2025-10-30
 
 import pandas as pd
 import numpy as np
+from enum import Enum
+from typing import Optional, List, Dict, Any
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 from enum import Enum
@@ -230,6 +232,105 @@ class QualityPersistenceAnalyzer:
         """Initialize the persistence analyzer."""
         self.calculator = QualityMetricsCalculator()
         logger.info("QualityPersistenceAnalyzer initialized")
+
+    def analyze_roe_history(
+        self,
+        roe_history: List[float],
+        ticker: Optional[str] = None
+    ) -> PersistenceAnalysisResult:
+        """
+        Analyze ROE persistence from FMP ROE history.
+
+        Simplified version that works with ROE history list.
+
+        Args:
+            roe_history: List of ROE values (most recent first)
+            ticker: Stock ticker for logging
+
+        Returns:
+            PersistenceAnalysisResult with basic metrics
+        """
+        try:
+            if not roe_history or len(roe_history) < 2:
+                logger.warning(f"Insufficient ROE history for {ticker}: need at least 2 years")
+                return None
+
+            # Convert ROE decimals to percentages if needed
+            roe_pct = [r * 100 if r < 1 else r for r in roe_history if r is not None and r > 0]
+
+            if not roe_pct:
+                logger.warning(f"No valid ROE data for {ticker}")
+                return None
+
+            # Calculate basic persistence metrics
+            years_analyzed = len(roe_pct)
+            roe_mean = sum(roe_pct) / years_analyzed
+            roe_years_above_15 = sum(1 for roe in roe_pct if roe >= 15)
+
+            # Log ROE values for debugging
+            logger.info(f"{ticker}: ROE values: {[f'{r:.1f}%' for r in roe_pct]}")
+            logger.info(f"{ticker}: ROE years >= 15%: {roe_years_above_15}/{years_analyzed} ({roe_years_above_15/years_analyzed:.1%})")
+
+            # Simple classification based on ROE consistency
+            roe_above_15_ratio = roe_years_above_15 / years_analyzed
+            if roe_above_15_ratio >= 0.8:
+                classification = PersistenceClassification.QUALITY_COMPOUNDER
+                confidence = 80.0 + (roe_above_15_ratio - 0.8) * 100
+            elif roe_above_15_ratio >= 0.5:
+                classification = PersistenceClassification.QUALITY_IMPROVER
+                confidence = 60.0 + (roe_above_15_ratio - 0.5) * 66.7
+            else:
+                classification = PersistenceClassification.INCONSISTENT
+                confidence = 40.0 + roe_above_15_ratio * 50
+
+            # Create result object
+            result = PersistenceAnalysisResult(
+                ticker=ticker or "",
+                classification=classification,
+                compounder_confidence=min(confidence, 95.0),
+                persistence_metrics=PersistenceMetrics(
+                    ticker=ticker or "",
+                    years_analyzed=years_analyzed,
+                    start_year=0,  # Not available from FMP data
+                    end_year=0,    # Not available from FMP data
+                    roe_mean=roe_mean / 100,  # Convert back to decimal
+                    roe_std=0.0,  # Not available from FMP data
+                    roe_cv=0.0,   # Not available from FMP data
+                    roe_trend_slope=0.0,  # Not available from FMP data
+                    roe_years_above_15pct=roe_years_above_15,
+                    roe_consistency_score=0.0,  # Not available from FMP data
+                    # Add default values for missing required fields
+                    gross_margin_mean=0.0,
+                    gross_margin_std=0.0,
+                    gross_margin_trend_slope=0.0,
+                    operating_margin_mean=0.0,
+                    operating_margin_std=0.0,
+                    operating_margin_trend_slope=0.0,
+                    roic_mean=0.0,
+                    roic_std=0.0,
+                    roic_trend_slope=0.0,
+                    roic_years_above_15pct=0,
+                    fcf_conversion_mean=0.0,
+                    fcf_conversion_std=0.0,
+                    fcf_positive_years=0,
+                    persistence_score=0.0,
+                    consistency_score=0.0,
+                    trend_score=0.0,
+                    recent_3yr_roe_mean=0.0,
+                    recent_vs_historical_roe=0.0,
+                    mean_reversion_risk=0.0
+                ),
+                trend_analysis={},  # Not calculated
+                key_insights=[],
+                warnings=[]
+            )
+
+            logger.info(f"{ticker}: FMP ROE Persistence: {classification.value} ({result.compounder_confidence:.1f}% confidence)")
+            return result
+
+        except Exception as e:
+            logger.error(f"Error analyzing ROE history for {ticker}: {e}")
+            return None
 
     def analyze_company(
         self,

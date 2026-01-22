@@ -110,12 +110,58 @@ python main_quality_analysis.py --ticker MSFT
 
 **Output:** `outputs/stock_analysis_AAPL_20250116.txt` - Detailed individual analysis
 
+### Multi-Day Orchestration (NEW!)
+```bash
+# Automatic multi-day orchestration for large datasets (NEW FEATURE!)
+python main_quality_analysis.py --index russell3000  # Automatically activates if needed
+python main_quality_analysis.py --index sp500 --multi-day  # Force multi-day mode
+python main_quality_analysis.py --index russell3000 --force-multi-day  # Force regardless of size
+
+# Features:
+# - Automatic activation when API calls exceed daily limit
+# - Intelligent market cap tier prioritization (Mega → Large → Small → Micro)
+# - 250 daily API call budget management
+# - Resume capability from any interruption point
+# - Quarterly data freshness management with 20-quarter rotation
+# - Progress tracking with ETA calculations
+# - Incremental summary updates (no data loss)
+```
+
+**Output:** `outputs/quality_analysis_summary.txt` - Incrementally updated, quarterly archives in `outputs/archive/`
+
+#### Multi-Day Logic
+The system now **automatically detects** when multi-day orchestration is needed:
+
+| Trigger | Condition | Example |
+|---------|------------|---------|
+| **API Limit Exceeded** | Total API calls > 250 | `python main_quality_analysis.py --index russell3000` |
+| **Large Dataset** | > 200 tickers | `python main_quality_analysis.py --index russell1000` |
+| **Forced** | Manual override | `python main_quality_analysis.py --multi-day` |
+
+**Smart Detection:** The system calculates exact API call requirements for each ticker based on market cap, then automatically activates multi-day mode when the total exceeds the 250-call daily limit.
+
 #### When to Use Each Mode
 
 | Mode | Use Case | Output | Time |
 |------|----------|--------|------|
 | `--index sp500` | Find highest quality stocks in an index | Ranked quality analysis | 12-17 min |
 | `--ticker AAPL` | Deep dive on specific stock | Detailed individual analysis | ~5-10 sec |
+| `--index russell3000 --multi-day` | Multi-day orchestration for large datasets | Daily batches, ~22-25 days total | Daily sessions |
+
+### Performance Options
+
+```bash
+# Parallel processing for fast analysis (6-10x speedup)
+python main_quality_analysis.py --index sp500 --parallel --workers 10
+
+# Multi-day orchestration for Russell 3000 (NEW!)
+python main_quality_analysis.py --index russell3000 --multi-day
+
+# Custom limits
+python main_quality_analysis.py --index sp500 --limit 25
+python main_quality_analysis.py --index russell3000 --multi-day
+python main_quality_analysis.py --ticker AAPL
+```
 
 ### International Markets
 ```bash
@@ -169,6 +215,10 @@ The system can analyze stocks from these pre-built indexes:
 | **`russell2000`** | Russell 2000* (US Small Cap) | ~600 stocks | US small caps | 60+ min | `--index russell2000` |
 | **`russell1000`** | Russell 1000* (US Large/Mid) | ~900 stocks | US large/mid caps | 40+ min | `--index russell1000` |
 | **`russell3000`** | Russell 3000* (US Total) | ~1500 stocks | US total market | 120+ min | `--index russell3000` |
+| `--index russell3000`** | Russell 3000* (Auto Multi-Day) | ~1500 stocks | Auto-detects multi-day needs | 22-25 days total | `--index russell3000` |
+| `--index russell3000 --multi-day`** | Russell 3000* (Force Multi-Day) | ~1500 stocks | Force multi-day mode | 22-25 days total | `--index russell3000 --multi-day` |
+| `--index sp500 --multi-day`** | S&P 500* (Force Multi-Day) | ~500 stocks | Force multi-day mode | 2-3 days total | `--index sp500 --multi-day` |
+| `--index russell1000`** | Russell 1000* (Auto Multi-Day) | ~900 stocks | Auto-detects multi-day needs | 4-6 days total | `--index russell1000` |
 
 **Note on Russell Indexes:** Russell indexes marked with (*) use S&P indexes as approximations since direct Russell data requires a paid FTSE Russell subscription. Russell 1000 is approximated by combining S&P 500 + S&P MidCap 400 (~900 stocks). Russell 2000 uses S&P SmallCap 600 (~600 stocks). Russell 3000 combines all three S&P indexes (~1500 stocks).
 
