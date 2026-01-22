@@ -50,8 +50,25 @@ Date: 2025
 
 import argparse
 import sys
+import signal
 from pathlib import Path
 from typing import List
+
+# Global flag for graceful shutdown
+_SHUTDOWN_REQUESTED = False
+
+
+def _signal_handler(signum, frame):
+    """Handle shutdown signals gracefully"""
+    global _SHUTDOWN_REQUESTED
+    _SHUTDOWN_REQUESTED = True
+    print("\n\nShutdown signal received, finishing current operation...")
+    sys.stdout.flush()
+
+
+signal.signal(signal.SIGINT, _signal_handler)
+signal.signal(signal.SIGTERM, _signal_handler)
+
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
