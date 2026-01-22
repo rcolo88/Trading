@@ -9,7 +9,8 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, List
+from dataclasses import dataclass, asdict
 import requests
 import logging
 
