@@ -6,11 +6,12 @@ Automatically converts all values to USD using live exchange rates.
 """
 
 import yfinance as yf
-import logging
-from datetime import datetime
-from typing import Dict, Optional, List, Any
-from dataclasses import dataclass, asdict
 import pandas as pd
+import numpy as np
+from datetime import datetime
+from typing import Dict, Optional
+import requests
+import logging
 
 from .currency_converter import CurrencyConverter, CurrencyConversionError
 from .company_detector import CompanyDetector, CompanyProfile
@@ -233,6 +234,9 @@ class YFinanceDataFetcher:
             
             return data
             
+        except requests.exceptions.HTTPError as e:
+            logger.warning(f"Ticker not found or delisted: {ticker} (HTTP 404)")
+            return None
         except Exception as e:
             logger.error(f"Failed to fetch yfinance data for {ticker}: {e}")
             return None

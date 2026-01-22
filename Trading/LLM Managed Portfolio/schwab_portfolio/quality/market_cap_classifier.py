@@ -27,6 +27,7 @@ import yfinance as yf
 import pickle
 import json
 import logging
+import requests
 from enum import Enum
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta
@@ -273,6 +274,10 @@ class MarketCapClassifier:
             logger.debug(f"Fetched market cap for {ticker}: ${market_cap:,.0f}")
             return market_cap, None
 
+        except requests.exceptions.HTTPError as e:
+            error = f"Ticker not found or delisted: {ticker} (HTTP 404)"
+            logger.warning(error)
+            return None, error
         except Exception as e:
             error = f"Failed to fetch market cap for {ticker}: {str(e)}"
             logger.error(error)

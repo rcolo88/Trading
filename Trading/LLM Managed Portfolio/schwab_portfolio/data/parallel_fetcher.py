@@ -8,6 +8,7 @@ Features:
 - Progress bar with tqdm
 - Graceful error handling
 - Retry logic with exponential backoff
+- Signal handling for graceful shutdown
 
 Author: Quality Analysis System
 Date: January 2026
@@ -16,6 +17,7 @@ Date: January 2026
 import logging
 import sys
 import time
+import signal
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from concurrent.futures._base import Future
 from threading import Semaphore
@@ -31,6 +33,24 @@ if TYPE_CHECKING:
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+# Global flag for graceful shutdown
+_SHUTDOWN_REQUESTED = False
+
+
+def _setup_signal_handlers():
+    """Setup signal handlers for graceful shutdown"""
+    def signal_handler(signum, frame):
+        global _SHUTDOWN_REQUESTED
+        _SHUTDOWN_REQUESTED = True
+        logger.info("Shutdown signal received, finishing current batch...")
+        
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+
+
+_setup_signal_handlers()
 
 
 @dataclass
@@ -232,18 +252,35 @@ class ParallelFetcher:
         logger.info(f"Starting parallel fetch for {len(tickers)} tickers "
                    f"(workers={self.max_workers})")
         
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {
-                executor.submit(self._fetch_single_ticker, ticker): ticker
-                for ticker in tickers
-            }
-            
-            for i, future in enumerate(as_completed(futures)):
-                ticker, data = future.result()
-                results[ticker] = data
+        try:
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = {
+                    executor.submit(self._fetch_single_ticker, ticker): ticker
+                    for ticker in tickers
+                }
                 
-                if (i + 1) % 50 == 0:
-                    logger.info(f"Progress: {i + 1}/{len(tickers)} completed")
+                for i, future in enumerate(as_completed(futures)):
+                    # Check for shutdown signal
+                    if _SHUTDOWN_REQUESTED:
+                        logger.info(f"Shutdown requested, stopping after {i+1} tickers")
+                        break
+                    
+                    try:
+                        ticker, data = future.result()
+                        results[ticker] = data
+                    except Exception as e:
+                        logger.warning(f"Error getting result: {e}")
+                        continue
+                    
+                    if (i + 1) % 50 == 0:
+                        logger.info(f"Progress: {i + 1}/{len(tickers)} completed")
+                        
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt received, stopping fetch...")
+            return results
+        except Exception as e:
+            logger.error(f"Error during batch fetch: {e}")
+            return results
         
         duration = time.time() - start_time
         
@@ -313,8 +350,17 @@ class ParallelFetcher:
 
                 with tqdm(total=len(tickers), desc=desc, unit=unit, mininterval=0.1, miniters=1, dynamic_ncols=True, disable=False, file=sys.stdout) as pbar:
                     for future in as_completed(futures):
-                        ticker, data = future.result()
-                        results[ticker] = data
+                        # Check for shutdown signal
+                        if _SHUTDOWN_REQUESTED:
+                            logger.info("Shutdown requested, stopping fetch...")
+                            break
+                        
+                        try:
+                            ticker, data = future.result()
+                            results[ticker] = data
+                        except Exception as e:
+                            logger.warning(f"Error getting result: {e}")
+                            continue
                         pbar.update(1)
 
             duration = time.time() - start_time
@@ -326,6 +372,9 @@ class ParallelFetcher:
             logger.info(f"Parallel fetch with progress complete: {duration:.1f}s")
             logger.info(f"  Success: {success_count}, Failed: {failed_count}")
 
+            return results
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt received, stopping fetch...")
             return results
         finally:
             if suppress_logging and original_level is not None:
@@ -356,29 +405,42 @@ class ParallelFetcher:
             if progress_callback:
                 progress_callback(completed, total)
 
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = {
-                executor.submit(self._fetch_single_ticker, ticker): ticker
-                for ticker in tickers
-            }
+        try:
+            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                futures = {
+                    executor.submit(self._fetch_single_ticker, ticker): ticker
+                    for ticker in tickers
+                }
 
-            completed = 0
-            for future in as_completed(futures):
-                ticker, data = future.result()
-                results[ticker] = data
-                completed += 1
-                _update_progress(completed, total)
+                completed = 0
+                for future in as_completed(futures):
+                    # Check for shutdown signal
+                    if _SHUTDOWN_REQUESTED:
+                        logger.info("Shutdown requested, stopping fetch...")
+                        break
+                    
+                    try:
+                        ticker, data = future.result()
+                        results[ticker] = data
+                    except Exception as e:
+                        logger.warning(f"Error getting result: {e}")
+                        continue
+                    completed += 1
+                    _update_progress(completed, total)
 
-        duration = time.time() - start_time
+            duration = time.time() - start_time
 
-        success_count = sum(1 for v in results.values() 
-                           if v and v.data_quality != "insufficient")
-        failed_count = sum(1 for v in results.values() if v is None)
+            success_count = sum(1 for v in results.values() 
+                               if v and v.data_quality != "insufficient")
+            failed_count = sum(1 for v in results.values() if v is None)
 
-        logger.info(f"Parallel fetch with callback complete: {duration:.1f}s")
-        logger.info(f"  Success: {success_count}, Failed: {failed_count}")
+            logger.info(f"Parallel fetch with callback complete: {duration:.1f}s")
+            logger.info(f"  Success: {success_count}, Failed: {failed_count}")
 
-        return results
+            return results
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt received, stopping fetch...")
+            return results
     
     def fetch_historical_financials(
         self,
