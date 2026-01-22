@@ -2,35 +2,15 @@
 Quality Metrics Calculator for Stock Analysis
 
 This module implements academically-validated quality metrics for evaluating company quality.
-Implements the 5-Factor Quality Framework from UPDATES.md:
+Metrics are based on research by Novy-Marx, Piotroski, and other academic studies on quality investing.
 
-Factor Weights (must sum to 1.0):
-1. Profitability (35%): Gross Profitability, ROE, ROIC
-2. Earnings Quality (20%): Accrual Ratio, Cash Conversion, Piotroski F-Score
-3. Growth Quality (15%): Asset Growth, Revenue CAGR, Margin Trend
-4. Safety (15%): Beta, Z-Score, Debt/EBITDA, Interest Coverage
-5. ROE Persistence (15%): Years >15% ROE, ROE Trend
+Ranked Metrics Calculated:
+1. Gross Profitability = (Revenue - COGS) / Total Assets
+2. Return on Equity (ROE) = Net Income / Shareholder Equity
+3. Operating Profitability = (Revenue - COGS - SG&A) / Total Assets
+4. Free Cash Flow Yield = Free Cash Flow / Market Cap
+5. ROIC = NOPAT / (Total Debt + Total Equity)
 
-Market Cap Multipliers (for lookback adjustments):
-- Mega Cap (> $200B): 1.25x
-- Large Cap ($10B-$200B): 1.0x
-- Mid Cap ($2B-$10B): 0.75x
-- Small Cap ($300M-$2B): 0.5x
-- Micro Cap (< $300M): 0.35x
-
-Multipliers (final score adjustments):
-- Safety Multiplier: 0.70 - 1.00 (based on risk factors)
-- Data Quality Multiplier: 0.80 - 1.00 (based on data availability)
-
-Research References:
-- Novy-Marx (2013): Gross profitability is a powerful predictor
-- Piotroski (2000): F-Score for financial health
-- Sloan (1996): Accrual anomaly
-- Cooper, Gulen, Schill (2008): Asset growth anomaly
-- Fama-French (2015): Quality factor definition
-
-Author: Quality Analysis System
-Date: January 2026
 """
 
 from typing import Dict, List, Tuple, Optional, Any
@@ -38,9 +18,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 
+# Configure logging
 logger = logging.getLogger(__name__)
 
-# Import new quality modules
+# Import quality analysis modules
 from .earnings_quality import (
     EarningsQualityAnalyzer,
     EarningsQualityResult,
@@ -59,17 +40,6 @@ from .safety_metrics import (
     get_safety_analyzer
 )
 
-from .lookback_calculator import (
-    LookbackCalculator,
-    get_lookback_calculator
-)
-
-from .multipliers import (
-    MultiplierCalculator,
-    MultiplierResult,
-    get_multiplier_calculator
-)
-
 
 class QualityTier(Enum):
     """Quality tier classifications based on composite score."""
@@ -77,16 +47,6 @@ class QualityTier(Enum):
     STRONG = "Strong"        # 70-84
     MODERATE = "Moderate"    # 50-69
     WEAK = "Weak"           # 0-49
-
-
-@dataclass
-class DimensionScore:
-    """Score for a single quality dimension."""
-    name: str
-    score: float
-    weight: float
-    weighted_score: float
-    metrics: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -110,8 +70,18 @@ class RedFlag:
 
 
 @dataclass
+class DimensionScore:
+    """Score for a single quality dimension."""
+    name: str
+    score: float
+    weight: float
+    weighted_score: float
+    metrics: Dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
 class QualityAnalysisResult:
-    """Complete quality analysis result (supports DEFAULT, STEPS, and NEW_5FACTOR frameworks)."""
+    """Complete quality analysis result (supports both DEFAULT and STEPS frameworks)."""
     ticker: str
     metric_scores: List[MetricScore]
     composite_score: float
@@ -120,29 +90,22 @@ class QualityAnalysisResult:
     is_consistent_roe_performer: bool
     summary: str
     raw_metrics: Dict[str, float]
-    market_cap: Optional[float] = None
-    framework: str = 'NEW_5FACTOR'  # 'DEFAULT', 'STEPS', or 'NEW_5FACTOR'
-    dimension_scores: Optional[Dict[str, DimensionScore]] = None
-    dimension_weights: Optional[Dict[str, float]] = None
-    multiplier_result: Optional[MultiplierResult] = None
-    base_score: Optional[float] = None  # Score before multipliers
+    market_cap: Optional[float] = None  # Market capitalization (for tier classification)
+    framework: str = 'DEFAULT'  # 'DEFAULT' or 'STEPS'
+    dimension_scores: Optional[Dict[str, float]] = None  # For STEPS mode transparency
+    dimension_weights: Optional[Dict[str, float]] = None  # Document weights used
 
 
 class QualityMetricsCalculator:
     """
     Calculates and analyzes quality metrics for stock evaluation.
 
-    Implements three frameworks:
-    1. DEFAULT: Original 5-metric system
-    2. STEPS: 4-dimension STEPS framework
-    3. NEW_5FACTOR: 5-dimension comprehensive framework (recommended)
+    This class implements five academically-validated quality metrics and provides
+    comprehensive scoring, tier classification, and red flag detection.
 
-    NEW_5FACTOR Framework (UPDATES.md):
-    - Profitability (35%): Gross Profitability, ROE, ROIC
-    - Earnings Quality (20%): Accrual Ratio, Cash Conversion, Piotroski F-Score
-    - Growth Quality (15%): Asset Growth, Revenue CAGR, Margin Trend
-    - Safety (15%): Beta, Z-Score, Debt/EBITDA, Interest Coverage
-    - ROE Persistence (15%): Years >15% ROE, ROE Trend
+    Attributes:
+        METRIC_WEIGHTS: Dictionary defining weights for each quality metric
+        TIER_THRESHOLDS: Score thresholds for quality tier classification
 
     Example:
         >>> calculator = QualityMetricsCalculator()
@@ -150,6 +113,7 @@ class QualityMetricsCalculator:
         ...     'ticker': 'AAPL',
         ...     'revenue': 394_328_000_000,
         ...     'cogs': 223_546_000_000,
+        ...     'sga': 26_094_000_000,
         ...     'total_assets': 352_755_000_000,
         ...     'net_income': 99_803_000_000,
         ...     'shareholder_equity': 62_146_000_000,
@@ -158,35 +122,40 @@ class QualityMetricsCalculator:
         ...     'total_debt': 111_088_000_000,
         ...     'nopat': 85_000_000_000,
         ... }
-        >>> result = calculator.calculate_quality_metrics(financial_data, framework='NEW_5FACTOR')
+        >>> result = calculator.calculate_quality_metrics(financial_data)
         >>> print(f"Composite Score: {result.composite_score}")
         >>> print(f"Tier: {result.tier.value}")
     """
 
-    # NEW_5FACTOR dimension weights (must sum to 1.0)
+    # Metric weights (must sum to 1.0) - Research-backed priority order
+    # 1. Gross profitability: Sharpe ratio 0.85, strongest predictor
+    # 2. ROE: Powerful for persistence (15%+ for 10 years)
+    # 3. Operating profitability: Comparable to gross profitability in Fama-French
+    # 4. FCF yield: Top quintile outperforms by ~10% annually
+    # 5. ROIC: Core quality assessment metric
+    METRIC_WEIGHTS = {
+        'gross_profitability': 0.30,   # Strongest predictor (was 0.25)
+        'roe': 0.25,                   # Persistence power (was 0.20)
+        'operating_profitability': 0.20,  # Comparable to gross prof
+        'fcf_yield': 0.15,             # Strong performance (was 0.20)
+        'roic': 0.10                   # Core metric (was 0.15)
+    }
+
+    # STEPS framework weights (4 dimensions, must sum to 1.0)
+    STEPS_WEIGHTS = {
+        'gross_profitability': 0.30,
+        'roe_persistence': 0.25,
+        'earnings_quality': 0.25,
+        'conservative_growth': 0.20
+    }
+
+    # NEW_5FACTOR framework weights (5 dimensions, must sum to 1.0)
     NEW_5FACTOR_WEIGHTS = {
         'profitability': 0.35,
         'earnings_quality': 0.20,
         'growth_quality': 0.15,
         'safety': 0.15,
         'roe_persistence': 0.15
-    }
-
-    # Original DEFAULT weights
-    METRIC_WEIGHTS = {
-        'gross_profitability': 0.30,
-        'roe': 0.25,
-        'operating_profitability': 0.20,
-        'fcf_yield': 0.15,
-        'roic': 0.10
-    }
-
-    # STEPS framework weights (must sum to 1.0)
-    STEPS_WEIGHTS = {
-        'gross_profitability': 0.30,
-        'roe_persistence': 0.25,
-        'earnings_quality': 0.25,
-        'conservative_growth': 0.20
     }
 
     # Tier classification thresholds
@@ -242,35 +211,49 @@ class QualityMetricsCalculator:
 
     def __init__(self):
         """Initialize the Quality Metrics Calculator."""
-        self.earnings_analyzer = get_earnings_quality_analyzer()
-        self.growth_analyzer = get_growth_quality_analyzer()
-        self.safety_analyzer = get_safety_analyzer()
-        self.lookback_calculator = get_lookback_calculator()
-        self.multiplier_calculator = get_multiplier_calculator()
-
         # Validate weights sum to 1.0
-        total_weight = sum(self.NEW_5FACTOR_WEIGHTS.values())
+        total_weight = sum(self.METRIC_WEIGHTS.values())
         if abs(total_weight - 1.0) > 0.001:
-            raise ValueError(f"NEW_5FACTOR weights must sum to 1.0, got {total_weight}")
+            raise ValueError(f"Metric weights must sum to 1.0, got {total_weight}")
 
-        logger.info("QualityMetricsCalculator initialized with NEW_5FACTOR framework")
+        # Initialize quality analyzers
+        self.earnings_analyzer = EarningsQualityAnalyzer()
+        self.growth_analyzer = GrowthQualityAnalyzer()
+        self.safety_analyzer = SafetyAnalyzer()
 
-    def calculate_quality_metrics(
-        self,
-        financial_data: Dict[str, Any],
-        framework: str = 'NEW_5FACTOR'
-    ) -> QualityAnalysisResult:
+        logger.info("QualityMetricsCalculator initialized")
+
+    def calculate_quality_metrics(self, financial_data: Dict[str, Any], framework: str = 'DEFAULT') -> QualityAnalysisResult:
         """
         Calculate all quality metrics and generate comprehensive analysis.
 
         Supports three frameworks:
-        - NEW_5FACTOR: 5-dimension comprehensive framework (recommended)
-        - DEFAULT: Original 5-metric system
-        - STEPS: 4-dimension STEPS framework
+        - DEFAULT: 5-metric system (Gross Profitability, ROE, Operating Profitability, FCF Yield, ROIC)
+        - STEPS: 4-dimension system (Gross Profitability, ROE Persistence, Earnings Quality, Conservative Growth)
+        - NEW_5FACTOR: 5-dimension system (Profitability, Earnings Quality, Growth Quality, Safety, ROE Persistence)
 
         Args:
-            financial_data: Dictionary containing financial metrics
-            framework: 'NEW_5FACTOR', 'DEFAULT', or 'STEPS'
+            financial_data: Dictionary containing financial metrics with keys:
+                - ticker: Stock ticker symbol
+                - revenue: Total revenue
+                - cogs: Cost of goods sold
+                - sga: Selling, general & administrative expenses
+                - total_assets: Total assets
+                - net_income: Net income
+                - shareholder_equity: Shareholder equity
+                - free_cash_flow: Free cash flow
+                - market_cap: Market capitalization
+                - total_debt: Total debt
+                - nopat: Net operating profit after tax
+                - roe_history: (Optional) List of historical ROE values (required for STEPS)
+                - operating_cash_flow: (Optional) Operating cash flow (required for STEPS)
+                - accruals: (Optional) Accruals as % of assets
+                - asset_growth: (Optional) YoY asset growth rate
+                - margin_change: (Optional) YoY margin change
+                - prior_year_revenue: (Optional) Prior year revenue
+                - prior_year_cogs: (Optional) Prior year COGS
+                - ebitda: (Optional) EBITDA (required for STEPS Conservative Growth)
+            framework: 'DEFAULT', 'STEPS', or 'NEW_5FACTOR' (default: 'DEFAULT')
 
         Returns:
             QualityAnalysisResult: Complete analysis with scores, tier, and red flags
@@ -283,16 +266,23 @@ class QualityMetricsCalculator:
 
         # Validate framework parameter
         if framework not in ['DEFAULT', 'STEPS', 'NEW_5FACTOR']:
-            raise ValueError(
-                f"Invalid framework '{framework}'. "
-                "Must be 'DEFAULT', 'STEPS', or 'NEW_5FACTOR'"
-            )
+            raise ValueError(f"Invalid framework '{framework}'. Must be 'DEFAULT', 'STEPS', or 'NEW_5FACTOR'")
+
+        # Validate required fields
+        is_valid, missing_fields, zero_fields = self._validate_financial_data(financial_data, framework)
+
+        # If data is invalid, log warning and continue with best effort
+        if not is_valid:
+            if missing_fields:
+                logger.warning(f"Missing fields for {ticker}: {', '.join(missing_fields)}")
+            if zero_fields:
+                logger.warning(f"Zero values for critical fields: {', '.join(zero_fields)}")
 
         # Branch based on framework
-        if framework == 'NEW_5FACTOR':
-            return self._calculate_new_5factor_metrics(financial_data)
-        elif framework == 'STEPS':
+        if framework == 'STEPS':
             return self._calculate_steps_metrics(financial_data)
+        elif framework == 'NEW_5FACTOR':
+            return self._calculate_new_5factor_metrics(financial_data)
         else:
             return self._calculate_default_metrics(financial_data)
 
@@ -353,16 +343,16 @@ class QualityMetricsCalculator:
         logger.info(f"Quality analysis complete for {ticker}: {tier.value} tier, score {composite_score:.1f}")
         return result
 
-    def _validate_financial_data(self, data: Dict[str, Any], framework: str = 'DEFAULT') -> None:
+    def _validate_financial_data(self, data: Dict[str, Any], framework: str = 'DEFAULT') -> tuple:
         """
         Validate that required financial data fields are present and valid.
 
         Args:
             data: Financial data dictionary
-            framework: 'DEFAULT' or 'STEPS'
+            framework: 'DEFAULT', 'STEPS', or 'NEW_5FACTOR'
 
-        Raises:
-            ValueError: If required fields are missing or invalid
+        Returns:
+            Tuple of (is_valid: bool, missing_fields: list, zero_fields: list)
         """
         required_fields = [
             'revenue', 'cogs', 'sga', 'total_assets', 'net_income',
@@ -372,26 +362,22 @@ class QualityMetricsCalculator:
 
         # Additional fields required for STEPS framework
         if framework == 'STEPS':
-            required_fields.extend(['operating_cash_flow'])  # For earnings quality
+            required_fields.extend(['operating_cash_flow'])
 
-        missing_fields = [field for field in required_fields if field not in data]
-        if missing_fields:
-            raise ValueError(f"Missing required fields for {framework} framework: {', '.join(missing_fields)}")
+        missing_fields = []
+        none_fields = []
+        zero_fields = []
 
-        # Validate no negative values for key metrics
         for field in required_fields:
-            if data[field] is None:
-                raise ValueError(f"Field '{field}' cannot be None")
+            if field not in data:
+                missing_fields.append(field)
+            elif data[field] is None:
+                none_fields.append(field)
+            elif isinstance(data[field], (int, float)) and data[field] == 0:
+                if field in ['total_assets', 'shareholder_equity', 'market_cap']:
+                    zero_fields.append(field)
 
-        # Validate denominators are not zero
-        if data['total_assets'] == 0:
-            raise ValueError("total_assets cannot be zero")
-        if data['shareholder_equity'] == 0:
-            raise ValueError("shareholder_equity cannot be zero")
-        if data['market_cap'] == 0:
-            raise ValueError("market_cap cannot be zero")
-        if (data['total_debt'] + data['shareholder_equity']) == 0:
-            raise ValueError("total_debt + shareholder_equity cannot be zero")
+        return len(missing_fields) == 0 and len(zero_fields) == 0, missing_fields, zero_fields
 
     def _calculate_raw_metrics(self, data: Dict[str, Any]) -> Dict[str, float]:
         """
@@ -405,31 +391,54 @@ class QualityMetricsCalculator:
         """
         metrics = {}
 
+        # Safely get values with defaults
+        revenue = data.get('revenue', 0) or 0
+        cogs = data.get('cogs', 0) or 0
+        sga = data.get('sga', 0) or 0
+        total_assets = data.get('total_assets', 1) or 1
+        net_income = data.get('net_income', 0) or 0
+        shareholder_equity = data.get('shareholder_equity', 1) or 1
+        free_cash_flow = data.get('free_cash_flow', 0) or 0
+        market_cap = data.get('market_cap', 1) or 1
+        total_debt = data.get('total_debt', 0) or 0
+        nopat = data.get('nopat', 0) or 0
+
+        # Ensure denominators are not zero
+        if total_assets == 0:
+            total_assets = 1
+        if shareholder_equity == 0:
+            shareholder_equity = 1
+        if market_cap == 0:
+            market_cap = 1
+
         # 1. Gross Profitability = (Revenue - COGS) / Total Assets
         metrics['gross_profitability'] = (
-            (data['revenue'] - data['cogs']) / data['total_assets']
+            (revenue - cogs) / total_assets
         )
 
         # 2. Return on Equity (ROE) = Net Income / Shareholder Equity
-        metrics['roe'] = data['net_income'] / data['shareholder_equity']
+        metrics['roe'] = net_income / shareholder_equity
 
         # 3. Operating Profitability = (Revenue - COGS - SG&A) / Total Assets
         metrics['operating_profitability'] = (
-            (data['revenue'] - data['cogs'] - data['sga']) / data['total_assets']
+            (revenue - cogs - sga) / total_assets
         )
 
         # 4. Free Cash Flow Yield = Free Cash Flow / Market Cap
-        metrics['fcf_yield'] = data['free_cash_flow'] / data['market_cap']
+        metrics['fcf_yield'] = free_cash_flow / market_cap
 
         # 5. ROIC = NOPAT / (Total Debt + Total Equity)
-        invested_capital = data['total_debt'] + data['shareholder_equity']
-        metrics['roic'] = data['nopat'] / invested_capital
+        invested_capital = total_debt + shareholder_equity
+        if invested_capital == 0:
+            metrics['roic'] = 0.0
+        else:
+            metrics['roic'] = nopat / invested_capital
 
         # Additional metrics for red flag detection
-        metrics['debt_to_equity'] = (
-            data['total_debt'] / data['shareholder_equity']
-            if data['shareholder_equity'] != 0 else float('inf')
-        )
+        if shareholder_equity != 0:
+            metrics['debt_to_equity'] = total_debt / shareholder_equity
+        else:
+            metrics['debt_to_equity'] = float('inf')
 
         return metrics
 
@@ -635,23 +644,25 @@ class QualityMetricsCalculator:
             ))
 
         # 5. Negative Free Cash Flow
-        if data['free_cash_flow'] < 0:
+        free_cash_flow = data.get('free_cash_flow', 0) or 0
+        if free_cash_flow < 0:
             red_flags.append(RedFlag(
                 category="Negative Free Cash Flow",
                 severity="HIGH",
-                description=f"Negative FCF of ${abs(data['free_cash_flow']):,.0f}. "
+                description=f"Negative FCF of ${abs(free_cash_flow):,.0f}. "
                            "Company is burning cash and may face liquidity issues.",
-                metric_value=data['free_cash_flow']
+                metric_value=free_cash_flow
             ))
 
         # 6. Negative ROE
-        if raw_metrics['roe'] < 0:
+        roe = raw_metrics.get('roe', 0)
+        if roe is not None and roe < 0:
             red_flags.append(RedFlag(
                 category="Negative Return on Equity",
                 severity="HIGH",
-                description=f"ROE at {raw_metrics['roe']*100:.1f}%. "
+                description=f"ROE at {roe*100:.1f}%. "
                            "Company is destroying shareholder value.",
-                metric_value=raw_metrics['roe']
+                metric_value=roe
             ))
 
         return red_flags
@@ -821,456 +832,6 @@ class QualityMetricsCalculator:
         logger.info(f"Percentile scores calculated for {ticker} against {len(peer_metrics)} peers")
         return result
 
-    # ==================== NEW_5FACTOR FRAMEWORK METHODS ====================
-
-    def _calculate_new_5factor_metrics(self, financial_data: Dict[str, Any]) -> QualityAnalysisResult:
-        """
-        Calculate quality metrics using NEW_5FACTOR framework (5-dimension comprehensive).
-
-        NEW_5FACTOR Framework (UPDATES.md):
-        - Profitability (35%): Gross Profitability, ROE, ROIC
-        - Earnings Quality (20%): Accrual Ratio, Cash Conversion, Piotroski F-Score
-        - Growth Quality (15%): Asset Growth, Revenue CAGR, Margin Trend
-        - Safety (15%): Beta, Z-Score, Debt/EBITDA, Interest Coverage
-        - ROE Persistence (15%): Years >15% ROE, ROE Trend
-
-        Args:
-            financial_data: Financial data dictionary
-
-        Returns:
-            QualityAnalysisResult with NEW_5FACTOR framework
-        """
-        ticker = financial_data.get('ticker', 'UNKNOWN')
-        market_cap = financial_data.get('market_cap', 0)
-        logger.info(f"Calculating NEW_5FACTOR quality metrics for {ticker}")
-
-        # Calculate dimension scores using specialized analyzers
-        profitability_score, profitability_metrics = self._calculate_profitability_score(financial_data)
-
-        earnings_result = self.earnings_analyzer.analyze(financial_data)
-        earnings_quality_score = earnings_result.earnings_quality_score
-
-        growth_result = self.growth_analyzer.analyze(financial_data)
-        growth_quality_score = growth_result.growth_quality_score
-
-        safety_result = self.safety_analyzer.analyze(financial_data)
-        safety_score = safety_result.safety_score
-
-        roe_persistence_score, roe_metrics = self._calculate_roe_persistence_score_new(financial_data)
-
-        # Calculate base composite score (0-100 scale)
-        base_score = (
-            profitability_score * self.NEW_5FACTOR_WEIGHTS['profitability'] +
-            earnings_quality_score * self.NEW_5FACTOR_WEIGHTS['earnings_quality'] +
-            growth_quality_score * self.NEW_5FACTOR_WEIGHTS['growth_quality'] +
-            safety_score * self.NEW_5FACTOR_WEIGHTS['safety'] +
-            roe_persistence_score * self.NEW_5FACTOR_WEIGHTS['roe_persistence']
-        ) * 10
-
-        # Calculate multipliers
-        safety_metrics = {
-            'z_score': safety_result.altman_z_score,
-            'debt_to_ebitda': safety_result.debt_to_ebitda,
-            'interest_coverage': safety_result.interest_coverage,
-            'beta': safety_result.beta
-        }
-
-        multiplier_result = self.multiplier_calculator.calculate_multipliers(
-            safety_metrics=safety_metrics,
-            data_years=financial_data.get('data_years', 5),
-            required_years=5,
-            data_completeness=financial_data.get('data_completeness', 1.0),
-            has_audited_statements=financial_data.get('has_audited_statements', True),
-            market_cap=market_cap
-        )
-
-        # Apply multipliers
-        composite_score = base_score * multiplier_result.combined_multiplier
-
-        # Build dimension scores
-        dimension_scores = {
-            'profitability': DimensionScore(
-                name='Profitability',
-                score=profitability_score,
-                weight=self.NEW_5FACTOR_WEIGHTS['profitability'],
-                weighted_score=profitability_score * self.NEW_5FACTOR_WEIGHTS['profitability'],
-                metrics=profitability_metrics
-            ),
-            'earnings_quality': DimensionScore(
-                name='Earnings Quality',
-                score=earnings_quality_score,
-                weight=self.NEW_5FACTOR_WEIGHTS['earnings_quality'],
-                weighted_score=earnings_quality_score * self.NEW_5FACTOR_WEIGHTS['earnings_quality'],
-                metrics={
-                    'accrual_ratio': earnings_result.accrual_ratio,
-                    'cash_conversion': earnings_result.cash_conversion,
-                    'f_score': earnings_result.f_score
-                }
-            ),
-            'growth_quality': DimensionScore(
-                name='Growth Quality',
-                score=growth_quality_score,
-                weight=self.NEW_5FACTOR_WEIGHTS['growth_quality'],
-                weighted_score=growth_quality_score * self.NEW_5FACTOR_WEIGHTS['growth_quality'],
-                metrics={
-                    'asset_growth': growth_result.asset_growth_rate,
-                    'revenue_cagr': growth_result.revenue_cagr,
-                    'margin_trend': growth_result.margin_trend
-                }
-            ),
-            'safety': DimensionScore(
-                name='Safety',
-                score=safety_score,
-                weight=self.NEW_5FACTOR_WEIGHTS['safety'],
-                weighted_score=safety_score * self.NEW_5FACTOR_WEIGHTS['safety'],
-                metrics={
-                    'beta': safety_result.beta,
-                    'z_score': safety_result.altman_z_score,
-                    'debt_to_ebitda': safety_result.debt_to_ebitda,
-                    'interest_coverage': safety_result.interest_coverage
-                }
-            ),
-            'roe_persistence': DimensionScore(
-                name='ROE Persistence',
-                score=roe_persistence_score,
-                weight=self.NEW_5FACTOR_WEIGHTS['roe_persistence'],
-                weighted_score=roe_persistence_score * self.NEW_5FACTOR_WEIGHTS['roe_persistence'],
-                metrics=roe_metrics
-            )
-        }
-
-        # Combine all red flags
-        all_red_flags = []
-        for rf in earnings_result.red_flags:
-            all_red_flags.append(RedFlag(
-                category=rf['category'],
-                severity=rf['severity'],
-                description=rf['description'],
-                metric_value=rf['metric_value']
-            ))
-        for rf in growth_result.red_flags:
-            all_red_flags.append(RedFlag(
-                category=rf['category'],
-                severity=rf['severity'],
-                description=rf['description'],
-                metric_value=rf['metric_value']
-            ))
-        for rf in safety_result.red_flags:
-            all_red_flags.append(RedFlag(
-                category=rf['category'],
-                severity=rf['severity'],
-                description=rf['description'],
-                metric_value=rf['metric_value']
-            ))
-
-        # Classify tier
-        tier = self._classify_tier(composite_score)
-
-        # Check for consistent ROE performance
-        is_consistent_roe = self._check_consistent_roe(financial_data)
-
-        # Generate summary
-        summary = self._generate_new_5factor_summary(
-            ticker=ticker,
-            base_score=base_score,
-            composite_score=composite_score,
-            tier=tier,
-            dimension_scores=dimension_scores,
-            multiplier_result=multiplier_result,
-            red_flags=all_red_flags,
-            is_consistent_roe=is_consistent_roe
-        )
-
-        # Create metric scores list for backward compatibility
-        metric_scores = [
-            MetricScore(
-                name='Profitability',
-                value=0.0,
-                score=profitability_score,
-                weight=self.NEW_5FACTOR_WEIGHTS['profitability'],
-                weighted_score=profitability_score * self.NEW_5FACTOR_WEIGHTS['profitability']
-            ),
-            MetricScore(
-                name='Earnings Quality',
-                value=0.0,
-                score=earnings_quality_score,
-                weight=self.NEW_5FACTOR_WEIGHTS['earnings_quality'],
-                weighted_score=earnings_quality_score * self.NEW_5FACTOR_WEIGHTS['earnings_quality']
-            ),
-            MetricScore(
-                name='Growth Quality',
-                value=0.0,
-                score=growth_quality_score,
-                weight=self.NEW_5FACTOR_WEIGHTS['growth_quality'],
-                weighted_score=growth_quality_score * self.NEW_5FACTOR_WEIGHTS['growth_quality']
-            ),
-            MetricScore(
-                name='Safety',
-                value=0.0,
-                score=safety_score,
-                weight=self.NEW_5FACTOR_WEIGHTS['safety'],
-                weighted_score=safety_score * self.NEW_5FACTOR_WEIGHTS['safety']
-            ),
-            MetricScore(
-                name='ROE Persistence',
-                value=0.0,
-                score=roe_persistence_score,
-                weight=self.NEW_5FACTOR_WEIGHTS['roe_persistence'],
-                weighted_score=roe_persistence_score * self.NEW_5FACTOR_WEIGHTS['roe_persistence']
-            )
-        ]
-
-        result = QualityAnalysisResult(
-            ticker=ticker,
-            metric_scores=metric_scores,
-            composite_score=round(composite_score, 1),
-            tier=tier,
-            red_flags=all_red_flags,
-            is_consistent_roe_performer=is_consistent_roe,
-            summary=summary,
-            raw_metrics={},
-            market_cap=market_cap,
-            framework='NEW_5FACTOR',
-            dimension_scores=dimension_scores,
-            dimension_weights=dict(self.NEW_5FACTOR_WEIGHTS),
-            multiplier_result=multiplier_result,
-            base_score=round(base_score, 1)
-        )
-
-        logger.info(f"NEW_5FACTOR analysis complete for {ticker}: {tier.value} tier, score {composite_score:.1f}")
-        return result
-
-    def _calculate_profitability_score(self, financial_data: Dict[str, Any]) -> Tuple[float, Dict[str, float]]:
-        """
-        Calculate profitability dimension score (0-10 scale).
-
-        Components:
-        - Gross Profitability: (Revenue - COGS) / Total Assets
-        - ROE: Net Income / Shareholder Equity
-        - ROIC: NOPAT / Invested Capital
-
-        Args:
-            financial_data: Financial data dictionary
-
-        Returns:
-            Tuple of (profitability_score, metrics_dict)
-        """
-        revenue = financial_data.get('revenue', 0)
-        cogs = financial_data.get('cogs', 0)
-        total_assets = financial_data.get('total_assets', 1)
-        net_income = financial_data.get('net_income', 0)
-        shareholder_equity = financial_data.get('shareholder_equity', 1)
-        total_debt = financial_data.get('total_debt', 0)
-        nopat = financial_data.get('nopat', 0)
-
-        # Calculate components
-        gross_profitability = (revenue - cogs) / total_assets if total_assets > 0 else 0
-        roe = net_income / shareholder_equity if shareholder_equity > 0 else 0
-        invested_capital = total_debt + shareholder_equity
-        roic = nopat / invested_capital if invested_capital > 0 else 0
-
-        # Score each component (0-10 scale)
-        gp_score = self._score_profitability_metric(gross_profitability, 'gross')
-        roe_score = self._score_profitability_metric(roe, 'roe')
-        roic_score = self._score_profitability_metric(roic, 'roic')
-
-        # Weighted average (equal weights within profitability)
-        profitability_score = (gp_score + roe_score + roic_score) / 3
-
-        metrics = {
-            'gross_profitability': gross_profitability,
-            'roe': roe,
-            'roic': roic
-        }
-
-        return round(profitability_score, 1), metrics
-
-    def _score_profitability_metric(self, value: float, metric_type: str) -> float:
-        """Score a profitability metric on 0-10 scale."""
-        if metric_type == 'gross':
-            # Gross Profitability thresholds
-            if value >= 0.45:
-                return 10.0
-            elif value >= 0.35:
-                return 7.0 + (value - 0.35) / 0.10 * 2.0
-            elif value >= 0.25:
-                return 4.0 + (value - 0.25) / 0.10 * 2.0
-            elif value >= 0.15:
-                return 1.0 + (value - 0.15) / 0.10 * 2.0
-            else:
-                return max(0.0, value / 0.15 * 1.0)
-        elif metric_type == 'roe':
-            # ROE thresholds
-            if value >= 0.25:
-                return 10.0
-            elif value >= 0.18:
-                return 7.0 + (value - 0.18) / 0.07 * 2.0
-            elif value >= 0.12:
-                return 4.0 + (value - 0.12) / 0.06 * 2.0
-            elif value >= 0.05:
-                return 1.0 + (value - 0.05) / 0.07 * 2.0
-            else:
-                return max(0.0, value / 0.05 * 1.0)
-        else:  # roic
-            if value >= 0.20:
-                return 10.0
-            elif value >= 0.15:
-                return 7.0 + (value - 0.15) / 0.05 * 2.0
-            elif value >= 0.10:
-                return 4.0 + (value - 0.10) / 0.05 * 2.0
-            elif value >= 0.05:
-                return 1.0 + (value - 0.05) / 0.05 * 2.0
-            else:
-                return max(0.0, value / 0.05 * 1.0)
-
-    def _calculate_roe_persistence_score_new(self, financial_data: Dict[str, Any]) -> Tuple[float, Dict[str, float]]:
-        """
-        Calculate ROE Persistence dimension score (0-10 scale).
-
-        Components:
-        - Years with ROE > 15%
-        - ROE Trend (improving vs declining)
-        - ROE Stability (low variance)
-
-        Args:
-            financial_data: Financial data dictionary
-
-        Returns:
-            Tuple of (roe_persistence_score, metrics_dict)
-        """
-        roe_history = financial_data.get('roe_history', [])
-        net_income = financial_data.get('net_income', 0)
-        shareholder_equity = financial_data.get('shareholder_equity', 1)
-
-        current_roe = net_income / shareholder_equity if shareholder_equity > 0 else 0
-
-        # Count years with ROE > 15%
-        high_roe_years = sum(1 for roe in roe_history if roe > 0.15)
-
-        # Calculate ROE trend (if we have history)
-        if len(roe_history) >= 2:
-            recent_avg = sum(roe_history[:2]) / 2
-            old_avg = sum(roe_history[-2:]) / 2
-            roe_trend = (recent_avg - old_avg) / old_avg if old_avg > 0 else 0
-        else:
-            roe_trend = 0
-
-        # Calculate ROE stability (inverse of variance)
-        if len(roe_history) >= 3:
-            import statistics
-            roe_std = statistics.stdev(roe_history)
-            stability_score = max(0, 10 - roe_std * 100)  # Lower variance = higher score
-        else:
-            stability_score = 5.0  # Neutral if insufficient data
-
-        # Score high ROE years (0-10 based on consecutive years >15%)
-        if len(roe_history) >= 10:
-            years_score = min(10.0, high_roe_years * 1.0)
-        else:
-            years_score = min(10.0, high_roe_years * 1.5)
-
-        # Score ROE trend
-        if roe_trend > 0.10:
-            trend_score = 10.0
-        elif roe_trend > 0.05:
-            trend_score = 7.0 + (roe_trend - 0.05) / 0.05 * 2.0
-        elif roe_trend > 0:
-            trend_score = 5.0 + roe_trend / 0.05 * 2.0
-        elif roe_trend > -0.05:
-            trend_score = 3.0 + (roe_trend + 0.05) / 0.05 * 2.0
-        else:
-            trend_score = max(1.0, 3.0 + roe_trend * 5)
-
-        # Weighted average
-        roe_persistence_score = (
-            years_score * 0.40 +
-            trend_score * 0.35 +
-            stability_score * 0.25
-        )
-
-        metrics = {
-            'high_roe_years': high_roe_years,
-            'current_roe': current_roe,
-            'roe_trend': roe_trend,
-            'roe_stability': stability_score
-        }
-
-        return round(roe_persistence_score, 1), metrics
-
-    def _generate_new_5factor_summary(
-        self,
-        ticker: str,
-        base_score: float,
-        composite_score: float,
-        tier: QualityTier,
-        dimension_scores: Dict[str, DimensionScore],
-        multiplier_result: MultiplierResult,
-        red_flags: List[RedFlag],
-        is_consistent_roe: bool
-    ) -> str:
-        """Generate human-readable summary for NEW_5FACTOR analysis."""
-        lines = []
-        lines.append(f"=== NEW_5FACTOR Quality Analysis for {ticker} ===\n")
-        lines.append(f"Base Quality Score: {base_score:.1f}/100")
-        lines.append(f"Composite Quality Score: {composite_score:.1f}/100")
-        lines.append(f"Quality Tier: {tier.value}\n")
-
-        if multiplier_result.quality_adjustment_notes:
-            lines.append("Score Adjustments:")
-            for key, note in multiplier_result.quality_adjustment_notes.items():
-                lines.append(f"  {key}: {note}")
-            lines.append("")
-
-        lines.append("Dimension Scores:")
-        lines.append("-" * 60)
-
-        for dim_name, dim_score in dimension_scores.items():
-            lines.append(
-                f"{dim_score.name:20} | Score: {dim_score.score:.1f}/10 | "
-                f"Weight: {dim_score.weight:.0%} | Contrib: {dim_score.weighted_score:.1f}"
-            )
-
-        if is_consistent_roe:
-            lines.append("\n*** ELITE PERFORMER: ROE >15% for 10+ consecutive years ***")
-
-        # Red flags
-        if red_flags:
-            lines.append("\n RED FLAGS DETECTED:")
-            lines.append("-" * 60)
-            high_severity = [rf for rf in red_flags if rf.severity in ["HIGH", "CRITICAL"]]
-            medium_severity = [rf for rf in red_flags if rf.severity == "MEDIUM"]
-
-            for severity_group, label in [
-                (high_severity, "HIGH/CRITICAL"),
-                (medium_severity, "MEDIUM")
-            ]:
-                if severity_group:
-                    lines.append(f"\n{label}:")
-                    for rf in severity_group:
-                        lines.append(f"  - {rf.category}: {rf.description}")
-
-        # Investment recommendation
-        lines.append("\n" + "=" * 70)
-        lines.append("INVESTMENT IMPLICATION:")
-
-        high_red_flags = len([rf for rf in red_flags if rf.severity in ["HIGH", "CRITICAL"]])
-
-        if tier == QualityTier.ELITE and high_red_flags == 0:
-            recommendation = "STRONG BUY - Elite quality with no major red flags"
-        elif tier == QualityTier.STRONG and high_red_flags == 0:
-            recommendation = "BUY - Strong quality fundamentals"
-        elif tier == QualityTier.STRONG or tier == QualityTier.MODERATE:
-            recommendation = "HOLD/CAUTIOUS BUY - Moderate quality, monitor red flags"
-        elif high_red_flags >= 2:
-            recommendation = "AVOID - Multiple high-severity red flags"
-        else:
-            recommendation = "SELL/AVOID - Weak quality fundamentals"
-
-        lines.append(recommendation)
-        lines.append("=" * 70)
-
-        return "\n".join(lines)
-
     # ==================== STEPS FRAMEWORK METHODS ====================
 
     def _calculate_steps_metrics(self, financial_data: Dict[str, Any]) -> QualityAnalysisResult:
@@ -1298,32 +859,12 @@ class QualityMetricsCalculator:
         earnings_quality_score = self._calculate_earnings_quality_score(financial_data)
         conservative_growth_score = self._calculate_conservative_growth_score(financial_data)
 
-        # Build dimension scores dict (using DimensionScore objects)
+        # Build dimension scores dict
         dimension_scores = {
-            'gross_profitability': DimensionScore(
-                name='Gross Profitability',
-                score=gp_score,
-                weight=self.STEPS_WEIGHTS['gross_profitability'],
-                weighted_score=gp_score * self.STEPS_WEIGHTS['gross_profitability']
-            ),
-            'roe_persistence': DimensionScore(
-                name='ROE Persistence',
-                score=roe_persistence_score,
-                weight=self.STEPS_WEIGHTS['roe_persistence'],
-                weighted_score=roe_persistence_score * self.STEPS_WEIGHTS['roe_persistence']
-            ),
-            'earnings_quality': DimensionScore(
-                name='Earnings Quality',
-                score=earnings_quality_score,
-                weight=self.STEPS_WEIGHTS['earnings_quality'],
-                weighted_score=earnings_quality_score * self.STEPS_WEIGHTS['earnings_quality']
-            ),
-            'conservative_growth': DimensionScore(
-                name='Conservative Growth',
-                score=conservative_growth_score,
-                weight=self.STEPS_WEIGHTS['conservative_growth'],
-                weighted_score=conservative_growth_score * self.STEPS_WEIGHTS['conservative_growth']
-            )
+            'gross_profitability': gp_score,
+            'roe_persistence': roe_persistence_score,
+            'earnings_quality': earnings_quality_score,
+            'conservative_growth': conservative_growth_score
         }
 
         # Build dimension weights dict
@@ -1400,6 +941,438 @@ class QualityMetricsCalculator:
         )
 
         logger.info(f"STEPS analysis complete for {ticker}: {tier.value} tier, score {composite_score:.1f}")
+        return result
+
+    def _calculate_new_5factor_metrics(self, financial_data: Dict[str, Any]) -> QualityAnalysisResult:
+        """
+        Calculate quality metrics using NEW_5FACTOR framework (5-dimension system).
+
+        NEW_5FACTOR Framework:
+        - Profitability (35%): Gross Profitability, ROE, ROIC
+        - Earnings Quality (20%): Accrual Ratio, Cash Conversion, F-Score
+        - Growth Quality (15%): Asset Growth, Revenue CAGR, Margin Trend
+        - Safety (15%): Beta, Z-Score, Debt/EBITDA, Interest Coverage
+        - ROE Persistence (15%): ROE consistency over time
+
+        Uses quality analyzers for comprehensive multi-dimensional scoring.
+
+        Args:
+            financial_data: Financial data dictionary
+
+        Returns:
+            QualityAnalysisResult with NEW_5FACTOR framework
+        """
+        ticker = financial_data.get('ticker', 'UNKNOWN')
+        logger.info(f"Calculating NEW_5FACTOR quality metrics for {ticker}")
+
+        # Extract core values with defaults
+        revenue = financial_data.get('revenue', 0) or 0
+        cogs = financial_data.get('cogs', 0) or 0
+        total_assets = financial_data.get('total_assets', 1) or 1
+        net_income = financial_data.get('net_income', 0) or 0
+        shareholder_equity = financial_data.get('shareholder_equity', 1) or 1
+        total_debt = financial_data.get('total_debt', 0) or 0
+        nopat = financial_data.get('nopat', 0) or 0
+        market_cap = financial_data.get('market_cap', 1) or 1
+        sga = financial_data.get('sga', 0) or 0
+        free_cash_flow = financial_data.get('free_cash_flow', 0) or 0
+
+        # Ensure valid denominators
+        if total_assets <= 0:
+            total_assets = 1
+        if shareholder_equity <= 0:
+            shareholder_equity = 1
+        if market_cap <= 0:
+            market_cap = 1
+
+        # Calculate Profitability dimension (Gross Profitability, ROE, ROIC)
+        profitability_metrics = {}
+        profitability_score = 5.0
+
+        if total_assets > 0 and shareholder_equity > 0:
+            gross_profitability = (revenue - cogs) / total_assets
+            roe = net_income / shareholder_equity
+            invested_capital = total_debt + shareholder_equity
+            roic = nopat / invested_capital if invested_capital > 0 else 0
+
+            profitability_metrics = {
+                'gross_profitability': gross_profitability,
+                'roe': roe,
+                'roic': roic
+            }
+
+            gp_score = self._score_metric('gross_profitability', gross_profitability)
+            roe_score = self._score_metric('roe', roe)
+            roic_score = self._score_metric('roic', roic)
+
+            profitability_score = (gp_score * 0.4 + roe_score * 0.3 + roic_score * 0.3)
+
+        # Calculate Earnings Quality dimension using analyzer
+        earnings_quality_score = 5.0
+        earnings_metrics = {}
+        try:
+            earnings_result = self.earnings_analyzer.analyze(financial_data)
+            if earnings_result:
+                earnings_quality_score = earnings_result.earnings_quality_score
+                earnings_metrics = earnings_result.to_dict()
+        except Exception as e:
+            logger.warning(f"Could not calculate earnings quality for {ticker}: {e}")
+
+        # Calculate Growth Quality dimension using analyzer
+        growth_quality_score = 5.0
+        growth_metrics = {}
+        try:
+            growth_result = self.growth_analyzer.analyze(financial_data)
+            if growth_result:
+                growth_quality_score = growth_result.growth_quality_score
+                growth_metrics = growth_result.to_dict()
+        except Exception as e:
+            logger.warning(f"Could not calculate growth quality for {ticker}: {e}")
+
+        # Calculate Safety dimension using analyzer
+        safety_score = 5.0
+        safety_metrics = {}
+        try:
+            # Create safety data dict with field mappings for SafetyAnalyzer compatibility
+            safety_data = dict(financial_data)
+            safety_data['total_equity'] = safety_data.get('shareholder_equity')
+            safety_data['sales'] = safety_data.get('revenue')
+
+            safety_result = self.safety_analyzer.analyze(safety_data)
+            if safety_result:
+                safety_score = safety_result.safety_score
+                safety_metrics = safety_result.to_dict()
+        except Exception as e:
+            logger.warning(f"Could not calculate safety metrics for {ticker}: {e}")
+
+        # Calculate ROE Persistence dimension
+        roe_persistence_score = 5.0
+        roe_persistence_metrics = {}
+        try:
+            roe_history = financial_data.get('roe_history', [])
+            if len(roe_history) >= 3:
+                avg_roe = sum(roe_history) / len(roe_history)
+                high_roe_years = sum(1 for roe in roe_history if roe > 0.15)
+                persistence_ratio = high_roe_years / len(roe_history)
+                roe_persistence_score = persistence_ratio * 10.0
+                roe_persistence_metrics = {
+                    'roe_mean': avg_roe,
+                    'high_roe_years': high_roe_years,
+                    'persistence_ratio': persistence_ratio
+                }
+            else:
+                # Use current ROE as proxy
+                if shareholder_equity > 0 and net_income > 0:
+                    current_roe = net_income / shareholder_equity
+                    if current_roe > 0.20:
+                        roe_persistence_score = 8.0
+                    elif current_roe > 0.15:
+                        roe_persistence_score = 7.0
+                    elif current_roe > 0.10:
+                        roe_persistence_score = 5.0
+                    elif current_roe > 0.05:
+                        roe_persistence_score = 3.0
+                    else:
+                        roe_persistence_score = 1.0
+                    roe_persistence_metrics = {'current_roe': current_roe}
+        except Exception as e:
+            logger.warning(f"Could not calculate ROE persistence for {ticker}: {e}")
+
+        # Build dimension scores dict
+        dimension_scores = {
+            'profitability': profitability_score,
+            'earnings_quality': earnings_quality_score,
+            'growth_quality': growth_quality_score,
+            'safety': safety_score,
+            'roe_persistence': roe_persistence_score
+        }
+
+        # Build dimension weights dict
+        dimension_weights = dict(self.NEW_5FACTOR_WEIGHTS)
+
+        # Calculate weighted composite score (convert to 0-100 scale)
+        composite_score = (
+            profitability_score * self.NEW_5FACTOR_WEIGHTS['profitability'] +
+            earnings_quality_score * self.NEW_5FACTOR_WEIGHTS['earnings_quality'] +
+            growth_quality_score * self.NEW_5FACTOR_WEIGHTS['growth_quality'] +
+            safety_score * self.NEW_5FACTOR_WEIGHTS['safety'] +
+            roe_persistence_score * self.NEW_5FACTOR_WEIGHTS['roe_persistence']
+        ) * 10
+
+        # Create MetricScore objects for display
+        metric_scores = [
+            MetricScore(
+                name='Profitability',
+                value=profitability_score / 10.0,
+                score=profitability_score,
+                weight=self.NEW_5FACTOR_WEIGHTS['profitability'],
+                weighted_score=profitability_score * self.NEW_5FACTOR_WEIGHTS['profitability']
+            ),
+            MetricScore(
+                name='Earnings Quality',
+                value=earnings_quality_score / 10.0,
+                score=earnings_quality_score,
+                weight=self.NEW_5FACTOR_WEIGHTS['earnings_quality'],
+                weighted_score=earnings_quality_score * self.NEW_5FACTOR_WEIGHTS['earnings_quality']
+            ),
+            MetricScore(
+                name='Growth Quality',
+                value=growth_quality_score / 10.0,
+                score=growth_quality_score,
+                weight=self.NEW_5FACTOR_WEIGHTS['growth_quality'],
+                weighted_score=growth_quality_score * self.NEW_5FACTOR_WEIGHTS['growth_quality']
+            ),
+            MetricScore(
+                name='Safety',
+                value=safety_score / 10.0,
+                score=safety_score,
+                weight=self.NEW_5FACTOR_WEIGHTS['safety'],
+                weighted_score=safety_score * self.NEW_5FACTOR_WEIGHTS['safety']
+            ),
+            MetricScore(
+                name='ROE Persistence',
+                value=roe_persistence_score / 10.0,
+                score=roe_persistence_score,
+                weight=self.NEW_5FACTOR_WEIGHTS['roe_persistence'],
+                weighted_score=roe_persistence_score * self.NEW_5FACTOR_WEIGHTS['roe_persistence']
+            )
+        ]
+
+        # Classify tier
+        tier = self._classify_tier(composite_score)
+
+        # Check for consistent ROE performance
+        is_consistent_roe = self._check_consistent_roe(financial_data)
+
+        # Calculate raw metrics for red flag detection
+        raw_metrics = self._calculate_raw_metrics(financial_data)
+
+        # Detect red flags
+        red_flags = self._detect_red_flags(financial_data, raw_metrics)
+
+        # Generate summary
+        summary = f"NEW_5FACTOR Quality Analysis: {ticker} - {tier.value} tier (Score: {composite_score:.1f}/100)\n"
+        summary += f"Dimensions: Profitability {profitability_score:.1f}/10, Earnings Quality {earnings_quality_score:.1f}/10, "
+        summary += f"Growth Quality {growth_quality_score:.1f}/10, Safety {safety_score:.1f}/10, ROE Persistence {roe_persistence_score:.1f}/10"
+
+        result = QualityAnalysisResult(
+            ticker=ticker,
+            metric_scores=metric_scores,
+            composite_score=composite_score,
+            tier=tier,
+            red_flags=red_flags,
+            is_consistent_roe_performer=is_consistent_roe,
+            summary=summary,
+            raw_metrics=raw_metrics,
+            market_cap=financial_data.get('market_cap'),
+            framework='NEW_5FACTOR',
+            dimension_scores=dimension_scores,
+            dimension_weights=dimension_weights
+        )
+
+        logger.info(f"NEW_5FACTOR analysis complete for {ticker}: {tier.value} tier, score {composite_score:.1f}")
+        return result
+
+        # Calculate Growth Quality dimension
+        try:
+            asset_growth = financial_data.get('asset_growth', 0) or 0
+            prior_total_assets = financial_data.get('prior_total_assets', total_assets) or total_assets
+
+            if prior_total_assets > 0:
+                calculated_asset_growth = (total_assets - prior_total_assets) / prior_total_assets
+            else:
+                calculated_asset_growth = 0
+
+            if calculated_asset_growth < 0.10:
+                ag_score = 10.0
+            elif calculated_asset_growth < 0.20:
+                ag_score = 7.0 + (0.20 - calculated_asset_growth) / 0.10 * 2.0
+            else:
+                ag_score = max(1.0, 7.0 - (calculated_asset_growth - 0.20) * 10)
+        except (TypeError, ZeroDivisionError):
+            ag_score = 5.0
+
+        growth_quality_score = ag_score
+
+        # Calculate Safety dimension
+        try:
+            retained_earnings = financial_data.get('retained_earnings', 0) or 0
+            ebit = financial_data.get('ebit', nopat) or nopat
+            sales = financial_data.get('sales', revenue) or revenue
+            working_capital = financial_data.get('working_capital', 0) or 0
+            ebitda = financial_data.get('ebitda', nopat * 1.2) or (nopat * 1.2)
+            interest_expense = financial_data.get('interest_expense', 0) or 0
+            market_cap = financial_data.get('market_cap', 0) or 0
+
+            # Altman Z-Score
+            if total_assets > 0 and total_assets != shareholder_equity:
+                total_liabilities = total_assets - shareholder_equity
+                if total_liabilities > 0:
+                    market_value_equity = market_cap if market_cap > 0 else shareholder_equity
+                    x1 = working_capital / total_assets
+                    x2 = retained_earnings / total_assets if retained_earnings is not None else 0
+                    x3 = ebit / total_assets if ebit is not None else 0
+                    x4 = market_value_equity / total_liabilities
+                    x5 = sales / total_assets
+                    z_score = (1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 1.0 * x5)
+                    z_score_score = min(10.0, max(1.0, z_score)) if z_score else 5.0
+                else:
+                    z_score_score = 5.0
+            else:
+                z_score_score = 5.0
+
+            # Debt/EBITDA
+            if ebitda > 0:
+                debt_ebitda = total_debt / ebitda
+                if debt_ebitda < 1.0:
+                    leverage_score = 10.0
+                elif debt_ebitda < 2.0:
+                    leverage_score = 8.0 + (2.0 - debt_ebitda) * 2.0
+                elif debt_ebitda < 3.0:
+                    leverage_score = 6.0 + (3.0 - debt_ebitda) * 2.0
+                else:
+                    leverage_score = max(3.0, 6.0 - (debt_ebitda - 3.0))
+            else:
+                leverage_score = 5.0
+
+            # Interest Coverage
+            if interest_expense > 0 and ebit:
+                coverage = ebit / interest_expense
+                if coverage > 10:
+                    int_cov_score = 10.0
+                elif coverage > 6:
+                    int_cov_score = 8.0 + (coverage - 6) / 4.0 * 2.0
+                elif coverage > 3:
+                    int_cov_score = 5.0 + (coverage - 3) / 3.0 * 2.0
+                else:
+                    int_cov_score = max(1.0, coverage * 2)
+            else:
+                int_cov_score = 5.0
+
+            safety_score = (z_score_score * 0.4 + leverage_score * 0.3 + int_cov_score * 0.3)
+        except (TypeError, ZeroDivisionError):
+            logger.warning(f"Could not calculate safety metrics for {ticker}")
+
+        # Calculate ROE Persistence dimension
+        try:
+            roe_history = financial_data.get('roe_history', [])
+            if len(roe_history) >= 3:
+                avg_roe = sum(roe_history) / len(roe_history)
+                high_roe_years = sum(1 for roe in roe_history if roe > 0.15)
+                persistence_ratio = high_roe_years / len(roe_history)
+                roe_persistence_score = persistence_ratio * 10.0
+            else:
+                # Use current ROE as proxy
+                if shareholder_equity > 0 and net_income > 0:
+                    current_roe = net_income / shareholder_equity
+                    if current_roe > 0.20:
+                        roe_persistence_score = 8.0
+                    elif current_roe > 0.15:
+                        roe_persistence_score = 7.0
+                    elif current_roe > 0.10:
+                        roe_persistence_score = 5.0
+                    elif current_roe > 0.05:
+                        roe_persistence_score = 3.0
+                    else:
+                        roe_persistence_score = 1.0
+                else:
+                    roe_persistence_score = 5.0
+        except (TypeError, ZeroDivisionError):
+            logger.warning(f"Could not calculate ROE persistence for {ticker}")
+
+        # Build dimension scores dict
+        dimension_scores = {
+            'profitability': profitability_score,
+            'earnings_quality': earnings_quality_score,
+            'growth_quality': growth_quality_score,
+            'safety': safety_score,
+            'roe_persistence': roe_persistence_score
+        }
+
+        # Build dimension weights dict
+        dimension_weights = dict(self.NEW_5FACTOR_WEIGHTS)
+
+        # Calculate weighted composite score (convert to 0-100 scale)
+        composite_score = (
+            profitability_score * self.NEW_5FACTOR_WEIGHTS['profitability'] +
+            earnings_quality_score * self.NEW_5FACTOR_WEIGHTS['earnings_quality'] +
+            growth_quality_score * self.NEW_5FACTOR_WEIGHTS['growth_quality'] +
+            safety_score * self.NEW_5FACTOR_WEIGHTS['safety'] +
+            roe_persistence_score * self.NEW_5FACTOR_WEIGHTS['roe_persistence']
+        ) * 10
+
+        # Create MetricScore objects for display
+        metric_scores = [
+            MetricScore(
+                name='Profitability',
+                value=profitability_score / 10.0,
+                score=profitability_score,
+                weight=self.NEW_5FACTOR_WEIGHTS['profitability'],
+                weighted_score=profitability_score * self.NEW_5FACTOR_WEIGHTS['profitability']
+            ),
+            MetricScore(
+                name='Earnings Quality',
+                value=earnings_quality_score / 10.0,
+                score=earnings_quality_score,
+                weight=self.NEW_5FACTOR_WEIGHTS['earnings_quality'],
+                weighted_score=earnings_quality_score * self.NEW_5FACTOR_WEIGHTS['earnings_quality']
+            ),
+            MetricScore(
+                name='Growth Quality',
+                value=growth_quality_score / 10.0,
+                score=growth_quality_score,
+                weight=self.NEW_5FACTOR_WEIGHTS['growth_quality'],
+                weighted_score=growth_quality_score * self.NEW_5FACTOR_WEIGHTS['growth_quality']
+            ),
+            MetricScore(
+                name='Safety',
+                value=safety_score / 10.0,
+                score=safety_score,
+                weight=self.NEW_5FACTOR_WEIGHTS['safety'],
+                weighted_score=safety_score * self.NEW_5FACTOR_WEIGHTS['safety']
+            ),
+            MetricScore(
+                name='ROE Persistence',
+                value=roe_persistence_score / 10.0,
+                score=roe_persistence_score,
+                weight=self.NEW_5FACTOR_WEIGHTS['roe_persistence'],
+                weighted_score=roe_persistence_score * self.NEW_5FACTOR_WEIGHTS['roe_persistence']
+            )
+        ]
+
+        # Classify tier
+        tier = self._classify_tier(composite_score)
+
+        # Check for consistent ROE performance
+        is_consistent_roe = self._check_consistent_roe(financial_data)
+
+        # Calculate raw metrics for red flag detection
+        raw_metrics = self._calculate_raw_metrics(financial_data)
+
+        # Detect red flags
+        red_flags = self._detect_red_flags(financial_data, raw_metrics)
+
+        # Generate summary
+        summary = f"NEW_5FACTOR Quality Analysis: {ticker} - {tier.value} tier (Score: {composite_score:.1f}/100)\n"
+        summary += f"Dimensions: Profitability {profitability_score:.1f}/10, Earnings Quality {earnings_quality_score:.1f}/10, "
+        summary += f"Growth Quality {growth_quality_score:.1f}/10, Safety {safety_score:.1f}/10, ROE Persistence {roe_persistence_score:.1f}/10"
+
+        result = QualityAnalysisResult(
+            ticker=ticker,
+            metric_scores=metric_scores,
+            composite_score=composite_score,
+            tier=tier,
+            red_flags=red_flags,
+            is_consistent_roe_performer=is_consistent_roe,
+            summary=summary,
+            raw_metrics=raw_metrics,
+            market_cap=financial_data.get('market_cap'),
+            framework='NEW_5FACTOR',
+            dimension_scores=dimension_scores,
+            dimension_weights=dimension_weights
+        )
+
+        logger.info(f"NEW_5FACTOR analysis complete for {ticker}: {tier.value} tier, score {composite_score:.1f}")
         return result
 
     def _calculate_gross_profitability_score_steps(self, financial_data: Dict[str, Any]) -> float:
