@@ -1,25 +1,22 @@
 """
-Enhanced Hybrid Data Fetcher v3.0
+Enhanced Hybrid Data Fetcher v4.0
 
-Integrates yfinance + FMP + SimFin with automatic foreign company detection.
+Integrates yfinance + SimFin with automatic foreign company detection.
 
 Strategy:
-- US companies: SimFin (complete 20+ years, USD)
+- US companies: SimFin (complete historical data, USD)
 - Foreign companies: yfinance with currency conversion (TWD, JPY, etc.)
-- FMP: Pre-calculated ratios when available (limited free tier)
-- Automatic detection and routing based on company origin
+- FMP: REMOVED - SimFin provides all needed data without rate limits
 
 Features:
 - Automatic US vs Foreign company detection
 - Live currency conversion for foreign companies
-- Triple-source integration with intelligent fallback
-- Source tagging for comparison and validation
-- Cost optimization (FREE tier priority)
+- Dual-source integration (yfinance + SimFin)
+- No daily API limits (SimFin rate-limited per second, not per day)
+- No premium symbol restrictions
 """
 
 from .financial_data_fetcher import FinancialDataFetcher, FinancialData
-from .fmp_fetcher import FMPDataFetcher, get_fmp_limit_by_market_cap
-from .fmp_cache_tracker import FMPCacheTracker
 from .simfin_fetcher import SimFinDataFetcher
 from .ratio_calculator import FinancialRatioCalculator
 from .company_detector import CompanyDetector, CompanyProfile
@@ -37,63 +34,50 @@ class EnhancedHybridDataFetcher:
     Enhanced hybrid data fetcher with automatic foreign company detection.
     
     Usage:
-        fetcher = EnhancedHybridDataFetcher(fmp_api_key='YOUR_FMP_KEY')
+        fetcher = EnhancedHybridDataFetcher()
         data = fetcher.fetch_complete_data('GOOGL')  # US company → SimFin
         data = fetcher.fetch_complete_data('TSM')    # Foreign → yfinance + currency conversion
     
     Features:
     - Automatic US vs Foreign company detection
     - Live currency conversion for foreign companies
-    - Triple-source integration (yfinance + FMP + SimFin)
-    - Intelligent routing based on company origin
-    - Source tagging for comparison and validation
+    - Dual-source integration (yfinance + SimFin)
+    - No daily API limits (SimFin rate-limited per second, not per day)
+    - No premium symbol restrictions
     """
 
     def __init__(
         self,
-        fmp_api_key: str,
         simfin_api_key: Optional[str] = None,
-        fmp_cache_file: str = "fmp_cache_tracker.json",
-        simfin_cache_file: str = "simfin_cache.pkl",
-        api_tier: str = 'FREE',
-        enable_simfin: bool = True
+        simfin_cache_file: str = "simfin_cache.pkl"
     ):
         """
         Initialize enhanced hybrid data fetcher with foreign detection.
         
         Args:
-            fmp_api_key: FMP API key (get free at financialmodelingprep.com)
             simfin_api_key: SimFin API key (optional, for enhanced US company data)
-            fmp_cache_file: Path to FMP cache file
             simfin_cache_file: Path to SimFin cache file
-            api_tier: FMP API tier configuration
-            enable_simfin: Whether to enable SimFin integration
         """
         self.yf_fetcher = FinancialDataFetcher()
         self.yf_fetcher_foreign = YFinanceDataFetcher()
         self.company_detector = CompanyDetector()
-        self.cache_tracker = FMPCacheTracker(cache_file=fmp_cache_file, api_tier=api_tier)
-        self.fmp_fetcher = FMPDataFetcher(fmp_api_key, self.cache_tracker)
         
-        self.enable_simfin = enable_simfin
-        if enable_simfin and simfin_api_key:
+        if simfin_api_key:
             self.simfin_fetcher = SimFinDataFetcher(
                 api_key=simfin_api_key,
                 cache_file=simfin_cache_file
             )
             self.ratio_calculator = FinancialRatioCalculator()
-        elif enable_simfin:
+        else:
             self.simfin_fetcher = SimFinDataFetcher(cache_file=simfin_cache_file)
             self.ratio_calculator = FinancialRatioCalculator()
         
-        logger.info("EnhancedHybridDataFetcher v3.0 initialized (auto-routing foreign companies)")
+        logger.info("EnhancedHybridDataFetcher v4.0 initialized (SimFin-only, no FMP)")
 
     def fetch_complete_data(
         self,
         ticker: str,
-        include_fmp: bool = True,
         include_simfin: bool = True,
-        force_refresh_fmp: bool = False,
         force_refresh_simfin: bool = False
     ) -> Dict:
         """
@@ -102,13 +86,11 @@ class EnhancedHybridDataFetcher:
         Strategy:
         - US companies: yfinance (current) + SimFin (historical, USD)
         - Foreign companies: yfinance with currency conversion (TWD, JPY, etc.)
-        - FMP: Pre-calculated ratios when available
+        - No FMP - SimFin provides all needed data without daily rate limits
         
         Args:
             ticker: Stock ticker symbol
-            include_fmp: Whether to fetch FMP data (default True)
             include_simfin: Whether to fetch SimFin data (default True)
-            force_refresh_fmp: Force refresh FMP cache
             force_refresh_simfin: Force refresh SimFin cache
             
         Returns:
@@ -123,8 +105,7 @@ class EnhancedHybridDataFetcher:
         if company_profile.is_us_company:
             logger.info(f"{ticker}: Detected as US company → Using SimFin for historical data")
             return self._fetch_us_company_data(
-                ticker, company_profile, include_fmp, include_simfin,
-                force_refresh_fmp, force_refresh_simfin
+                ticker, company_profile, include_simfin, force_refresh_simfin
             )
         else:
             logger.info(
@@ -132,17 +113,14 @@ class EnhancedHybridDataFetcher:
                 f"→ Using yfinance with {company_profile.currency} → USD conversion"
             )
             return self._fetch_foreign_company_data(
-                ticker, company_profile, include_fmp, include_simfin,
-                force_refresh_fmp, force_refresh_simfin
+                ticker, company_profile, include_simfin, force_refresh_simfin
             )
     
     def _fetch_us_company_data(
         self,
         ticker: str,
         company_profile: CompanyProfile,
-        include_fmp: bool,
         include_simfin: bool,
-        force_refresh_fmp: bool,
         force_refresh_simfin: bool
     ) -> Dict:
         """Fetch data for US company using SimFin"""
@@ -159,10 +137,9 @@ class EnhancedHybridDataFetcher:
         current_dict['company_profile'] = company_profile.to_dict()
         
         # Step 2: Get SimFin data (if enabled) - PRIMARY source for US companies
-        # FMP is skipped as it's not reliable (premium limitations, errors)
         simfin_data = {}
         simfin_ratios = {}
-        if include_simfin and self.enable_simfin:
+        if include_simfin:
             logger.debug(f"{ticker}: Fetching data from SimFin...")
             
             simfin_current = self.simfin_fetcher.fetch_financial_data(ticker)
@@ -180,9 +157,6 @@ class EnhancedHybridDataFetcher:
             else:
                 logger.warning(f"{ticker}: SimFin data not available, will use yfinance historical data")
         
-        # FMP is disabled - SimFin is primary for US companies
-        fmp_data = {}
-        
         # Step 3: If SimFin historical data is missing, fall back to yfinance historical
         yfinance_historical = {}
         if not simfin_data.get('simfin_historical'):
@@ -191,9 +165,9 @@ class EnhancedHybridDataFetcher:
             if yfinance_historical:
                 simfin_data['yfinance_historical'] = yfinance_historical
         
-        # Step 4: Merge all datasets
+        # Step 4: Merge all datasets (no FMP)
         merged_data = self._merge_enhanced_data(
-            current_dict, fmp_data, simfin_data, simfin_ratios, ticker
+            current_dict, simfin_data, simfin_ratios, ticker
         )
         
         # Add company profile info
@@ -207,9 +181,7 @@ class EnhancedHybridDataFetcher:
         self,
         ticker: str,
         company_profile: CompanyProfile,
-        include_fmp: bool,
         include_simfin: bool,
-        force_refresh_fmp: bool,
         force_refresh_simfin: bool
     ) -> Dict:
         """Fetch data for foreign company using yfinance with currency conversion"""
@@ -229,23 +201,7 @@ class EnhancedHybridDataFetcher:
         current_dict['exchange_rate'] = yf_data.exchange_rate_used
         current_dict['source_currency'] = yf_data.source_currency
         
-        # Step 2: Get FMP historical data (if enabled)
-        fmp_data = {}
-        if include_fmp:
-            market_cap = current_dict.get('market_cap')
-            if market_cap:
-                logger.debug(
-                    f"{ticker}: Market cap ${market_cap:,.0f}, "
-                    f"fetching {get_fmp_limit_by_market_cap(market_cap)} years from FMP"
-                )
-            
-            fmp_data = self.fmp_fetcher.fetch_historical_financials(
-                ticker=ticker,
-                market_cap=market_cap,
-                force_refresh=force_refresh_fmp
-            )
-        
-        # Step 3: Get historical data from yfinance (with currency conversion)
+        # Step 2: Get historical data from yfinance (with currency conversion)
         yf_historical = {}
         if include_simfin:
             logger.debug(f"{ticker}: Fetching historical data from yfinance...")
@@ -253,13 +209,13 @@ class EnhancedHybridDataFetcher:
             if yf_historical:
                 current_dict['yfinance_historical'] = yf_historical
         
-        # Step 4: Skip SimFin for foreign companies (they typically don't have data)
+        # Step 3: No SimFin for foreign companies
         simfin_data = {}
         simfin_ratios = {}
         
-        # Step 5: Merge all datasets
+        # Step 4: Merge all datasets (no FMP)
         merged_data = self._merge_enhanced_data(
-            current_dict, fmp_data, simfin_data, simfin_ratios, ticker
+            current_dict, simfin_data, simfin_ratios, ticker
         )
         
         # Add company profile info

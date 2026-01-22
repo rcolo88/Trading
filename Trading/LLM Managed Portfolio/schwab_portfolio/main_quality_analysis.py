@@ -62,8 +62,9 @@ def _signal_handler(signum, frame):
     """Handle shutdown signals gracefully"""
     global _SHUTDOWN_REQUESTED
     _SHUTDOWN_REQUESTED = True
-    print("\n\nShutdown signal received, finishing current operation...")
+    print("\n\nShutdown signal received, stopping...")
     sys.stdout.flush()
+    sys.exit(0)
 
 
 signal.signal(signal.SIGINT, _signal_handler)
@@ -76,57 +77,27 @@ sys.path.insert(0, str(Path(__file__).parent))
 from workflows.quality_analysis_script import QualityAnalysisScript
 from workflows.individual_stock_analysis import IndividualStockAnalysis
 from data.watchlist_config import WatchlistConfig, WatchlistIndex
-from data.multi_day_orchestrator import MultiDayOrchestrator
-from data.fmp_config import get_api_calls_needed
-
-
-def calculate_total_api_calls(tickers: List[str]) -> int:
-    """
-    Calculate total API calls needed for all tickers.
-    
-    Args:
-        tickers: List of ticker symbols
-        
-    Returns:
-        Total API calls needed
-    """
-    total_calls = 0
-    for ticker in tickers:
-        try:
-            import yfinance as yf
-            stock = yf.Ticker(ticker)
-            market_cap = stock.info.get('marketCap', 0) or 0
-            total_calls += get_api_calls_needed(market_cap)
-        except:
-            # Fallback to 2 calls per ticker if market cap fetch fails
-            total_calls += 2
-    return total_calls
 
 
 def should_use_multi_day(index_name: str, total_tickers: int, total_api_calls: int, force_multi_day: bool = False) -> bool:
     """
-    Determine if multi-day mode should be used based on API requirements.
+    Determine if multi-day mode should be used.
+    
+    NOTE: Multi-day mode is now DISABLED by default because we use SimFin
+    which has no daily API limit (only rate-limited per second).
     
     Args:
         index_name: Name of the index
         total_tickers: Number of tickers in the index
-        total_api_calls: Total API calls needed
+        total_api_calls: Total API calls needed (not used anymore)
         force_multi_day: Force multi-day mode regardless
         
     Returns:
-        True if multi-day mode should be used
+        Always False - SimFin eliminates need for multi-day processing
     """
-    if force_multi_day:
-        return True
-    
-    # Use multi-day if API calls exceed daily limit OR if index is large
-    daily_limit = 250
-    exceeds_limit = total_api_calls > daily_limit
-    
-    # Also consider using multi-day for large indexes even if under limit
-    is_large_index = total_tickers > 200  # Arbitrary threshold for "large"
-    
-    return exceeds_limit or is_large_index
+    # Multi-day mode is disabled because SimFin has no daily call limit
+    # SimFin is rate-limited per second (2 calls/sec), not per day
+    return False
 
 
 def parse_indices(indices_str: str) -> list:
@@ -206,18 +177,6 @@ def main():
         help='Maximum runtime in seconds (default: 600 = 10 minutes). Increase for large indices with parallel mode.'
     )
 
-    parser.add_argument(
-        '--multi-day',
-        action='store_true',
-        help='Enable automatic multi-day orchestration for large datasets. Activates when API calls exceed daily limit.'
-    )
-
-    parser.add_argument(
-        '--force-multi-day',
-        action='store_true',
-        help='Force multi-day mode regardless of index size.'
-    )
-
     args = parser.parse_args()
 
     # Validate arguments
@@ -233,9 +192,6 @@ def main():
 
     if args.timeout < 0:
         parser.error("--timeout must be a positive number (use 0 for no timeout)")
-
-    if args.multi_day and args.parallel:
-        parser.error("--multi-day mode is not compatible with --parallel")
 
     print(f"{'='*60}")
     print(f"QUALITY ANALYSIS SYSTEM")
@@ -277,96 +233,40 @@ def main():
                 limit=args.limit if args.limit > 0 else None
             )
         
-        # Determine if multi-day mode should be used
+        # Get tickers
         all_tickers = config.get_tickers()
-        total_api_calls = calculate_total_api_calls(all_tickers)
-        use_multi_day = should_use_multi_day(
-            args.index if args.index else 'multi_indices',
-            len(all_tickers),
-            total_api_calls,
-            args.multi_day or getattr(args, 'force_multi_day', False)
-        )
         
-        if use_multi_day or args.multi_day:
-            # Multi-day orchestration mode
-            print(f"Mode: Multi-Day Orchestration ({'Forced' if args.multi_day or getattr(args, 'force_multi_day', False) else 'Automatic'})")
-            print(f"Index: {args.index if args.index else 'Multi-Index'}")
-            print(f"Total tickers: {len(all_tickers)}")
-            print(f"API calls needed: {total_api_calls}")
-            print(f"Daily API Limit: 250 calls")
-            print(f"Processing Strategy: Market cap tier prioritization")
-            print(f"Resume Capability: Enabled")
-            print()
+        # Multi-day mode is disabled - SimFin has no daily call limit
+        # Processing always happens in single session now
+        
+        # Regular index analysis
+        print(f"Mode: Index Analysis")
 
-            # Initialize multi-day orchestrator
-            orchestrator = MultiDayOrchestrator(
-                index_name=args.index if args.index else 'multi_indices',
-                data_dir="data",
-                outputs_dir="outputs",
-                max_daily_calls=250
-            )
-
-            # Generate and run daily session
-            daily_queue = orchestrator.run_session(all_tickers)
-            
-            if daily_queue and daily_queue.items:
-                print(f"Today's processing queue: {len(daily_queue.items)} stocks")
-                print(f"API calls required: {daily_queue.total_api_calls}")
-                print(f"Estimated time: {daily_queue.estimated_completion_time}")
-                print()
-
-                # Run quality analysis on today's queue
-                print("Starting quality analysis for today's queue...")
-
-                # Create a temporary config for today's tickers only
-                today_config = WatchlistConfig(
-                    index=WatchlistIndex.CUSTOM,
-                    custom_tickers=daily_queue.get_tickers()
-                )
-
-                # Run quality analysis (sequential mode for multi-day)
-                script = QualityAnalysisScript(watchlist_config=today_config)
-                script.run(
-                    watchlist_limit=None,  # Use all from queue
-                    parallel=False,         # Sequential for better API control
-                    timeout_seconds=0,      # No timeout for multi-day
-                    multi_day_mode=True,    # Custom flag for multi-day processing
-                    orchestrator=orchestrator  # Pass orchestrator for progress tracking
-                )
-
-                print()
-                print("Multi-day session completed!")
-
-            else:
-                print("No stocks to process today - all caught up!")
-
+        if args.index:
+            index_display = args.index
+            print(f"Index: {args.index}")
         else:
-            # Regular index analysis
-            print(f"Mode: Index Analysis")
+            indices_list = args.indices.split(',')
+            index_display = f"[{args.indices}]"
+            print(f"Indices: {args.indices}")
 
-            if args.index:
-                index_display = args.index
-                print(f"Index: {args.index}")
-            else:
-                indices_list = args.indices.split(',')
-                index_display = f"[{args.indices}]"
-                print(f"Indices: {args.indices}")
+        print(f"Total tickers: {len(all_tickers)}")
+        print(f"Limit: {args.limit if args.limit > 0 else 'All'}")
+        print(f"Parallel: {'Enabled' if args.parallel else 'Disabled'}")
+        if args.parallel:
+            print(f"Workers: {args.workers}")
+        print(f"Timeout: {args.timeout}s")
+        print(f"Data Source: SimFin (no daily rate limit)")
+        print()
 
-            print(f"Limit: {args.limit if args.limit > 0 else 'All'}")
-            print(f"Parallel: {'Enabled' if args.parallel else 'Disabled'}")
-            if args.parallel:
-                print(f"Workers: {args.workers}")
-            print(f"Timeout: {args.timeout}s")
-            print()
-
-            # Run analysis with parallel options
-            script = QualityAnalysisScript(watchlist_config=config)
-            script.run(
-                watchlist_limit=args.limit if args.limit > 0 else None,
-                parallel=args.parallel,
-                max_workers=args.workers,
-                timeout_seconds=args.timeout
-            )
+        # Run analysis with parallel options
+        script = QualityAnalysisScript(watchlist_config=config)
+        script.run(
+            watchlist_limit=args.limit if args.limit > 0 else None,
+            parallel=args.parallel,
+            max_workers=args.workers,
+            timeout_seconds=args.timeout
+        )
 
 
 if __name__ == "__main__":

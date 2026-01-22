@@ -268,13 +268,10 @@ class QualityAnalysisScript:
         # Use EnhancedHybridDataFetcher with SimFin as primary, yfinance as fallback
         # This system automatically detects US vs foreign companies and routes accordingly
         import os
-        fmp_api_key = os.getenv('FMP_API_KEY', '')  # No longer primary, but kept for compatibility
         simfin_api_key = os.getenv('SIMFIN_API_KEY', '9916893d-f20d-45b7-b4ac-4449607d5128')
         
         self.enhanced_fetcher = EnhancedHybridDataFetcher(
-            fmp_api_key=fmp_api_key,
-            simfin_api_key=simfin_api_key,
-            enable_simfin=True
+            simfin_api_key=simfin_api_key
         )
         self.financial_fetcher = FinancialDataFetcher(enable_cache=True)  # Fallback
         self.fetcher = self.enhanced_fetcher  # Use enhanced fetcher by default
