@@ -1,0 +1,9 @@
+{
+  "simfin:FISV": {
+    "standard_ticker": "FISV",
+    "api_source": "simfin",
+    "mapped_ticker": "FI",
+    "timestamp": "2026-01-21T19:27:25.542281",
+    "discovered": false
+  }
+}
