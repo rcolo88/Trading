@@ -277,23 +277,20 @@ class EnhancedHybridDataFetcher:
     def _merge_enhanced_data(
         self,
         current: Dict,
-        fmp_historical: Dict,
         simfin_data: Dict,
         simfin_ratios: Dict,
         ticker: str
     ) -> Dict:
         """
-        Merge data from all three sources with intelligent source tagging
+        Merge data from yfinance and SimFin with intelligent source tagging
         
         Priority and Strategy:
         1. yfinance: Current year fundamentals (always primary)
-        2. FMP: Pre-calculated ratios and historical trends (when available)
-        3. SimFin: Raw data backup + calculated ratios (fallback/comparison)
-        4. Source tagging: All metrics tagged with source for comparison
+        2. SimFin: Raw data + calculated ratios (no FMP)
+        3. Source tagging: All metrics tagged with source for comparison
         
         Args:
             current: yfinance current data dict
-            fmp_historical: FMP historical data dict
             simfin_data: SimFin current data dict
             simfin_ratios: SimFin calculated ratios dict
             ticker: Stock ticker for logging
@@ -311,30 +308,7 @@ class EnhancedHybridDataFetcher:
         # Add yfinance to sources
         merged['data_sources'].append('yfinance')
         
-        # Step 1: Add FMP historical data with source tagging
-        if fmp_historical:
-            merged['data_sources'].append('FMP')
-            
-            # Add FMP historical trends
-            ratios_data = fmp_historical.get('ratios', [])
-            score_data = fmp_historical.get('score', {})
-            income_data = fmp_historical.get('income', [])
-            balance_data = fmp_historical.get('balance', [])
-            cash_flow_data = fmp_historical.get('cash_flow', [])
-            
-            # Extract historical trends from FMP
-            merged.update(self._extract_fmp_historical_trends(
-                ratios_data, score_data, income_data, balance_data, cash_flow_data
-            ))
-            
-            # Add FMP pre-calculated scores with source tagging
-            if isinstance(score_data, list) and len(score_data) > 0:
-                score_data = score_data[0]
-            
-            merged['fmp_piotroski_score'] = score_data.get('piotroskiScore')
-            merged['fmp_altman_z_score'] = score_data.get('altmanZScore')
-        
-        # Step 2: Add SimFin data with source tagging
+        # Add SimFin data with source tagging
         if simfin_data:
             merged['data_sources'].append('SimFin')
 
@@ -357,31 +331,22 @@ class EnhancedHybridDataFetcher:
             # Add SimFin calculated ratios with source tagging
             if simfin_ratios:
                 merged.update(simfin_ratios)
-                
-                # Add comparison ratios (FMP vs SimFin) if both available
-                comparison = self._create_ratio_comparison(merged, simfin_ratios)
-                if comparison:
-                    merged['ratio_comparison'] = comparison
 
             # Extract SimFin historical trends for ROE persistence analysis
-            # This is used when FMP data is not available (premium symbols)
             if simfin_data and not merged.get('roe_history'):
                 simfin_historical = simfin_data.get('simfin_historical', {})
                 if simfin_historical:
                     simfin_trends = self._extract_simfin_historical_trends(simfin_historical)
                     merged.update(simfin_trends)
         
-        # Step 3: Add data quality and validation metadata
+        # Add data quality and validation metadata
         merged['data_quality_score'] = self._calculate_data_quality_score(merged)
         merged['has_historical_data'] = bool(
             merged.get('roe_history') or merged.get('simfin_historical')
         )
         
-        # Step 4: Add fallback indicators
-        merged['simfin_used_as_fallback'] = (
-            'SimFin' in merged['data_sources'] and 
-            'FMP' not in merged['data_sources']
-        )
+        # No FMP, so SimFin is always used
+        merged['simfin_used_as_fallback'] = False
         
         logger.debug(
             f"{ticker}: Enhanced merge complete with {len(merged['data_sources'])} sources, "
