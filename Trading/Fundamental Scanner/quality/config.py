@@ -35,12 +35,13 @@ class MarketCapTierInfo:
 
 
 # Market Cap Tier Definitions
+# Updated: Extended multipliers for small and micro caps
 MARKET_CAP_TIERS = [
     MarketCapTierInfo("Mega Cap", 200_000_000_000, 1.25),
     MarketCapTierInfo("Large Cap", 10_000_000_000, 1.00),
     MarketCapTierInfo("Mid Cap", 2_000_000_000, 0.75),
-    MarketCapTierInfo("Small Cap", 300_000_000, 0.50),
-    MarketCapTierInfo("Micro Cap", 0, 0.35),
+    MarketCapTierInfo("Small Cap", 300_000_000, 0.75),  # Extended from 0.50
+    MarketCapTierInfo("Micro Cap", 0, 0.50),          # Extended from 0.35
 ]
 
 
@@ -82,8 +83,8 @@ class QualityConfig:
             'mega': 1.25,
             'large': 1.00,
             'mid': 0.75,
-            'small': 0.50,
-            'micro': 0.35
+            'small': 0.75,  # Extended from 0.50
+            'micro': 0.50   # Extended from 0.35
         }
 
         self.TIER_THRESHOLDS = {

@@ -31,6 +31,8 @@ import numpy as np
 if TYPE_CHECKING:
     from .financial_data_fetcher import FinancialData, FinancialDataCache
 
+from .stock_logger import get_stock_logger
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -217,12 +219,11 @@ class ParallelFetcher:
             
             if is_rate_limit and retry_count < self.max_retries:
                 wait_time = 2 ** retry_count
-                logger.warning(f"Rate limit for {ticker}, retrying in {wait_time}s "
-                              f"(attempt {retry_count + 1}/{self.max_retries})")
+                get_stock_logger().warning(ticker, f"Rate limit hit, retrying in {wait_time}s (attempt {retry_count + 1}/{self.max_retries})")
                 time.sleep(wait_time)
                 return self._fetch_single_ticker(ticker, retry_count + 1)
             else:
-                logger.error(f"Failed to fetch {ticker}: {e}")
+                get_stock_logger().error(ticker, f"Failed to fetch: {e}")
                 return (ticker, None)
     
     def _safe_get(self, df: pd.DataFrame, key: str, col: int = 0) -> Optional[float]:
@@ -249,7 +250,7 @@ class ParallelFetcher:
         results = {}
         start_time = time.time()
         
-        logger.info(f"Starting parallel fetch for {len(tickers)} tickers "
+        logger.debug(f"Starting parallel fetch for {len(tickers)} tickers "
                    f"(workers={self.max_workers})")
         
         try:
@@ -262,7 +263,7 @@ class ParallelFetcher:
                 for i, future in enumerate(as_completed(futures)):
                     # Check for shutdown signal
                     if _SHUTDOWN_REQUESTED:
-                        logger.info(f"Shutdown requested, stopping after {i+1} tickers")
+                        logger.debug(f"Shutdown requested, stopping after {i+1} tickers")
                         break
                     
                     try:
@@ -273,7 +274,7 @@ class ParallelFetcher:
                         continue
                     
                     if (i + 1) % 50 == 0:
-                        logger.info(f"Progress: {i + 1}/{len(tickers)} completed")
+                        logger.debug(f"Progress: {i + 1}/{len(tickers)} completed")
                         
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received, stopping fetch...")
@@ -326,7 +327,7 @@ class ParallelFetcher:
         results = {}
         start_time = time.time()
 
-        logger.info(f"Starting parallel fetch with progress: {len(tickers)} tickers")
+        logger.debug(f"Starting parallel fetch with progress: {len(tickers)} tickers")
 
         def set_logger_level(level: int):
             """Temporarily set logger level for all handlers"""
@@ -352,9 +353,9 @@ class ParallelFetcher:
                     for future in as_completed(futures):
                         # Check for shutdown signal
                         if _SHUTDOWN_REQUESTED:
-                            logger.info("Shutdown requested, stopping fetch...")
+                            logger.debug("Shutdown requested, stopping fetch...")
                             break
-                        
+
                         try:
                             ticker, data = future.result()
                             results[ticker] = data
@@ -369,12 +370,12 @@ class ParallelFetcher:
                                if v and v.data_quality != "insufficient")
             failed_count = sum(1 for v in results.values() if v is None)
 
-            logger.info(f"Parallel fetch with progress complete: {duration:.1f}s")
-            logger.info(f"  Success: {success_count}, Failed: {failed_count}")
+            logger.debug(f"Parallel fetch with progress complete: {duration:.1f}s")
+            logger.debug(f"  Success: {success_count}, Failed: {failed_count}")
 
             return results
         except KeyboardInterrupt:
-            logger.info("Keyboard interrupt received, stopping fetch...")
+            logger.debug("Keyboard interrupt received, stopping fetch...")
             return results
         finally:
             if suppress_logging and original_level is not None:
@@ -399,7 +400,7 @@ class ParallelFetcher:
         start_time = time.time()
         total = len(tickers)
 
-        logger.info(f"Starting parallel fetch with callback: {total} tickers")
+        logger.debug(f"Starting parallel fetch with callback: {total} tickers")
 
         def _update_progress(completed, total):
             if progress_callback:
@@ -416,7 +417,7 @@ class ParallelFetcher:
                 for future in as_completed(futures):
                     # Check for shutdown signal
                     if _SHUTDOWN_REQUESTED:
-                        logger.info("Shutdown requested, stopping fetch...")
+                        logger.debug("Shutdown requested, stopping fetch...")
                         break
                     
                     try:
@@ -434,12 +435,12 @@ class ParallelFetcher:
                                if v and v.data_quality != "insufficient")
             failed_count = sum(1 for v in results.values() if v is None)
 
-            logger.info(f"Parallel fetch with callback complete: {duration:.1f}s")
-            logger.info(f"  Success: {success_count}, Failed: {failed_count}")
+            logger.debug(f"Parallel fetch with callback complete: {duration:.1f}s")
+            logger.debug(f"  Success: {success_count}, Failed: {failed_count}")
 
             return results
         except KeyboardInterrupt:
-            logger.info("Keyboard interrupt received, stopping fetch...")
+            logger.debug("Keyboard interrupt received, stopping fetch...")
             return results
     
     def fetch_historical_financials(
@@ -466,7 +467,7 @@ class ParallelFetcher:
             cashflow = stock.cashflow
             
             if financials.empty and balance_sheet.empty and cashflow.empty:
-                logger.warning(f"No historical data for {ticker}")
+                get_stock_logger().warning(ticker, "No historical financial data available")
                 return None
             
             all_years = set()
@@ -559,7 +560,7 @@ class ParallelFetcher:
             return df
             
         except Exception as e:
-            logger.error(f"Failed to fetch historical financials for {ticker}: {e}")
+            get_stock_logger().error(ticker, f"Failed to fetch historical financials: {e}")
             return None
     
     def parallel_batch_historical_fetch(
@@ -580,7 +581,7 @@ class ParallelFetcher:
         results = {}
         total = len(tickers)
         
-        logger.info(f"Fetching historical financials for {total} tickers")
+        logger.debug(f"Fetching historical financials for {total} tickers")
         
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
@@ -595,7 +596,7 @@ class ParallelFetcher:
                     data = future.result()
                     results[ticker] = data
                 except Exception as e:
-                    logger.error(f"Error fetching historicals for {ticker}: {e}")
+                    get_stock_logger().error(ticker, f"Error fetching historicals: {e}")
                     results[ticker] = None
                 
                 completed += 1
@@ -603,7 +604,7 @@ class ParallelFetcher:
                     progress_callback(completed, total)
         
         success_count = sum(1 for v in results.values() if v is not None)
-        logger.info(f"Historical fetch complete: {success_count}/{total} successful")
+        logger.debug(f"Historical fetch complete: {success_count}/{total} successful")
         
         return results
 

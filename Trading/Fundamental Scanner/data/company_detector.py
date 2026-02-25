@@ -73,9 +73,15 @@ class CompanyDetector:
         """Load and cache US companies list from SimFin"""
         if self._us_companies_cache is None:
             try:
-                companies_df = sf.load_companies(market=self.us_market)
+                import sys
+                import io
+                from contextlib import redirect_stdout, redirect_stderr
+                
+                suppressed_output = io.StringIO()
+                with redirect_stdout(suppressed_output), redirect_stderr(suppressed_output):
+                    companies_df = sf.load_companies(market=self.us_market)
                 self._us_companies_cache = companies_df.index
-                logger.info(f"Loaded {len(self._us_companies_cache)} US companies from SimFin")
+                logger.debug(f"Loaded {len(self._us_companies_cache)} US companies from SimFin")
             except Exception as e:
                 logger.error(f"Failed to load US companies: {e}")
                 self._us_companies_cache = pd.Index([])
@@ -117,7 +123,7 @@ class CompanyDetector:
         is_foreign = not in_simfin_us or (country and country != 'United States')
         
         if is_foreign:
-            logger.info(f"{ticker}: Detected as foreign company (country: {country})")
+            logger.debug(f"{ticker}: Detected as foreign company (country: {country})")
             return self._create_foreign_profile_with_info(ticker, yfinance_currency, info)
         else:
             return self._create_us_profile(ticker, us_companies)
@@ -142,7 +148,13 @@ class CompanyDetector:
     def _create_us_profile(self, ticker: str, us_companies: pd.Index) -> CompanyProfile:
         """Create profile for US company"""
         try:
-            companies_df = sf.load_companies(market=self.us_market)
+            import sys
+            import io
+            from contextlib import redirect_stdout, redirect_stderr
+            
+            suppressed_output = io.StringIO()
+            with redirect_stdout(suppressed_output), redirect_stderr(suppressed_output):
+                companies_df = sf.load_companies(market=self.us_market)
             row = companies_df.loc[ticker]
             
             company_name = row.get('Company Name') or row.get('Name')
@@ -216,7 +228,13 @@ class CompanyDetector:
     def _count_simfin_data_years(self, ticker: str) -> int:
         """Count how many years of data exist for ticker in SimFin"""
         try:
-            income_df = sf.load_income(variant='annual', market=self.us_market)
+            import sys
+            import io
+            from contextlib import redirect_stdout, redirect_stderr
+            
+            suppressed_output = io.StringIO()
+            with redirect_stdout(suppressed_output), redirect_stderr(suppressed_output):
+                income_df = sf.load_income(variant='annual', market=self.us_market)
             if ticker in income_df.index:
                 return len(income_df.columns)
             return 0

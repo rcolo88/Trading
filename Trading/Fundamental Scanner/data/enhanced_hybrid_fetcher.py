@@ -22,6 +22,7 @@ from .ratio_calculator import FinancialRatioCalculator
 from .company_detector import CompanyDetector, CompanyProfile
 from .yfinance_fetcher import YFinanceDataFetcher, YFinanceFinancialData
 from .currency_converter import CurrencyConversionError
+from .stock_logger import get_stock_logger
 from typing import Dict, Optional, List, Any
 from datetime import datetime
 import logging
@@ -97,18 +98,18 @@ class EnhancedHybridDataFetcher:
             Dict with merged data from all sources with source tagging
         """
         ticker = ticker.upper().strip()
-        logger.info(f"Fetching enhanced complete data for {ticker}")
+        logger.debug(f"Fetching enhanced complete data for {ticker}")
         
         # Step 1: Detect company origin and determine routing
         company_profile = self.company_detector.detect(ticker)
         
         if company_profile.is_us_company:
-            logger.info(f"{ticker}: Detected as US company → Using SimFin for historical data")
+            logger.debug(f"{ticker}: Detected as US company → Using SimFin for historical data")
             return self._fetch_us_company_data(
                 ticker, company_profile, include_simfin, force_refresh_simfin
             )
         else:
-            logger.info(
+            logger.debug(
                 f"{ticker}: Detected as foreign company ({company_profile.country}) "
                 f"→ Using yfinance with {company_profile.currency} → USD conversion"
             )
@@ -123,7 +124,7 @@ class EnhancedHybridDataFetcher:
         include_simfin: bool,
         force_refresh_simfin: bool
     ) -> Dict:
-        """Fetch data for US company using SimFin"""
+        """Fetch data for US company using SimFin with proper yfinance fallback"""
         
         # Step 1: Get current fundamentals from yfinance (always free)
         logger.debug(f"{ticker}: Fetching current data from yfinance...")
@@ -131,7 +132,12 @@ class EnhancedHybridDataFetcher:
         
         if not current_data or not hasattr(current_data, 'to_dict'):
             logger.error(f"Failed to fetch yfinance data for {ticker}")
-            return {}
+            # Try foreign fetcher as last resort
+            logger.debug(f"{ticker}: Attempting fallback with foreign yfinance fetcher...")
+            current_data = self.yf_fetcher_foreign.fetch_financial_data(ticker)
+            if not current_data or not hasattr(current_data, 'to_dict'):
+                get_stock_logger().error(ticker, "All yfinance fetchers failed")
+                return {}
         
         current_dict = current_data.to_dict()
         current_dict['company_profile'] = company_profile.to_dict()
@@ -155,7 +161,7 @@ class EnhancedHybridDataFetcher:
                 if simfin_historical:
                     simfin_data['simfin_historical'] = simfin_historical
             else:
-                logger.warning(f"{ticker}: SimFin data not available, will use yfinance historical data")
+                get_stock_logger().warning(ticker, "SimFin data not available, using yfinance historical data")
         
         # Step 3: If SimFin historical data is missing, fall back to yfinance historical
         yfinance_historical = {}
@@ -165,7 +171,20 @@ class EnhancedHybridDataFetcher:
             if yfinance_historical:
                 simfin_data['yfinance_historical'] = yfinance_historical
         
-        # Step 4: Merge all datasets (no FMP)
+        # Step 4: Handle case where SimFin failed completely - enhance with yfinance data
+        if not simfin_data and current_dict:
+            logger.debug(f"{ticker}: SimFin failed completely, enhancing with yfinance data...")
+            # Copy key yfinance fields to simfin_data structure for consistency
+            for field in ['revenue', 'net_income', 'total_assets', 'shareholder_equity', 
+                         'total_debt', 'free_cash_flow', 'ebit', 'ebitda', 'interest_expense',
+                         'retained_earnings', 'working_capital', 'operating_income']:
+                if current_dict.get(field) is not None:
+                    simfin_data[field] = current_dict.get(field)
+            
+            # Mark that this is yfinance-only data
+            simfin_data['data_quality'] = current_dict.get('data_quality', 'partial')
+        
+        # Step 5: Merge all datasets (no FMP)
         merged_data = self._merge_enhanced_data(
             current_dict, simfin_data, simfin_ratios, ticker
         )
@@ -173,7 +192,7 @@ class EnhancedHybridDataFetcher:
         # Add company profile info
         merged_data['is_foreign_company'] = False
         merged_data['company_country'] = 'US'
-        merged_data['data_source'] = 'yfinance + SimFin'
+        merged_data['data_source'] = 'yfinance + SimFin' if simfin_data else 'yfinance (SimFin unavailable)'
         
         return merged_data
     
@@ -225,7 +244,7 @@ class EnhancedHybridDataFetcher:
         merged_data['currency'] = company_profile.currency
         merged_data['exchange_rate'] = yf_data.exchange_rate_used
         
-        logger.info(
+        logger.debug(
             f"{ticker}: Foreign company data complete "
             f"({company_profile.currency} → USD at rate {yf_data.exchange_rate_used:.4f})"
         )
@@ -471,7 +490,6 @@ class EnhancedHybridDataFetcher:
     def batch_fetch_enhanced(
         self,
         tickers: List[str],
-        include_fmp: bool = True,
         include_simfin: bool = True,
         max_workers: int = 5
     ) -> Dict[str, Dict]:
@@ -480,7 +498,6 @@ class EnhancedHybridDataFetcher:
         
         Args:
             tickers: List of ticker symbols
-            include_fmp: Whether to include FMP data
             include_simfin: Whether to include SimFin data
             max_workers: Number of parallel workers
             
@@ -492,12 +509,11 @@ class EnhancedHybridDataFetcher:
         logger.info(f"Starting enhanced batch fetch for {len(tickers)} tickers")
         
         for i, ticker in enumerate(tickers):
-            logger.info(f"Enhanced batch fetch {i+1}/{len(tickers)}: {ticker}")
+            logger.debug(f"Enhanced batch fetch {i+1}/{len(tickers)}: {ticker}")
             
             try:
                 data = self.fetch_complete_data(
                     ticker=ticker,
-                    include_fmp=include_fmp,
                     include_simfin=include_simfin
                 )
                 results[ticker] = data
@@ -511,7 +527,7 @@ class EnhancedHybridDataFetcher:
         fmp_available = sum(1 for data in results.values() if 'FMP' in data.get('data_sources', []))
         simfin_available = sum(1 for data in results.values() if 'SimFin' in data.get('data_sources', []))
         
-        logger.info(
+        logger.debug(
             f"Enhanced batch fetch complete: {successful}/{len(tickers)} successful, "
             f"FMP: {fmp_available}, SimFin: {simfin_available}"
         )
@@ -595,10 +611,9 @@ class EnhancedHybridDataFetcher:
 
 # Example usage
 if __name__ == "__main__":
-    # Initialize enhanced fetcher
+    # Initialize enhanced fetcher (SimFin-only, no FMP)
     fetcher = EnhancedHybridDataFetcher(
-        fmp_api_key='YOUR_FMP_KEY',
-        simfin_api_key='YOUR_SIMFIN_KEY'  # Optional
+        simfin_api_key='YOUR_SIMFIN_KEY'  # Optional, uses free tier if not provided
     )
     
     # Example 1: Fetch enhanced data for a single ticker
@@ -610,7 +625,7 @@ if __name__ == "__main__":
     print(f"Data Sources: {data.get('data_sources', [])}")
     print(f"Quality Score: {data.get('data_quality_score', 'N/A')}")
     print(f"SimFin Years: {data.get('simfin_years_available', 'N/A')}")
-    print(f"FMP ROE History: {len(data.get('fmp_roe_history', []))} years")
+    print(f"ROE History: {len(data.get('roe_history', []))} years")
     print(f"SimFin ROE: {data.get('simfin_roe', 'N/A')}")
     
     # Example 2: Batch fetch with enhanced data

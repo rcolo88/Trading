@@ -1,0 +1,77 @@
+================================================================================
+INDIVIDUAL STOCK QUALITY ANALYSIS: AAPL
+================================================================================
+Generated: 2026-01-21 18:09:23
+
+🏢 COMPANY OVERVIEW
+----------------------------------------
+Ticker: AAPL
+Sector: Technology
+Industry: Consumer Electronics
+Market Cap: $3714.18B
+Market Cap Tier: Large Cap
+
+📊 QUALITY SCORE SUMMARY
+----------------------------------------
+Quality Score: 90.2/100
+Tier: Elite
+Red Flags: 0
+Data Quality: complete
+
+💡 INVESTMENT RECOMMENDATION
+----------------------------------------
+STRONG BUY - Elite quality stock | ROE Persistence: Inconsistent performance
+
+📈 DETAILED QUALITY METRICS
+----------------------------------------
+gross_profitability: 0.54 (Score: 10.0)
+roe: 1.52 (Score: 10.0)
+operating_profitability: 0.99 (Score: 10.0)
+fcf_yield: 0.03 (Score: 3.5)
+roic: 0.61 (Score: 10.0)
+
+✅ NO RED FLAGS DETECTED
+----------------------------------------
+This stock shows no major quality concerns.
+
+💰 KEY FINANCIAL METRICS
+----------------------------------------
+Revenue: $416.16B
+Net Income: $112.01B
+Free Cash Flow: $98.77B
+Total Assets: $359.24B
+Shareholder Equity: $73.73B
+Total Debt: $98.66B
+Gross Margin: 46.9%
+Return on Equity: 151.9%
+
+📊 ROE PERSISTENCE ANALYSIS
+----------------------------------------
+Years Analyzed: 4
+ROE Years Above 15%: 0
+ROE Mean: 1.7%
+Incremental ROCE Advantage: 0.0%
+Classification: Inconsistent
+Compounder Confidence: 40.0%
+
+📐 LOOKBACK PERIODS SUMMARY
+----------------------------------------
+Market Cap Tier: Mega Cap
+Market Cap Multiplier: 1.25x
+Sector Adjustment: 0.80x
+
+Quality Dimension Lookback Periods:
+----------------------------------------
+  Profitability: 1.0 years (base: 1)
+  Earnings Quality: 1.0 years (base: 1)
+  Growth Quality: 3.0 years (base: 3)
+  Safety: 3.0 years (base: 3)
+  Roe Persistence: 5.0 years (base: 5)
+
+Formula: Adjusted Lookback = Base × Market Cap Multiplier × Sector Adjustment
+
+================================================================================
+Quality Framework: Academic research-based metrics
+Data Source: Yahoo Finance (yfinance)
+Analysis Date: Real-time as of report generation
+================================================================================

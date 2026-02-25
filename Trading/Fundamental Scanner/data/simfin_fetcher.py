@@ -19,6 +19,7 @@ import simfin as sf
 import pandas as pd
 import numpy as np
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Any, Tuple
 import pickle
@@ -29,6 +30,7 @@ import json
 warnings.filterwarnings('ignore', category=FutureWarning, module='simfin.load')
 
 from .ticker_mapping import get_api_ticker, is_mapped_ticker
+from .stock_logger import get_stock_logger
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -227,17 +229,25 @@ class SimFinDataFetcher:
                 return cached
 
         try:
-            logger.info(f"Fetching SimFin data for {ticker} (resolved: {simfin_ticker})")
+            logger.debug(f"Fetching SimFin data for {ticker} (resolved: {simfin_ticker})")
             
-            # Load financial statements from SimFin
-            income_df = sf.load_income(variant=variant, market=market)
-            balance_df = sf.load_balance(variant=variant, market=market)
-            cashflow_df = sf.load_cashflow(variant=variant, market=market)
-            companies_df = sf.load_companies(market=market)
+            # Suppress SimFin library output during data loading
+            import sys
+            import io
+            from contextlib import redirect_stdout, redirect_stderr
+            
+            suppressed_output = io.StringIO()
+            with redirect_stdout(suppressed_output), redirect_stderr(suppressed_output):
+                # Load financial statements from SimFin
+                income_df = sf.load_income(variant=variant, market=market)
+                balance_df = sf.load_balance(variant=variant, market=market)
+                cashflow_df = sf.load_cashflow(variant=variant, market=market)
+                companies_df = sf.load_companies(market=market)
             
             # Check if ticker exists in data (use resolved ticker for SimFin lookup)
             if simfin_ticker not in income_df.index:
-                logger.warning(
+                get_stock_logger().warning(
+                    ticker,
                     f"Ticker {ticker} (resolved: {simfin_ticker}) not found in SimFin data. "
                     f"Note: SimFin uses internal tickers (e.g., FISV -> FI, GOOGL -> GOOG)"
                 )
@@ -335,13 +345,13 @@ class SimFinDataFetcher:
             # Data quality assessment
             if data.validate():
                 data.data_quality = "complete"
-                logger.info(f"Successfully fetched complete SimFin data for {ticker}")
+                logger.debug(f"Successfully fetched complete SimFin data for {ticker}")
             elif any([data.revenue, data.total_assets, data.net_income]):
                 data.data_quality = "partial"
-                logger.warning(f"Partial SimFin data for {ticker}")
+                get_stock_logger().warning(ticker, "Partial SimFin data")
             else:
                 data.data_quality = "insufficient"
-                logger.warning(f"Insufficient SimFin data for {ticker}")
+                get_stock_logger().warning(ticker, "Insufficient SimFin data")
             
             # Cache results
             if self.cache:
@@ -350,7 +360,7 @@ class SimFinDataFetcher:
             return data
             
         except Exception as e:
-            logger.error(f"Failed to fetch SimFin data for {ticker}: {e}")
+            get_stock_logger().error(ticker, f"Failed to fetch SimFin data: {e}")
             return None
     
     def fetch_historical_financials(self, ticker: str, years: int = 5,
@@ -371,16 +381,24 @@ class SimFinDataFetcher:
         simfin_ticker = self._resolve_ticker(ticker)
 
         try:
-            logger.info(f"Fetching historical SimFin data for {ticker} (resolved: {simfin_ticker}, {years} years)")
+            logger.debug(f"Fetching historical SimFin data for {ticker} (resolved: {simfin_ticker}, {years} years)")
 
-            # Load financial statements
-            income_df = sf.load_income(variant=variant, market=market)
-            balance_df = sf.load_balance(variant=variant, market=market)
-            cashflow_df = sf.load_cashflow(variant=variant, market=market)
+            # Suppress SimFin library output during data loading
+            import sys
+            import io
+            from contextlib import redirect_stdout, redirect_stderr
+            
+            suppressed_output = io.StringIO()
+            with redirect_stdout(suppressed_output), redirect_stderr(suppressed_output):
+                # Load financial statements
+                income_df = sf.load_income(variant=variant, market=market)
+                balance_df = sf.load_balance(variant=variant, market=market)
+                cashflow_df = sf.load_cashflow(variant=variant, market=market)
 
             # Use resolved ticker for lookup
             if simfin_ticker not in income_df.index:
-                logger.warning(
+                get_stock_logger().warning(
+                    ticker,
                     f"Ticker {ticker} (resolved: {simfin_ticker}) not found in SimFin historical data"
                 )
                 return None
@@ -471,11 +489,11 @@ class SimFinDataFetcher:
                         balance_year['current_assets'] - balance_year['current_liabilities']
                     )
             
-            logger.info(f"Successfully fetched {len(historical_data['income'])} years of historical data for {ticker}")
+            logger.debug(f"Successfully fetched {len(historical_data['income'])} years of historical data for {ticker}")
             return historical_data
             
         except Exception as e:
-            logger.error(f"Failed to fetch historical SimFin data for {ticker}: {e}")
+            get_stock_logger().error(ticker, f"Failed to fetch historical SimFin data: {e}")
             return None
     
     def get_available_tickers(self, market: str = 'us') -> List[str]:
@@ -489,9 +507,15 @@ class SimFinDataFetcher:
             List of ticker symbols available in SimFin
         """
         try:
-            companies_df = sf.load_companies(market=market)
+            import sys
+            import io
+            from contextlib import redirect_stdout, redirect_stderr
+            
+            suppressed_output = io.StringIO()
+            with redirect_stdout(suppressed_output), redirect_stderr(suppressed_output):
+                companies_df = sf.load_companies(market=market)
             tickers = companies_df.index.tolist()
-            logger.info(f"Found {len(tickers)} tickers available in SimFin for {market} market")
+            logger.debug(f"Found {len(tickers)} tickers available in SimFin for {market} market")
             return tickers
         except Exception as e:
             logger.error(f"Failed to get available tickers from SimFin: {e}")
@@ -511,7 +535,7 @@ class SimFinDataFetcher:
         results = {}
         
         for i, ticker in enumerate(tickers):
-            logger.info(f"Fetching SimFin data {i+1}/{len(tickers)}: {ticker}")
+            logger.debug(f"Fetching SimFin data {i+1}/{len(tickers)}: {ticker}")
             data = self.fetch_financial_data(ticker)
             results[ticker] = data
             
@@ -521,7 +545,7 @@ class SimFinDataFetcher:
                 time.sleep(delay)
         
         success_count = sum(1 for v in results.values() if v and v.data_quality != "insufficient")
-        logger.info(f"SimFin batch fetch complete: {success_count}/{len(tickers)} tickers with usable data")
+        logger.debug(f"SimFin batch fetch complete: {success_count}/{len(tickers)} tickers with usable data")
         
         return results
 

@@ -10,8 +10,11 @@ Choose between:
 3. Individual stock analysis: Deep dive on specific ticker
 
 Usage:
-    # Single index analysis (batch) - Sequential (default)
-    python main_quality_analysis.py --index sp500 --limit 50
+    # Single index analysis (batch) - Analyzes ALL tickers by default
+    python main_quality_analysis.py --index sp600
+
+    # Limit to specific number of tickers
+    python main_quality_analysis.py --index sp500 --limit 100
 
     # Multiple indices combined (e.g., SP500 + SP400 + SP600)
     python main_quality_analysis.py --indices sp500,sp400,sp600 --limit 100
@@ -49,10 +52,31 @@ Date: 2025
 """
 
 import argparse
+import logging
 import sys
 import signal
 from pathlib import Path
 from typing import List
+
+# Configure logging to suppress all console output - only progress bar should show
+# Remove any existing handlers
+root_logger = logging.getLogger()
+for handler in root_logger.handlers[:]:
+    root_logger.removeHandler(handler)
+
+# Create a null handler to prevent "No handler found" warnings
+null_handler = logging.NullHandler()
+root_logger.addHandler(null_handler)
+
+# Set root logger level to ERROR to suppress warnings/info
+root_logger.setLevel(logging.ERROR)
+
+# Suppress specific noisy loggers
+logging.getLogger('schwab_portfolio').setLevel(logging.ERROR)
+logging.getLogger('simfin').setLevel(logging.ERROR)
+logging.getLogger('yfinance').setLevel(logging.ERROR)
+logging.getLogger('pandas').setLevel(logging.ERROR)
+logging.getLogger('urllib3').setLevel(logging.ERROR)
 
 # Global flag for graceful shutdown
 _SHUTDOWN_REQUESTED = False
@@ -116,14 +140,17 @@ def main():
     parser = argparse.ArgumentParser(
         description='Algorithmic Quality Scoring System',
         epilog='Examples:\n'
-               '  # Single index analysis (sequential - default)\n'
-               '  python main_quality_analysis.py --index sp500 --limit 50\n'
+               '  # Analyze all stocks in SP600 (default behavior)\n'
+               '  python main_quality_analysis.py --index sp600\n'
+               '\n'
+               '  # Limit to top 100 stocks\n'
+               '  python main_quality_analysis.py --index sp500 --limit 100\n'
                '\n'
                '  # Multiple indices combined\n'
                '  python main_quality_analysis.py --indices sp500,sp400,sp600 --limit 100\n'
                '\n'
                '  # Parallel fetching (10x speedup for large indices)\n'
-               '  python main_quality_analysis.py --index combined_sp --limit 0 --parallel\n'
+               '  python main_quality_analysis.py --index combined_sp --parallel\n'
                '\n'
                '  # Individual stock analysis\n'
                '  python main_quality_analysis.py --ticker AAPL',
@@ -153,8 +180,8 @@ def main():
     parser.add_argument(
         '--limit',
         type=int,
-        default=50,
-        help='Maximum tickers to analyze (default: 50). Use 0 for all tickers. Ignored for --ticker.'
+        default=0,
+        help='Maximum tickers to analyze (default: 0 = all tickers). Use a number to limit.'
     )
 
     parser.add_argument(
@@ -193,16 +220,8 @@ def main():
     if args.timeout < 0:
         parser.error("--timeout must be a positive number (use 0 for no timeout)")
 
-    print(f"{'='*60}")
-    print(f"QUALITY ANALYSIS SYSTEM")
-    print(f"{'='*60}")
-
     if args.ticker:
         # Individual stock analysis
-        print(f"Mode: Individual Stock Analysis")
-        print(f"Ticker: {args.ticker.upper()}")
-        print()
-
         analyzer = IndividualStockAnalysis(ticker=args.ticker.upper())
         analyzer.run()
 
@@ -235,29 +254,10 @@ def main():
         
         # Get tickers
         all_tickers = config.get_tickers()
+        print(f"DEBUG: Fetched {len(all_tickers)} tickers from {args.index}")
         
         # Multi-day mode is disabled - SimFin has no daily call limit
         # Processing always happens in single session now
-        
-        # Regular index analysis
-        print(f"Mode: Index Analysis")
-
-        if args.index:
-            index_display = args.index
-            print(f"Index: {args.index}")
-        else:
-            indices_list = args.indices.split(',')
-            index_display = f"[{args.indices}]"
-            print(f"Indices: {args.indices}")
-
-        print(f"Total tickers: {len(all_tickers)}")
-        print(f"Limit: {args.limit if args.limit > 0 else 'All'}")
-        print(f"Parallel: {'Enabled' if args.parallel else 'Disabled'}")
-        if args.parallel:
-            print(f"Workers: {args.workers}")
-        print(f"Timeout: {args.timeout}s")
-        print(f"Data Source: SimFin (no daily rate limit)")
-        print()
 
         # Run analysis with parallel options
         script = QualityAnalysisScript(watchlist_config=config)

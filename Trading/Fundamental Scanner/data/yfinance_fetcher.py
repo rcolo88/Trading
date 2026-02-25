@@ -227,9 +227,9 @@ class YFinanceDataFetcher:
             
             if data.validate():
                 if reporting_currency != 'USD':
-                    logger.info(f"Successfully fetched yfinance data for {ticker} ({reporting_currency} → USD at rate {exchange_rate:.4f})")
+                    logger.debug(f"Successfully fetched yfinance data for {ticker} ({reporting_currency} → USD at rate {exchange_rate:.4f})")
                 else:
-                    logger.info(f"Successfully fetched yfinance data for {ticker} (USD)")
+                    logger.debug(f"Successfully fetched yfinance data for {ticker} (USD)")
             else:
                 logger.warning(f"Partial yfinance data for {ticker}")
             
@@ -421,7 +421,7 @@ class YFinanceDataFetcher:
                         'interest_expense': self._get_value(row, ['Interest Expense'], rate),
                     })
             
-            logger.info(f"Fetched {historical_data['years_available']} years of historical data for {ticker}")
+            logger.debug(f"Fetched {historical_data['years_available']} years of historical data for {ticker}")
             return historical_data
             
         except Exception as e:

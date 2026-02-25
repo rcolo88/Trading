@@ -1,0 +1,130 @@
+============================================================
+QUALITY ANALYSIS SUMMARY
+============================================================
+Generated: 2026-01-23 11:46:01
+Index: sp600
+Stocks Analyzed: 601
+============================================================
+
+QUALITY SCORE DISTRIBUTION:
+------------------------------------------------------------
+Elite (85-100): 40 stocks
+Strong (70-84): 66 stocks
+Moderate (50-69): 129 stocks
+Weak (0-49): 366 stocks
+
+================================================================================
+TOP 20 STOCKS BY QUALITY SCORE:
+--------------------------------------------------------------------------------
+Rank Ticker   Market Cap   Score    Tier         Red Flags 
+--------------------------------------------------------------------------------
+1     CALM     $3.8B        100.0       Elite        0         
+2     KTB      $3.4B        100.0       Elite        0         
+3     TDC      $2.8B        100.0       Elite        1         
+4     SMPL     $2.0B        99.7        Elite        0         
+5     GFF      $4.0B        99.4        Elite        1         
+6     BKE      $2.8B        98.6        Elite        0         
+7     MCY      $4.8B        98.3        Elite        0         
+8     PRG      $1.3B        98.1        Elite        0         
+9     CPRX     $3.0B        97.3        Elite        0         
+10    FIZZ     $3.2B        96.1        Elite        0         
+11    HRMY     $2.1B        95.7        Elite        0         
+12    FTDR     $4.5B        94.8        Elite        1         
+13    NSP      $1.8B        94.4        Elite        1         
+14    SBH      $1.6B        94.2        Elite        0         
+15    DFIN     $1.5B        94.1        Elite        0         
+16    YOU      $4.7B        93.3        Elite        0         
+17    IPAR     $3.1B        92.8        Elite        0         
+18    SLVM     $2.1B        92.0        Elite        0         
+19    CRI      $1.4B        91.3        Elite        0         
+20    WDFC     $2.9B        90.8        Elite        0         
+
+============================================================
+MARKET CAP DISTRIBUTION:
+------------------------------------------------------------
+Large Cap (≥$50B): 0 stocks
+Mid Cap ($2B-$50B): 355 stocks
+Small Cap ($500M-$2B): 245 stocks
+Micro Cap (<$500M): 1 stocks
+
+============================================================
+LOOKBACK PERIODS BY MARKET CAP:
+------------------------------------------------------------
+Market cap tier determines how many years of historical data
+are used for each quality dimension. Smaller caps use shorter
+lookbacks due to data availability and higher volatility.
+
+Market Cap Tiers and Multipliers:
+------------------------------------------------------------
+  Mega Cap: 1.25x multiplier
+  Large Cap: 1.00x multiplier
+  Mid Cap: 0.75x multiplier
+  Small Cap: 0.75x multiplier
+  Micro Cap: 0.50x multiplier
+
+Quality Dimension Base Lookbacks:
+------------------------------------------------------------
+  Profitability: 1 years (range: 1-3)
+  Earnings Quality: 1 years (range: 1-3)
+  Growth Quality: 3 years (range: 1-5)
+  Safety: 3 years (range: 1-5)
+  Roe Persistence: 5 years (range: 2-5)
+
+Formula: Adjusted Lookback = Base × Market Cap Multiplier × Sector Adjustment
+
+Sector Adjustments:
+------------------------------------------------------------
+  Technology: 0.80x
+  Healthcare: 1.10x
+  Utilities: 1.10x
+  Industrials: 1.10x
+  Financials: 1.00x
+  Consumer Cyclicals: 1.00x
+  Real Estate: 1.00x
+  Communication Services: 0.90x
+  Materials: 1.00x
+  Energy: 1.00x
+
+This Index's Market Cap Distribution:
+------------------------------------------------------------
+  Micro Cap: 1 stocks
+  Mid Cap: 355 stocks
+  Small Cap: 245 stocks
+
+Adjusted Lookback Examples by Tier:
+------------------------------------------------------------
+
+  Mega Cap (×1.25):
+    Profitability: 1.2 years
+    Earnings Quality: 1.2 years
+    Growth Quality: 3.8 years
+    Safety: 3.8 years
+    Roe Persistence: 6.2 years
+
+  Large Cap (×1.00):
+    Profitability: 1.0 years
+    Earnings Quality: 1.0 years
+    Growth Quality: 3.0 years
+    Safety: 3.0 years
+    Roe Persistence: 5.0 years
+
+  Mid Cap (×0.75):
+    Profitability: 0.8 years
+    Earnings Quality: 0.8 years
+    Growth Quality: 2.2 years
+    Safety: 2.2 years
+    Roe Persistence: 3.8 years
+
+  Small Cap (×0.75):
+    Profitability: 0.8 years
+    Earnings Quality: 0.8 years
+    Growth Quality: 2.2 years
+    Safety: 2.2 years
+    Roe Persistence: 3.8 years
+
+  Micro Cap (×0.50):
+    Profitability: 0.5 years
+    Earnings Quality: 0.5 years
+    Growth Quality: 1.5 years
+    Safety: 1.5 years
+    Roe Persistence: 2.5 years

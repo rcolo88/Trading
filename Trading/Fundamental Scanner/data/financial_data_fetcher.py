@@ -15,6 +15,8 @@ import pandas as pd
 import numpy as np
 import time  # For rate limit delays
 
+from .stock_logger import get_stock_logger
+
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -241,7 +243,7 @@ class FinancialDataFetcher:
         # Note: Cache check is done in fetch_financial_data(), not here
 
         try:
-            logger.info(f"Fetching financial data for {ticker}")
+            logger.debug(f"Fetching financial data for {ticker}")
 
             # Create yfinance Ticker object
             stock = yf.Ticker(ticker)
@@ -267,25 +269,25 @@ class FinancialDataFetcher:
             # Income statement
             if not financials.empty:
                 try:
-                    data.revenue = self._safe_get_with_aliases(financials, 'revenue', 0)
-                    data.cogs = self._safe_get_with_aliases(financials, 'cogs', 0)
-                    data.operating_income = self._safe_get_with_aliases(financials, 'operating_income', 0)
-                    data.net_income = self._safe_get_with_aliases(financials, 'net_income', 0)
+                    data.revenue = self._safe_get_with_aliases(financials, 'revenue', ticker)
+                    data.cogs = self._safe_get_with_aliases(financials, 'cogs', ticker)
+                    data.operating_income = self._safe_get_with_aliases(financials, 'operating_income', ticker)
+                    data.net_income = self._safe_get_with_aliases(financials, 'net_income', ticker)
 
                     # EBIT is the same as operating_income
                     data.ebit = data.operating_income
 
                     # Extract interest expense for Interest Coverage ratio
-                    data.interest_expense = self._safe_get_with_aliases(financials, 'interest_expense', 0)
+                    data.interest_expense = self._safe_get_with_aliases(financials, 'interest_expense', ticker)
 
                     # Extract or calculate EBITDA
                     # Try direct extraction first
-                    ebitda = self._safe_get_with_aliases(financials, 'ebitda', 0)
+                    ebitda = self._safe_get_with_aliases(financials, 'ebitda', ticker)
                     if ebitda is not None:
                         data.ebitda = ebitda
                     elif data.ebit is not None:
                         # Calculate EBITDA = EBIT + Depreciation + Amortization
-                        depreciation = self._safe_get_with_aliases(financials, 'depreciation_amortization', 0)
+                        depreciation = self._safe_get_with_aliases(financials, 'depreciation_amortization', ticker)
                         if depreciation is not None:
                             data.ebitda = data.ebit + depreciation
                         else:
@@ -299,13 +301,13 @@ class FinancialDataFetcher:
                     if operating_expense and data.cogs:
                         data.sga = operating_expense - data.cogs
                 except Exception as e:
-                    logger.warning(f"Error extracting income statement for {ticker}: {e}")
+                    get_stock_logger().warning(ticker, f"Error extracting income statement: {e}")
 
             # Balance sheet
             if not balance_sheet.empty:
                 try:
-                    data.total_assets = self._safe_get_with_aliases(balance_sheet, 'total_assets', 0)
-                    data.shareholder_equity = self._safe_get_with_aliases(balance_sheet, 'shareholder_equity', 0)
+                    data.total_assets = self._safe_get_with_aliases(balance_sheet, 'total_assets', ticker)
+                    data.shareholder_equity = self._safe_get_with_aliases(balance_sheet, 'shareholder_equity', ticker)
 
                     # Try to get total debt
                     total_debt = self._safe_get(balance_sheet, 'Total Debt', 0)
@@ -317,25 +319,24 @@ class FinancialDataFetcher:
                     data.total_debt = total_debt
 
                     # Extract retained earnings for Z-Score
-                    data.retained_earnings = self._safe_get_with_aliases(balance_sheet, 'retained_earnings', 0)
+                    data.retained_earnings = self._safe_get_with_aliases(balance_sheet, 'retained_earnings', ticker)
 
                     # Calculate working capital (Current Assets - Current Liabilities)
-                    current_assets = self._safe_get_with_aliases(balance_sheet, 'current_assets', 0)
-                    current_liabilities = self._safe_get_with_aliases(balance_sheet, 'current_liabilities', 0)
+                    current_assets = self._safe_get_with_aliases(balance_sheet, 'current_assets', ticker)
+                    current_liabilities = self._safe_get_with_aliases(balance_sheet, 'current_liabilities', ticker)
                     if current_assets is not None and current_liabilities is not None:
                         data.working_capital = current_assets - current_liabilities
                     else:
                         data.working_capital = None
                 except Exception as e:
-                    logger.warning(f"Error extracting balance sheet for {ticker}: {e}")
+                    get_stock_logger().warning(ticker, f"Error extracting balance sheet: {e}")
 
             # Cash flow
             if not cashflow.empty:
                 try:
                     data.free_cash_flow = self._safe_get(cashflow, 'Free Cash Flow', 0)
-                    data.operating_cash_flow = self._safe_get_with_aliases(cashflow, 'operating_cash_flow', 0)
                 except Exception as e:
-                    logger.warning(f"Error extracting cash flow for {ticker}: {e}")
+                    get_stock_logger().warning(ticker, f"Error extracting cash flow: {e}")
 
             # Calculate NOPAT (approximate: operating income * (1 - tax rate))
             # Use 21% federal corporate tax rate as approximation
@@ -348,13 +349,13 @@ class FinancialDataFetcher:
             # Data quality assessment
             if data.validate():
                 data.data_quality = "complete"
-                logger.info(f"Successfully fetched complete financial data for {ticker}")
+                logger.debug(f"Successfully fetched complete financial data for {ticker}")
             elif any([data.revenue, data.total_assets, data.net_income]):
                 data.data_quality = "partial"
-                logger.warning(f"Partial financial data for {ticker}")
+                get_stock_logger().warning(ticker, f"Partial financial data for {ticker}")
             else:
                 data.data_quality = "insufficient"
-                logger.warning(f"Insufficient financial data for {ticker}")
+                get_stock_logger().warning(ticker, f"Insufficient financial data for {ticker}")
 
             # Cache results
             if self.cache:
@@ -400,7 +401,7 @@ class FinancialDataFetcher:
         logger.warning(f"Could not find valid {key} in any column (tried {min(max_attempts, len(df.columns))} columns)")
         return None
 
-    def _safe_get_with_aliases(self, df: pd.DataFrame, key: str, start_col: int = 0, max_attempts: int = 3) -> Optional[float]:
+    def _safe_get_with_aliases(self, df: pd.DataFrame, key: str, ticker: str, start_col: int = 0, max_attempts: int = 3) -> Optional[float]:
         """
         Safely get value from DataFrame with field aliases and column fallback.
         
@@ -421,7 +422,7 @@ class FinancialDataFetcher:
                 else:
                     logger.debug(f"Column {col_idx} missing alias: {alias}")
         
-        logger.warning(f"Could not find valid {key} using any alias (tried: {aliases})")
+        get_stock_logger().warning(ticker, f"Could not find valid {key} using any alias (tried: {aliases})")
         return None
 
     def fetch_historical_financials(self, ticker: str, years: int = 10) -> Optional[pd.DataFrame]:
@@ -457,7 +458,7 @@ class FinancialDataFetcher:
             - Missing values are filled with None
         """
         try:
-            logger.info(f"Fetching historical financials for {ticker} (target: {years} years)")
+            logger.debug(f"Fetching historical financials for {ticker} (target: {years} years)")
 
             # Create yfinance Ticker object
             stock = yf.Ticker(ticker)
@@ -583,7 +584,7 @@ class FinancialDataFetcher:
 
             # Log data quality
             complete_rows = df.dropna(subset=['revenue', 'net_income', 'shareholder_equity']).shape[0]
-            logger.info(f"Historical data for {ticker}: {len(df)} years, {complete_rows} complete rows")
+            logger.debug(f"Historical data for {ticker}: {len(df)} years, {complete_rows} complete rows")
 
             if len(df) < 2:
                 logger.warning(f"Insufficient historical data for {ticker}: only {len(df)} year(s)")
@@ -609,7 +610,7 @@ class FinancialDataFetcher:
         results = {}
 
         for i, ticker in enumerate(tickers):
-            logger.info(f"Fetching financials {i+1}/{len(tickers)}: {ticker}")
+            logger.debug(f"Fetching financials {i+1}/{len(tickers)}: {ticker}")
             data = self.fetch_financial_data(ticker)
             results[ticker] = data
 
@@ -619,7 +620,7 @@ class FinancialDataFetcher:
                 logger.debug(f"Rate limit protection: waiting {delay}s before next request")
 
         success_count = sum(1 for v in results.values() if v and v.data_quality != "insufficient")
-        logger.info(f"Batch fetch complete: {success_count}/{len(tickers)} tickers with usable data")
+        logger.debug(f"Batch fetch complete: {success_count}/{len(tickers)} tickers with usable data")
 
         return results
 
@@ -667,7 +668,7 @@ class FinancialDataFetcher:
             logger.warning(f"ParallelFetcher not available: {e}, falling back to sequential batch_fetch")
             return self.batch_fetch(tickers)
 
-        logger.info(f"Starting parallel batch fetch for {len(tickers)} tickers "
+        logger.debug(f"Starting parallel batch fetch for {len(tickers)} tickers "
                    f"(workers={max_workers}, rate={requests_per_second}/s)")
 
         parallel_fetcher = ParallelFetcher(
@@ -691,7 +692,7 @@ class FinancialDataFetcher:
             if data and data.data_quality != "insufficient"
         }
 
-        logger.info(f"Parallel fetch complete: {len(valid_results)}/{len(tickers)} tickers with usable data")
+        logger.debug(f"Parallel fetch complete: {len(valid_results)}/{len(tickers)} tickers with usable data")
         return valid_results
 
     def export_to_json(self, ticker: str, output_file: str):

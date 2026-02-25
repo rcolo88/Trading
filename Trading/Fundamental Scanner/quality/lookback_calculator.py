@@ -12,8 +12,8 @@ Market Cap Tiers and Multipliers:
 - Mega Cap (> $200B): 1.25x (extended lookback)
 - Large Cap ($10B-$200B): 1.0x (baseline)
 - Mid Cap ($2B-$10B): 0.75x (reduced lookback)
-- Small Cap ($300M-$2B): 0.5x (minimum lookback)
-- Micro Cap (< $300M): 0.35x (very minimum)
+- Small Cap ($300M-$2B): 0.75x (moderate lookback - extended from 0.5x)
+- Micro Cap (< $300M): 0.5x (conservative lookback - extended from 0.35x)
 
 Formula:
     Adjusted Lookback = Base Lookback × Market Cap Multiplier × Sector Adjustment
@@ -165,12 +165,13 @@ class LookbackCalculator:
     """
     
     # Market cap tier multipliers (smaller cap = smaller multiplier)
+    # Updated: Extended lookbacks for small and micro caps (conservative approach)
     MARKET_CAP_MULTIPLIERS = {
         MarketCapTier.MEGA_CAP: 1.25,
         MarketCapTier.LARGE_CAP: 1.0,
         MarketCapTier.MID_CAP: 0.75,
-        MarketCapTier.SMALL_CAP: 0.5,
-        MarketCapTier.MICRO_CAP: 0.35
+        MarketCapTier.SMALL_CAP: 0.75,  # Extended from 0.5x
+        MarketCapTier.MICRO_CAP: 0.5   # Extended from 0.35x
     }
     
     def __init__(self):
@@ -255,6 +256,38 @@ class LookbackCalculator:
             # Severe penalty for very limited data
             return 0.5
     
+    def validate_minimum_data_requirements(self, market_cap_tier: MarketCapTier, 
+                                          available_years: Optional[int] = None) -> Tuple[bool, str]:
+        """
+        Validate minimum data requirements for extended lookback periods.
+        
+        Args:
+            market_cap_tier: The company's market cap tier
+            available_years: Years of historical data available
+            
+        Returns:
+            Tuple of (is_valid, message)
+        """
+        # Define minimum data requirements by tier (in years)
+        MIN_DATA_REQUIREMENTS = {
+            MarketCapTier.MEGA_CAP: 5,    # Need at least 5 years for mega caps
+            MarketCapTier.LARGE_CAP: 3,    # Need at least 3 years for large caps
+            MarketCapTier.MID_CAP: 3,     # Need at least 3 years for mid caps
+            MarketCapTier.SMALL_CAP: 2,   # Need at least 2 years for small caps
+            MarketCapTier.MICRO_CAP: 2    # Need at least 2 years for micro caps
+        }
+        
+        if available_years is None:
+            return True, "Data availability unknown - proceeding with caution"
+        
+        min_required = MIN_DATA_REQUIREMENTS.get(market_cap_tier, 2)
+        
+        if available_years >= min_required:
+            return True, f"Sufficient data: {available_years} years available (minimum {min_required})"
+        else:
+            return False, (f"Insufficient data: {available_years} years available, "
+                          f"minimum {min_required} required for {market_cap_tier.value} lookback analysis")
+    
     def calculate_lookback(
         self,
         base_lookback: float,
@@ -282,23 +315,34 @@ class LookbackCalculator:
         # Step 1: Classify market cap tier
         market_cap_tier = self.classify_market_cap(market_cap)
         
-        # Step 2: Get market cap multiplier
+        # Step 2: Validate minimum data requirements
+        if data_years is not None:
+            is_valid, validation_msg = self.validate_minimum_data_requirements(market_cap_tier, data_years)
+            if not is_valid:
+                logger.warning(f"Data validation failed for {metric_name}: {validation_msg}")
+                # Reduce lookback to available data years if insufficient
+                adjusted = min(base_lookback, max(1, data_years))
+                data_adj = 0.5  # Penalty for insufficient data
+            else:
+                logger.debug(f"Data validation passed for {metric_name}: {validation_msg}")
+        
+        # Step 3: Get market cap multiplier
         market_cap_multiplier = self.get_multiplier(market_cap_tier)
         
-        # Step 3: Get sector adjustment
+        # Step 4: Get sector adjustment
         sector_adjustment = self.get_sector_adjustment(sector)
         
-        # Step 4: Calculate adjusted lookback
+        # Step 5: Calculate adjusted lookback
         adjusted = base_lookback * market_cap_multiplier * sector_adjustment
         
-        # Step 5: Apply data availability constraint
+        # Step 6: Apply data availability constraint
         if data_years is not None:
             adjusted = min(adjusted, max(1, data_years))
         
         # Enforce minimum of 1 year
         adjusted = max(1, adjusted)
         
-        # Step 6: Get data availability adjustment
+        # Step 7: Get data availability adjustment
         data_adj = self.get_data_availability_adjustment(data_years, int(base_lookback))
         
         logger.debug(

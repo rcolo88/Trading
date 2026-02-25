@@ -44,6 +44,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from data.financial_data_fetcher import FinancialDataFetcher, FinancialData
 from data.enhanced_hybrid_fetcher import EnhancedHybridDataFetcher
+from data.stock_logger import get_stock_logger
 from quality.quality_metrics_calculator import QualityMetricsCalculator, QualityAnalysisResult
 from quality.lookback_calculator import LookbackCalculator, DEFAULT_LOOKBACKS, QUALITY_DIMENSIONS, SECTOR_ADJUSTMENTS, MarketCapTier
 from quality.market_cap_classifier import MarketCapClassifier
@@ -55,9 +56,9 @@ QUALITY_MIN_SCORE = 70      # Minimum quality score for holdings
 QUALITY_IDEAL_SCORE = 85    # Ideal quality score for new buys
 QUALITY_SWAP_THRESHOLD = 15 # Minimum score improvement to swap holdings
 
-# Setup logging
+# Setup logging - only show errors (progress bar handled by tqdm, warnings logged to file)
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -421,11 +422,29 @@ class QualityAnalysisScript:
                 return data.get('data_quality')
             return getattr(data, 'data_quality', None)
 
+        # Log summary of data quality before filtering
+        quality_counts = {"complete": 0, "partial": 0, "insufficient": 0, "unknown": 0}
+        for ticker, data in results.items():
+            if data:
+                quality = _get_data_quality(data)
+                quality_counts[quality if quality in quality_counts else "unknown"] = \
+                    quality_counts.get(quality if quality in quality_counts else "unknown", 0) + 1
+        
+        logger.info(f"Data quality summary: {quality_counts['complete']} complete, "
+                   f"{quality_counts['partial']} partial, {quality_counts['insufficient']} insufficient")
+
+        # Include both "complete" and "partial" data - partial data can still be analyzed
         valid_results = {
             ticker: data
             for ticker, data in results.items()
-            if data and _get_data_quality(data) != "insufficient"
+            if data and _get_data_quality(data) in ["complete", "partial"]
         }
+
+        if not valid_results:
+            logger.warning("No valid financial data found for any ticker!")
+        elif len(valid_results) < len(results):
+            filtered_count = len(results) - len(valid_results)
+            logger.warning(f"Filtered out {filtered_count} tickers with insufficient data quality")
 
         return valid_results
 
@@ -492,28 +511,27 @@ class QualityAnalysisScript:
                 if 'revenue_history' not in calculator_input or 'prior_total_assets' not in calculator_input:
                     try:
                         historical_data = self.financial_fetcher.fetch_historical_financials(ticker, years=10)
-                        if historical_data is not None and len(historical_data) >= 3:
-                            # Calculate ROE history
+                        if historical_data is not None and len(historical_data) >= 1:
+                            # Calculate ROE history (need at least 1 year)
                             roe_history = []
                             for _, row in historical_data.iterrows():
                                 if row['shareholder_equity'] and row['net_income'] and row['shareholder_equity'] > 0:
                                     roe = row['net_income'] / row['shareholder_equity']
                                     roe_history.append(roe)
 
-                            if len(roe_history) >= 3:
+                            if len(roe_history) >= 1:
                                 calculator_input['roe_history'] = roe_history
 
-                            # Extract revenue history for CAGR calculation
+                            # Extract revenue history for CAGR calculation (need at least 1 year)
                             if 'revenue_history' not in calculator_input:
                                 revenue_history = []
                                 for _, row in historical_data.iterrows():
                                     if row.get('revenue') is not None and row['revenue'] > 0:
                                         revenue_history.append(row['revenue'])
-                                if len(revenue_history) >= 2:
+                                if len(revenue_history) >= 1:
                                     calculator_input['revenue_history'] = revenue_history
-                                    logger.info(f"Extracted {len(revenue_history)} years of revenue history for {ticker}")
 
-                            # Calculate prior_total_assets for asset growth
+                            # Calculate prior_total_assets for asset growth (need at least 1 year)
                             if 'prior_total_assets' not in calculator_input:
                                 assets_history = []
                                 for _, row in historical_data.iterrows():
@@ -521,9 +539,10 @@ class QualityAnalysisScript:
                                         assets_history.append(row['total_assets'])
                                 if len(assets_history) >= 2:
                                     calculator_input['prior_total_assets'] = assets_history[1]
-                                    logger.info(f"Prior total assets for {ticker}: {calculator_input['prior_total_assets']:,.0f}")
+                                elif len(assets_history) == 1:
+                                    calculator_input['prior_total_assets'] = assets_history[0]
 
-                            # Calculate gross margin history for margin trend
+                            # Calculate gross margin history for margin trend (need at least 1 year)
                             if 'gross_margin_history' not in calculator_input:
                                 gross_margin_history = []
                                 for _, row in historical_data.iterrows():
@@ -531,17 +550,16 @@ class QualityAnalysisScript:
                                         gp = row['revenue'] - row['cogs']
                                         margin = gp / row['revenue']
                                         gross_margin_history.append(margin)
-                                if len(gross_margin_history) >= 3:
+                                if len(gross_margin_history) >= 1:
                                     calculator_input['gross_margin_history'] = gross_margin_history
-                                    logger.info(f"Extracted {len(gross_margin_history)} periods of margin history for {ticker}")
                     except Exception as e:
-                        logger.debug(f"Could not fetch historical data for {ticker}: {e}")
+                        get_stock_logger().error(ticker, f"Could not fetch historical data: {e}")
 
                 result = self.quality_calculator.calculate_quality_metrics(calculator_input)
                 quality_results[ticker] = result
 
             except Exception as e:
-                logger.warning(f"Failed to calculate quality for {ticker}: {e}")
+                get_stock_logger().error(ticker, f"Failed to calculate quality: {e}")
                 continue
 
             self._progress_tracker.update(1)
@@ -591,7 +609,7 @@ class QualityAnalysisScript:
         Returns:
             Dict mapping ticker -> ROE persistence data
         """
-        logger.info(f"Analyzing ROE persistence for {len(tickers)} tickers "
+        logger.debug(f"Analyzing ROE persistence for {len(tickers)} tickers "
                    f"(parallel={parallel}, workers={max_workers})")
 
         roe_persistence = {}
@@ -918,7 +936,7 @@ class QualityAnalysisScript:
             logger.error("No watchlist tickers available. Exiting.")
             return
 
-        logger.info(f"Analyzing {len(watchlist)} tickers from {self.watchlist_config.index.value}")
+        logger.debug(f"Analyzing {len(watchlist)} tickers from {self.watchlist_config.index.value}")
 
         if self._check_timeout():
             logger.error("Timeout before starting analysis")
@@ -937,6 +955,12 @@ class QualityAnalysisScript:
                 logger.error("No financial data fetched. Exiting.")
                 self._progress_tracker.close()
                 return
+
+            # Log summary of fetch results
+            fetched_count = len(financial_data)
+            failed_count = len(watchlist) - fetched_count
+            logger.info(f"Data fetch complete: {fetched_count}/{len(watchlist)} tickers successful "
+                       f"({failed_count} failed or had insufficient data)")
 
             if self._check_timeout():
                 logger.error("Timeout during data fetching")

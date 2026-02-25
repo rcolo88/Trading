@@ -27,8 +27,8 @@ from quality.lookback_calculator import LookbackCalculator, DEFAULT_LOOKBACKS, Q
 from quality.market_cap_classifier import MarketCapClassifier
 from components.quality_persistence_analyzer import QualityPersistenceAnalyzer
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
+# Setup logging - only show errors (progress bar handled by tqdm, warnings logged to file)
+logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
 
