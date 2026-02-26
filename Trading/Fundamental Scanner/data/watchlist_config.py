@@ -289,8 +289,8 @@ class WatchlistConfig:
 
 
 # Default configurations for common use cases
-DEFAULT_DAILY_CONFIG = WatchlistConfig(index=WatchlistIndex.SP500, limit=50)
-DEFAULT_WEEKLY_CONFIG = WatchlistConfig(index=WatchlistIndex.SP500)
+DEFAULT_DAILY_CONFIG = WatchlistConfig(index=WatchlistIndex.COMBINED_SP, limit=50)
+DEFAULT_WEEKLY_CONFIG = WatchlistConfig(index=WatchlistIndex.COMBINED_SP)
 DEFAULT_MONTHLY_CONFIG = WatchlistConfig(index=WatchlistIndex.COMBINED_SP)
 
 

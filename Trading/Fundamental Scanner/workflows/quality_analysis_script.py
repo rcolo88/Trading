@@ -1075,9 +1075,9 @@ def main():
     parser.add_argument(
         '--index',
         type=str,
-        default='sp500',
+        default='combined_sp',
         choices=['sp500', 'sp400', 'sp600', 'nasdaq100', 'russell1000', 'russell2000', 'russell3000', 'combined_sp'],
-        help='Index to screen (default: sp500)'
+        help='Index to screen (default: combined_sp - S&P 1500)'
     )
     parser.add_argument(
         '--limit',

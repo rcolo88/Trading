@@ -164,7 +164,7 @@ def main():
         '--index',
         type=str,
         choices=['sp500', 'sp400', 'sp600', 'nasdaq100', 'russell1000', 'russell2000', 'russell3000', 'combined_sp'],
-        help='Single index to screen. Options: sp500, sp400, sp600, nasdaq100, combined_sp, etc.'
+        help='Single index to screen (default: combined_sp - S&P 1500). Options: sp500, sp400, sp600, nasdaq100, combined_sp, etc.'
     )
     group.add_argument(
         '--indices',
@@ -208,8 +208,8 @@ def main():
 
     # Validate arguments
     if not args.index and not args.indices and not args.ticker:
-        # Default to index analysis if nothing specified
-        args.index = 'sp500'
+        # Default to composite SP1500 (all S&P indices combined)
+        args.index = 'combined_sp'
 
     if args.ticker and args.limit != 50:
         parser.error("--limit is only used with --index or --indices, not --ticker")

@@ -427,9 +427,9 @@ def main():
     parser.add_argument(
         '--index',
         type=str,
-        default='sp500',
+        default='combined_sp',
         choices=['sp500', 'sp400', 'sp600', 'nasdaq100', 'combined_sp'],
-        help='Index to screen (default: sp500). Options: sp500 (large cap ~500), '
+        help='Index to screen (default: combined_sp - S&P 1500). Options: sp500 (large cap ~500), '
              'sp400 (mid cap ~400), sp600 (small cap ~600), nasdaq100 (tech ~100), '
              'combined_sp (S&P 1500 ~1500)'
     )
