@@ -374,91 +374,6 @@ class EnhancedHybridDataFetcher:
         
         return merged
 
-    def _extract_fmp_historical_trends(
-        self,
-        ratios_data: List,
-        score_data: Dict,
-        income_data: List,
-        balance_data: List,
-        cash_flow_data: List
-    ) -> Dict:
-        """Extract historical trends from FMP data"""
-        trends = {}
-        
-        # Process ratios data for historical trends
-        roe_history = []
-        margin_history = []
-        net_margin_history = []
-        current_ratio_history = []
-        debt_to_equity_history = []
-        interest_coverage_history = []
-        revenue_growth_history = []
-        
-        for year_data in ratios_data:
-            # FMP ratios don't include ROE, use proxy
-            net_margin = year_data.get('netProfitMargin', 0)
-            roe_proxy = net_margin * 3 if net_margin else 0
-            roe_history.append(roe_proxy)
-            
-            margin_history.append(year_data.get('grossProfitRatio', year_data.get('grossProfitMargin', 0)))
-            net_margin_history.append(year_data.get('netProfitMargin', 0))
-            current_ratio_history.append(year_data.get('currentRatio', 0))
-            debt_to_equity_history.append(year_data.get('debtToEquityRatio', 0))
-            interest_coverage_history.append(year_data.get('interestCoverageRatio', 0))
-            revenue_growth_history.append(year_data.get('revenueGrowth', 0))
-        
-        # Add historical trends to merged data
-        trends.update({
-            'fmp_roe_history': roe_history,
-            'fmp_gross_margin_history': margin_history,
-            'fmp_net_margin_history': net_margin_history,
-            'fmp_current_ratio_history': current_ratio_history,
-            'fmp_debt_to_equity_history': debt_to_equity_history,
-            'fmp_interest_coverage_history': interest_coverage_history,
-            'fmp_revenue_growth_history': revenue_growth_history,
-        })
-        
-        # Add revenue and assets history from statements
-        revenue_history = [year.get('revenue', 0) for year in income_data]
-        assets_history = [year.get('totalAssets', 0) for year in balance_data]
-        
-        trends.update({
-            'fmp_revenue_history': revenue_history,
-            'fmp_assets_history': assets_history,
-        })
-        
-        return trends
-
-    def _create_ratio_comparison(self, merged: Dict, simfin_ratios: Dict) -> Optional[Dict]:
-        """Create comparison between FMP and SimFin calculated ratios"""
-        comparison = {}
-        
-        # Compare key ratios if both sources available
-        key_ratios = [
-            ('roe', 'simfin_roe'),
-            ('altman_z_score', 'simfin_altman_z_score'),
-            ('debt_to_equity', 'simfin_debt_to_equity'),
-            ('interest_coverage', 'simfin_interest_coverage'),
-        ]
-        
-        for fmp_key, simfin_key in key_ratios:
-            fmp_value = merged.get(fmp_key)
-            simfin_value = simfin_ratios.get(simfin_key)
-            
-            if fmp_value is not None and simfin_value is not None:
-                diff = abs(fmp_value - simfin_value)
-                pct_diff = (diff / max(abs(fmp_value), abs(simfin_value), 0.001)) * 100
-                
-                comparison[f"{fmp_key}_vs_simfin"] = {
-                    'fmp_value': fmp_value,
-                    'simfin_value': simfin_value,
-                    'difference': diff,
-                    'percent_difference': pct_diff,
-                    'significant_difference': pct_diff > 10  # Flag >10% differences
-                }
-        
-        return comparison if comparison else None
-
     def _calculate_data_quality_score(self, merged: Dict) -> float:
         """Calculate overall data quality score (0-100)"""
         score = 0.0
@@ -467,19 +382,15 @@ class EnhancedHybridDataFetcher:
         if merged.get('ticker'):
             score += 30
         
-        # Bonus for FMP historical data
-        if 'FMP' in merged.get('data_sources', []):
-            score += 25
-            if merged.get('fmp_piotroski_score') is not None:
-                score += 10
-            if merged.get('fmp_altman_z_score') is not None:
-                score += 10
-        
         # Bonus for SimFin data
         if 'SimFin' in merged.get('data_sources', []):
-            score += 15
+            score += 35
             if merged.get('simfin_years_available', 0) >= 3:
                 score += 10
+        
+        # Bonus for having historical data
+        if merged.get('has_historical_data'):
+            score += 15
         
         # Bonus for having both sources (validation capability)
         if len(merged.get('data_sources', [])) >= 2:
@@ -524,12 +435,11 @@ class EnhancedHybridDataFetcher:
         
         # Calculate statistics
         successful = sum(1 for data in results.values() if data)
-        fmp_available = sum(1 for data in results.values() if 'FMP' in data.get('data_sources', []))
         simfin_available = sum(1 for data in results.values() if 'SimFin' in data.get('data_sources', []))
         
         logger.debug(
             f"Enhanced batch fetch complete: {successful}/{len(tickers)} successful, "
-            f"FMP: {fmp_available}, SimFin: {simfin_available}"
+            f"SimFin: {simfin_available}"
         )
         
         return results
@@ -547,12 +457,9 @@ class EnhancedHybridDataFetcher:
         summary = {
             'total_tickers': len(tickers),
             'yfinance_coverage': 0,
-            'fmp_coverage': 0,
             'simfin_coverage': 0,
             'dual_source_coverage': 0,
-            'triple_source_coverage': 0,
             'average_quality_score': 0.0,
-            'blocked_symbols_fmp': [],
             'blocked_symbols_simfin': []
         }
         
