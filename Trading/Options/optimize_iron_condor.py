@@ -41,6 +41,8 @@ def create_param_combinations():
         'stop_loss': [0.60, 0.75, 0.90],
         'dte_min_exit': [7, 14, 21],
         'min_credit': [1.00, 1.50, 2.00],
+        'vix_min': [5, 10, 15, 20],
+        'vix_max': [25, 30, 35, 40],
     }
 
 
@@ -223,8 +225,8 @@ def main():
                 'call_short_delta': float(best_params['call_short_delta']),
                 'call_long_delta': float(best_params['call_long_delta']),
                 'min_credit': float(best_params['min_credit']),
-                'iv_percentile_min': 60,
-                'iv_percentile_max': 85,
+                'vix_min': 15,
+                'vix_max': 35,
                 'max_wing_width': 10.0,
             },
             'exit': {

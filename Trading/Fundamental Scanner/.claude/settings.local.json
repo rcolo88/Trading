@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m py_compile:*)",
+      "Bash(python3:*)",
+      "Read(//Users/robertcologero/GitHub/Trading/LLM Managed Portfolio/**)",
+      "Bash(python test_hybrid_fetcher.py)",
+      "WebSearch",
+      "Bash(python main_quality_analysis.py --help)",
+      "Bash(python -c ' *)",
+      "Bash(ls -lh merged_opportunity_cache.pkl)",
+      "Bash(python -c \"import pickle; cache = pickle.load\\(open\\('merged_opportunity_cache.pkl', 'rb'\\)\\); print\\(f'Currently cached: {len\\(cache\\)} tickers'\\)\")",
+      "Bash(python -c \"from quality import OpportunityScorer, EarningsQualityAnalyzer; from workflows.opportunity_discovery import OpportunityDiscoveryWorkflow; print\\('✅ All imports working'\\)\")",
+      "Bash(python -c \"import pickle; cache = pickle.load\\(open\\('merged_opportunity_cache.pkl', 'rb'\\)\\); tickers = list\\(cache.keys\\(\\)\\); print\\(f'Cached: {len\\(tickers\\)} tickers'\\); print\\(f'Sample: {tickers[:5]}'\\)\")",
+      "Bash(python -c \"from data.watchlist_config import WatchlistConfig, WatchlistIndex; config = WatchlistConfig\\(index=WatchlistIndex.COMBINED_SP\\); tickers = config.get_tickers\\(\\); print\\(f'Combined_SP \\(S&P 1500\\) should have: {len\\(tickers\\)} tickers'\\)\")",
+      "Bash(python -c \"from main_quality_analysis import WatchlistIndex; print\\('✅ WatchlistIndex imported successfully'\\)\")",
+      "Bash(python -c \"import main_quality_analysis; print\\('✅ Module loads without errors'\\)\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

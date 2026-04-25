@@ -138,41 +138,6 @@ class SyntheticOptionsGenerator:
             # Fallback to historical volatility if VIX unavailable
             data['spy_iv'] = data['volatility']
 
-        # Calculate IV Percentile using 252 trading days (1 year) lookback
-        # IV Percentile = % of days in lookback period where SPY IV was below current level
-        # Formula: IVP = (# Days with lower IV than today) / (# Trading Days in period) * 100
-        lookback_period = 252  # ~1 year of trading days
-
-        def calculate_iv_percentile(series, window):
-            """
-            Calculate IV Percentile: % of days where IV was below current level.
-
-            Args:
-                series: SPY IV time series (decimal form, e.g., 0.20 for 20%)
-                window: Lookback period (252 for 1 year)
-
-            Returns:
-                Series with IV Percentile values (0-100%)
-            """
-            def percentile_calc(x):
-                if len(x) < 2:
-                    return 50.0  # Neutral default
-                # Count how many days in window had IV below current day
-                current = x.iloc[-1]
-                below_current = (x[:-1] < current).sum()
-                return (below_current / (len(x) - 1)) * 100
-
-            return series.rolling(window=window, min_periods=30).apply(percentile_calc, raw=False)
-
-        data['iv_percentile'] = calculate_iv_percentile(data['spy_iv'], lookback_period)
-
-        # Handle edge cases (not enough data)
-        data['iv_percentile'] = data['iv_percentile'].fillna(50.0)  # Use 50 as neutral default
-
-        print(f"✓ SPY IV Percentile calculated (252-day lookback)")
-        print(f"  SPY IV range: {data['spy_iv'].min():.2%} - {data['spy_iv'].max():.2%}")
-        print(f"  IV Percentile range: {data['iv_percentile'].min():.1f}% - {data['iv_percentile'].max():.1f}%")
-
         # Use median volatility for any remaining NaN
         median_vol = data['volatility'].median()
         data['volatility'] = data['volatility'].fillna(median_vol)
@@ -282,7 +247,6 @@ class SyntheticOptionsGenerator:
         spot_price: float,
         volatility: float,
         vix: float = None,
-        iv_percentile: float = None,
         num_strikes: int = 40,
         strike_interval: float = 5.0,
         add_spread: bool = True,
@@ -297,7 +261,6 @@ class SyntheticOptionsGenerator:
             spot_price: Current underlying price
             volatility: Current volatility estimate
             vix: VIX level (for reference)
-            iv_percentile: IV Percentile (0-100%)
             num_strikes: Number of strikes to generate
             strike_interval: Dollar spacing between strikes
             add_spread: Add bid-ask spread to prices
@@ -354,7 +317,6 @@ class SyntheticOptionsGenerator:
                 'underlying_symbol': self.symbol,
                 'underlying_price': spot_price,
                 'vix': vix if vix is not None else np.nan,
-                'iv_percentile': iv_percentile if iv_percentile is not None else np.nan,
                 'expiration': expiration_date,
                 'dte': dte,
                 'strike': strike,
@@ -385,7 +347,6 @@ class SyntheticOptionsGenerator:
                 'underlying_symbol': self.symbol,
                 'underlying_price': spot_price,
                 'vix': vix if vix is not None else np.nan,
-                'iv_percentile': iv_percentile if iv_percentile is not None else np.nan,
                 'expiration': expiration_date,
                 'dte': dte,
                 'strike': strike,
@@ -466,9 +427,8 @@ class SyntheticOptionsGenerator:
             spot_price = self.underlying_data.loc[quote_date, 'close']
             vol = self.underlying_data.loc[quote_date, 'volatility']
 
-            # Get VIX and IV Percentile if available
+            # Get VIX if available
             vix = self.underlying_data.loc[quote_date, 'vix'] if 'vix' in self.underlying_data.columns else None
-            iv_percentile = self.underlying_data.loc[quote_date, 'iv_percentile'] if 'iv_percentile' in self.underlying_data.columns else None
 
             # Determine which volatility to use for pricing
             if self.use_vix_for_iv and vix is not None and not np.isnan(vix):
@@ -491,8 +451,7 @@ class SyntheticOptionsGenerator:
                     expiration_date=exp_date,
                     spot_price=spot_price,
                     volatility=pricing_vol,  # Use VIX-based IV instead of historical vol
-                    vix=vix,
-                    iv_percentile=iv_percentile
+                    vix=vix
                 )
 
                 if not chain.empty:
@@ -562,7 +521,7 @@ def generate_spy_synthetic_data(
     )
 
 
-def load_sample_spy_options_data() -> pd.DataFrame:
+def load_sample_spy_options_data(specific_file: str = None) -> pd.DataFrame:
     """
     Load SPY options data from pre-generated synthetic data CSV.
 
@@ -572,6 +531,10 @@ def load_sample_spy_options_data() -> pd.DataFrame:
 
     The data is based on real SPY closing prices from Yahoo Finance
     with option prices calculated using the Black-Scholes-Merton model.
+
+    Args:
+        specific_file: Optional specific filename to load (e.g., "SPY_synthetic_options_2022-10-01_2026-04-09.csv")
+                       If None, loads the most recent file
 
     Returns:
         DataFrame with synthetic options data
@@ -585,12 +548,11 @@ def load_sample_spy_options_data() -> pd.DataFrame:
     # Get the project root directory (parent of src/)
     project_root = Path(__file__).parent.parent.parent
     data_dir = project_root / "data" / "processed"
-    pattern = str(data_dir / "SPY_synthetic_options_*.csv")
-    csv_files = glob.glob(pattern)
 
-    if csv_files:
-        # Use the most recent file (by filename)
-        csv_file = sorted(csv_files)[-1]
+    if specific_file:
+        csv_file = data_dir / specific_file
+        if not csv_file.exists():
+            raise FileNotFoundError(f"Specified file not found: {csv_file}")
         print(f"Loading data from: {os.path.basename(csv_file)}")
 
         data = pd.read_csv(csv_file)
@@ -605,11 +567,32 @@ def load_sample_spy_options_data() -> pd.DataFrame:
         print(f"  Expirations: {data['expiration'].nunique()}")
 
         return data
+    else:
+        pattern = str(data_dir / "SPY_synthetic_options_*.csv")
+        csv_files = glob.glob(pattern)
 
-    # If no CSV found, generate a small sample
-    print("⚠️  No synthetic data CSV found in data/processed/")
-    print("   Run: python generate_synthetic_data.py")
-    print("   Generating minimal sample dataset...")
+        if csv_files:
+            # Use the most recent file (by filename)
+            csv_file = sorted(csv_files)[-1]
+            print(f"Loading data from: {os.path.basename(csv_file)}")
+
+            data = pd.read_csv(csv_file)
+
+            # Convert date columns to datetime
+            data['quote_date'] = pd.to_datetime(data['quote_date'])
+            data['expiration'] = pd.to_datetime(data['expiration'])
+
+            print(f"✓ Loaded {len(data):,} option contracts")
+            print(f"  Date range: {data['quote_date'].min().date()} to {data['quote_date'].max().date()}")
+            print(f"  Trading days: {data['quote_date'].nunique()}")
+            print(f"  Expirations: {data['expiration'].nunique()}")
+
+            return data
+        else:
+            # If no CSV found, generate a small sample
+            print("⚠️  No synthetic data CSV found in data/processed/")
+            print("   Run: python generate_synthetic_data.py")
+            print("   Generating minimal sample dataset...")
 
     # Generate a small sample dataset (2 months for quick testing)
     generator = SyntheticOptionsGenerator(symbol="SPY")

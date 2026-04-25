@@ -227,14 +227,14 @@ class IronCondor(BaseStrategy):
         if valid_options.empty:
             return None
 
-        # Check IV Percentile filters
-        iv_percentile = kwargs.get('iv_percentile')
-        iv_percentile_max = self.entry_config.get('iv_percentile_max', 85)
-        iv_percentile_min = self.entry_config.get('iv_percentile_min', 60)
+        # Check VIX filters
+        vix = kwargs.get('vix')
+        vix_max = self.entry_config.get('vix_max', 25)
+        vix_min = self.entry_config.get('vix_min', 15)
 
-        if iv_percentile is not None and (iv_percentile > iv_percentile_max or iv_percentile < iv_percentile_min):
+        if vix is not None and (vix > vix_max or vix < vix_min):
             if self.debug:
-                print(f"  ❌ IV Percentile filter failed: {iv_percentile:.1f}%, range=[{iv_percentile_min}, {iv_percentile_max}]")
+                print(f"  ❌ VIX filter failed: {vix:.1f}, range=[{vix_min}, {vix_max}]")
             return None
 
         # Find put spread strikes (below current price)

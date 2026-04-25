@@ -99,7 +99,7 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
     optimizer.set_parameter_range('profit_target', min=0.15, max=0.70, step=0.05)
     optimizer.set_parameter_range('stop_loss', min=-0.70, max=-0.30, step=0.10)
     optimizer.set_parameter_range('dte_min', min=1, max=25, step=1)
-    optimizer.set_parameter_range('iv_percentile', min=10, max=110, step=10)
+    optimizer.set_parameter_range('vix', min=5, max=80, step=5)
 
     total: int = optimizer.get_total_combinations()
     print(f"  ✓ Optimizer configured")

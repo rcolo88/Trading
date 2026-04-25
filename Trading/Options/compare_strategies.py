@@ -30,7 +30,7 @@ def run_strategy_backtest(strategy, strategy_name, config, options_data, underly
     """Run a single strategy backtest and return results."""
     print(f"\n  Running {strategy_name}...")
     print(f"  - Entry DTE: {strategy.entry_config.get('dte_min', 'N/A')}-{strategy.entry_config.get('dte_max', 'N/A')}")
-    print(f"  - IV Percentile: {strategy.entry_config.get('iv_percentile_min', 'N/A')}-{strategy.entry_config.get('iv_percentile_max', 'N/A')}")
+    print(f"  - VIX: {strategy.entry_config.get('vix_min', 'N/A')}-{strategy.entry_config.get('vix_max', 'N/A')}")
 
     backtester = OptopsyBacktester(config)
     results = backtester.run_backtest(

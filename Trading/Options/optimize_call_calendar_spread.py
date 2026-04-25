@@ -60,8 +60,10 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     """Load options and underlying data."""
     print("Loading market data...")
 
-    # Load options data
-    options_data: pd.DataFrame = load_sample_spy_options_data()
+    # Load options data - use specific file for full date range
+    options_data: pd.DataFrame = load_sample_spy_options_data(
+        specific_file="SPY_synthetic_options_2022-10-01_2026-04-09.csv"
+    )
 
     # Load underlying data
     start_date: str = options_data['quote_date'].min().strftime('%Y-%m-%d')
@@ -92,13 +94,14 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
 
     # Define parameter ranges to test
     # Calendar spread parameters: near_dte (sell), far_dte (buy)
-    # Note: Smaller range for testing - expand based on results
-    optimizer.set_parameter_range('near_dte', min=20, max=35, step=5)       
+    # Note: VIX range to find optimal - 5 to 80 with step 5
+    optimizer.set_parameter_range('near_dte', min=10, max=35, step=5)       
     optimizer.set_parameter_range('far_dte', min=45, max=75, step=5)      
-    optimizer.set_parameter_range('target_delta', min=0.45, max=0.55, step=0.05)  
+    optimizer.set_parameter_range('target_delta', min=0.40, max=0.60, step=0.05)  
     optimizer.set_parameter_range('profit_target', min=0.10, max=0.70, step=0.1)  
-    optimizer.set_parameter_range('stop_loss', min=10, max=60, step=10)
-    optimizer.set_parameter_range('iv_percentile', min=15, max=75, step=5)
+    optimizer.set_parameter_range('stop_loss', min=-0.60, max=-0.10, step=0.10)
+    optimizer.set_parameter_range('vix_min', min=5, max=50, step=5)
+    optimizer.set_parameter_range('vix_max', min=5, max=50, step=5)
     optimizer.set_parameter_range('dte_exit', min=1, max=21, step=2)
 
     total: int = optimizer.get_total_combinations()

@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python validate_deltas.py)",
+      "Bash(python visualize_delta_decay.py)",
+      "Bash(python:*)",
+      "Bash(test:*)",
+      "Bash(pip install:*)",
+      "Bash(cat:*)",
+      "Bash(tee:*)",
+      "Bash(chmod:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(python3:*)",
+      "Bash(timeout 180 python:*)",
+      "Bash(timeout 120 python:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

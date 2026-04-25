@@ -7,8 +7,8 @@ underlying:
 
 # Backtesting period
 backtest:
-  start_date: "2025-01-03"  # Matches synthetic data start date
-  end_date: "2025-11-17"    # Matches synthetic data end date
+  start_date: "2024-01-01"  # Matches synthetic data start date
+  end_date: "2026-04-01"    # Matches synthetic data end date
   initial_capital: 10000
 
 # Data source configuration
@@ -33,8 +33,8 @@ strategies:
       dte_max: 45
       short_delta: 0.30     # Sell put with ~30 delta
       long_delta: 0.10      # Buy put with ~20 delta
-      iv_percentile_min: 60 # Enter when IV is above 30th percentile (higher premium)
-      iv_percentile_max: 110 # Don't enter if IV > 80th percentile (too risky)
+      vix_min: 19           # Enter when VIX >= 19 (elevated IV - higher premium)
+      vix_max: 35           # Don't enter if VIX > 35 (too volatile)
     exit:
       profit_target: 0.60   # Close at 50% of max profit
       stop_loss: 0.20       # Stop at 50% of max loss
@@ -47,8 +47,8 @@ strategies:
       dte_max: 60
       long_delta: 0.60      # Buy call with ~60 delta
       short_delta: 0.60     # Sell call with ~40 delta
-      iv_percentile_min: 0 # Can enter in lower IV percentile (cheaper debit)
-      iv_percentile_max: 40 # Don't enter if IV > 70th percentile (too expensive)
+      vix_min: 13           # Can enter in low VIX (cheaper debit)
+      vix_max: 17           # Don't enter if VIX > 17 (too expensive)
     exit:
       profit_target: 0.75   # Target 75% of max profit
       stop_loss: 0.20       # Stop at 50% of max loss
@@ -59,8 +59,8 @@ strategies:
     entry:
       # DTE Configuration - Two approaches supported:
       # Approach 1 (Default): Center ± Tolerance
-      near_dte: 20           # Sell 30 DTE call (center point)
-      far_dte: 45            # Buy 60 DTE call (center point)
+      near_dte: 15           # Sell 30 DTE call (center point)
+      far_dte: 50            # Buy 60 DTE call (center point)
       dte_tolerance: 5       # +/- 5 days tolerance (creates range: 25-35 and 55-65)
 
       # Approach 2 (For Optimizer): Min/Max Ranges
@@ -71,17 +71,17 @@ strategies:
       # far_dte_max: 65       # Maximum DTE for far-term leg
       # Note: If min/max specified, they override near_dte/far_dte/dte_tolerance
 
-      strike_selection: "atm"  # Options: atm, delta, moneyness
-      target_delta: 0.50     # Used if strike_selection = "delta"
+      strike_selection: "delta"  # Options: atm, delta, moneyness
+      target_delta: 0.4     # Used if strike_selection = "delta"
       moneyness: 0.0         # Used if strike_selection = "moneyness" (0.0 = ATM)
       min_debit: 0.5         # Minimum debit to enter (optional)
       max_debit: 28.0        # Maximum debit to enter (increased for SPY ~$530)
-      iv_percentile_min: 0  # Calendars prefer low IV environment (10th percentile+)
-      iv_percentile_max: 60  # Don't enter if IV > 60th percentile (defeats calendar purpose)
+      vix_min: 5            # Calendars prefer low VIX environment
+      vix_max: 20            # Don't enter if VIX > 20 (defeats calendar purpose)
     exit:
-      profit_target: 0.6    # Close at 60% profit
-      stop_loss: -0.1       # Stop at 10% loss
-      dte_exit: 1            # Exit when near-term has 7 DTE left
+      profit_target: 0.3    # Close at 30% profit
+      stop_loss: -0.1        # Stop at 10% loss
+      dte_exit: 5            # Exit when near-term has 7 DTE left
       max_underlying_move: 0.10  # Exit if underlying moves >10% from strike
 
 # Position sizing
@@ -98,10 +98,10 @@ position_sizing:
     bull_call_spread: 0.04   # Example: 4% (Half Kelly of 8%)
     call_calendar: 0.05      # Example: 5% (Half Kelly of 10%)
 
-# Market filters (global fallback - each strategy has its own IV Percentile criteria in entry section)
+# Market filters (global fallback - each strategy has its own VIX criteria in entry section)
 market_filters:
-  iv_percentile_max: 75  # Global fallback: Don't enter if IV Percentile > 75
-  iv_percentile_min: 25  # Global fallback: Don't enter if IV Percentile < 25
+  vix_max: 23  # Global fallback: Don't enter if VIX > 23
+  vix_min: 15  # Global fallback: Don't enter if VIX < 15
 
 # Analysis and reporting
 analysis:

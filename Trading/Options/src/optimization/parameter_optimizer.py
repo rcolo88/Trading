@@ -77,19 +77,19 @@ class ParameterOptimizer:
 
     # Strategy-specific allowed parameters
     VERTICAL_PARAMETERS = {
-        'entry': ['dte', 'short_delta', 'long_delta', 'iv_percentile'],
+        'entry': ['dte', 'short_delta', 'long_delta', 'vix'],
         'exit': ['profit_target', 'stop_loss', 'dte_min']
     }
 
     CALENDAR_PARAMETERS = {
         'entry': ['near_dte', 'far_dte', 'target_delta', 'min_debit', 'max_debit',
-                  'iv_percentile_min', 'iv_percentile_max'],
+                  'vix_min', 'vix_max'],
         'exit': ['profit_target', 'stop_loss', 'dte_exit', 'max_underlying_move']
     }
 
     IRON_CONDOR_PARAMETERS = {
         'entry': ['dte_min', 'dte_max', 'put_short_delta', 'put_long_delta',
-                  'call_short_delta', 'call_long_delta', 'iv_percentile_min', 'iv_percentile_max',
+                  'call_short_delta', 'call_long_delta', 'vix_min', 'vix_max',
                   'min_credit', 'max_wing_width'],
         'exit': ['profit_target', 'stop_loss', 'dte_min', 'breach_threshold']
     }
@@ -99,11 +99,11 @@ class ParameterOptimizer:
     PARAMETER_EXPANSION = {
         'vertical': {
             'dte': ['dte_min', 'dte_max'],  # Single dte value sets both min and max (target DTE)
-            'iv_percentile': ['iv_percentile_min', 'iv_percentile_max']  # Single IV percentile sets both min and max
+            'vix': ['vix_min', 'vix_max']  # Single vix value sets both min and max
         },
         'calendar': {
-            # Note: Calendar spreads use explicit iv_percentile_min and iv_percentile_max
-            # (not a single iv_percentile value) to avoid requiring exact match filters
+            # Note: Calendar spreads use explicit vix_min and vix_max
+            # (not a single vix value) to avoid requiring exact match filters
         },
         'iron_condor': {
             # Iron Condor uses explicit parameters with no expansion needed
@@ -888,18 +888,18 @@ class ParameterOptimizer:
                         f"Use -0.50 for 50% loss, not 50."
                     )
 
-            # Validate iv_percentile_max >= iv_percentile_min
+            # Validate vix_max >= vix_min
             entry = strategy_config.get('entry', {})
-            if 'iv_percentile_max' in entry and 'iv_percentile_min' in entry:
-                if entry['iv_percentile_max'] < entry['iv_percentile_min']:
+            if 'vix_max' in entry and 'vix_min' in entry:
+                if entry['vix_max'] < entry['vix_min']:
                     raise ValueError(
-                        f"iv_percentile_max ({entry['iv_percentile_max']}) must be >= "
-                        f"iv_percentile_min ({entry['iv_percentile_min']})"
+                        f"vix_max ({entry['vix_max']}) must be >= "
+                        f"vix_min ({entry['vix_min']})"
                     )
 
-            # Ensure iv_percentile_min has default if only max was set
-            if 'iv_percentile_max' in entry and 'iv_percentile_min' not in entry:
-                strategy_config['entry']['iv_percentile_min'] = 0
+            # Ensure vix_min has default if only max was set
+            if 'vix_max' in entry and 'vix_min' not in entry:
+                strategy_config['entry']['vix_min'] = 0
 
         elif self.strategy_type == 'vertical':
             # Validate stop_loss is between 0.0 and 1.0 (percentage of max loss)

@@ -1,54 +1,48 @@
 #!/usr/bin/env python3
 """
 Quality Analysis Main Entry Point
-Algorithmic quality scoring for stocks based on academic research
+Cross-sectional quality scoring based on academic research
 
-This script provides a simple command-line interface to the quality scoring system.
-Choose between:
-1. Index analysis: Analyze stocks from a market index (S&P 500, Russell 2000, etc.)
-2. Multiple indices: Combine multiple indices for broader coverage
-3. Individual stock analysis: Deep dive on specific ticker
+Uses profitability-anchored opportunity discovery framework from
+quality_investing_academic_research.md (Novy-Marx, Fama-French,
+AQR QMJ, Sloan, Piotroski, etc.)
 
-Usage:
-    # Single index analysis (batch) - Analyzes ALL tickers by default
-    python main_quality_analysis.py --index sp600
+Two-Phase Workflow (Recommended):
+    # Phase 1: Fetch data (resumable with Ctrl-C)
+    python main_quality_analysis.py --fetch-only
 
-    # Limit to specific number of tickers
-    python main_quality_analysis.py --index sp500 --limit 100
+    # Phase 2: Score cached data (instant, re-runnable)
+    python main_quality_analysis.py --score-only
 
-    # Multiple indices combined (e.g., SP500 + SP400 + SP600)
-    python main_quality_analysis.py --indices sp500,sp400,sp600 --limit 100
+Single-Step Workflow:
+    # Fetch + score in one command (default: combined SP1500)
+    python main_quality_analysis.py
 
-    # Index analysis with parallel fetching (10x speedup)
-    python main_quality_analysis.py --index russell2000 --limit 0 --parallel --workers 10
+    # Specific index
+    python main_quality_analysis.py --index sp500
 
-    # Multi-day orchestration (NEW!)
-    python main_quality_analysis.py --index russell3000  # Auto-activates when needed
-    python main_quality_analysis.py --index russell3000 --multi-day  # Force multi-day
-    python main_quality_analysis.py --index sp500 --multi-day  # Force for smaller index too
+    # Multiple indices
+    python main_quality_analysis.py --indices sp500,sp400,sp600
 
-    # Individual stock analysis
-    python main_quality_analysis.py --ticker AAPL
-    python main_quality_analysis.py --ticker NVDA
+Other Options:
+    --limit N: Process first N tickers only
+    --workers N: Parallel workers (default: 10, max: 10 for yfinance)
+    --rate R: Requests per second (default: 1.0, lower if hitting 429s)
+    --top-n N: Number in shortlist (default: 25)
+    --ticker AAPL: Single-stock analysis
 
-Performance Options:
-    --parallel: Enable parallel fetching (6-10x speedup)
-    --workers: Number of parallel workers (default: 10)
-    --timeout: Maximum runtime in seconds (default: 600 = 10 minutes)
+Output:
+    - outputs/opportunities_YYYYMMDD.json: Full ranked dataset with all signals
+    - outputs/opportunities_YYYYMMDD_top.txt: Human-readable top-N shortlist
+    - outputs/opportunities_YYYYMMDD_red.txt: Red-flagged tickers (failed hard gates)
 
-Multi-Day Options:
-    --multi-day: Enable automatic multi-day orchestration for large datasets
-    --force-multi-day: Force multi-day mode regardless of index size
-
-Output (Index):
-    - outputs/quality_analysis.json: Complete quality analysis results
-    - outputs/quality_analysis_summary.txt: Quality rankings and statistics
-
-Output (Individual):
-    - outputs/stock_analysis_AAPL_20250116.txt: Detailed individual analysis
+Defaults:
+    - Index: combined_sp (S&P 1500 = SP500 + SP400 + SP600)
+    - Workers: 10 (yfinance limit)
+    - Rate: 1.0 req/sec
 
 Author: Quality Scoring System
-Date: 2025
+Date: 2026
 """
 
 import argparse
@@ -98,30 +92,8 @@ signal.signal(signal.SIGTERM, _signal_handler)
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-from workflows.quality_analysis_script import QualityAnalysisScript
-from workflows.individual_stock_analysis import IndividualStockAnalysis
+from workflows.opportunity_discovery import OpportunityDiscoveryWorkflow
 from data.watchlist_config import WatchlistConfig, WatchlistIndex
-
-
-def should_use_multi_day(index_name: str, total_tickers: int, total_api_calls: int, force_multi_day: bool = False) -> bool:
-    """
-    Determine if multi-day mode should be used.
-    
-    NOTE: Multi-day mode is now DISABLED by default because we use SimFin
-    which has no daily API limit (only rate-limited per second).
-    
-    Args:
-        index_name: Name of the index
-        total_tickers: Number of tickers in the index
-        total_api_calls: Total API calls needed (not used anymore)
-        force_multi_day: Force multi-day mode regardless
-        
-    Returns:
-        Always False - SimFin eliminates need for multi-day processing
-    """
-    # Multi-day mode is disabled because SimFin has no daily call limit
-    # SimFin is rate-limited per second (2 calls/sec), not per day
-    return False
 
 
 def parse_indices(indices_str: str) -> list:
@@ -138,21 +110,23 @@ def parse_indices(indices_str: str) -> list:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Algorithmic Quality Scoring System',
+        description='Cross-Sectional Quality Scoring (Academic Research-Based)',
         epilog='Examples:\n'
-               '  # Analyze all stocks in SP600 (default behavior)\n'
-               '  python main_quality_analysis.py --index sp600\n'
+               '  # Two-step workflow (recommended for large indices):\n'
+               '  python main_quality_analysis.py --fetch-only  # Fetch data (resumable)\n'
+               '  python main_quality_analysis.py --score-only  # Score cached data\n'
                '\n'
-               '  # Limit to top 100 stocks\n'
+               '  # One-step workflow (fetch + score):\n'
+               '  python main_quality_analysis.py               # Default: combined SP1500\n'
+               '  python main_quality_analysis.py --index sp500 # Specific index\n'
+               '\n'
+               '  # Multiple indices:\n'
+               '  python main_quality_analysis.py --indices sp500,sp400,sp600\n'
+               '\n'
+               '  # Limit processing:\n'
                '  python main_quality_analysis.py --index sp500 --limit 100\n'
                '\n'
-               '  # Multiple indices combined\n'
-               '  python main_quality_analysis.py --indices sp500,sp400,sp600 --limit 100\n'
-               '\n'
-               '  # Parallel fetching (10x speedup for large indices)\n'
-               '  python main_quality_analysis.py --index combined_sp --parallel\n'
-               '\n'
-               '  # Individual stock analysis\n'
+               '  # Single stock:\n'
                '  python main_quality_analysis.py --ticker AAPL',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         usage='%(prog)s [options]'
@@ -164,44 +138,57 @@ def main():
         '--index',
         type=str,
         choices=['sp500', 'sp400', 'sp600', 'nasdaq100', 'russell1000', 'russell2000', 'russell3000', 'combined_sp'],
-        help='Single index to screen (default: combined_sp - S&P 1500). Options: sp500, sp400, sp600, nasdaq100, combined_sp, etc.'
+        help='Single index to screen (default: combined_sp)'
     )
     group.add_argument(
         '--indices',
         type=str,
-        help='Multiple indices to combine (comma-separated). Example: sp500,sp400,sp600'
+        help='Multiple indices to combine (comma-separated, e.g., sp500,sp400,sp600)'
     )
     group.add_argument(
         '--ticker',
         type=str,
-        help='Analyze individual stock ticker (e.g., AAPL, MSFT, NVDA)'
+        help='Individual stock ticker (e.g., AAPL, MSFT, NVDA)'
     )
 
     parser.add_argument(
         '--limit',
         type=int,
         default=0,
-        help='Maximum tickers to analyze (default: 0 = all tickers). Use a number to limit.'
-    )
-
-    parser.add_argument(
-        '--parallel',
-        action='store_true',
-        help='Enable parallel fetching for faster analysis (6-10x speedup). Recommended for indices >100 tickers.'
+        help='Maximum tickers to process (0 = all)'
     )
 
     parser.add_argument(
         '--workers',
         type=int,
         default=10,
-        help='Number of parallel workers for fetching (default: 10). Range: 5-20. Higher values = faster but may hit rate limits.'
+        help='Parallel workers (default: 10, max: 10 for yfinance)'
     )
 
     parser.add_argument(
-        '--timeout',
+        '--top-n',
         type=int,
-        default=600,
-        help='Maximum runtime in seconds (default: 600 = 10 minutes). Increase for large indices with parallel mode.'
+        default=25,
+        help='Number of top opportunities in shortlist (default: 25)'
+    )
+
+    parser.add_argument(
+        '--rate',
+        type=float,
+        default=1.0,
+        help='Requests per second (default: 1.0, lower if hitting 429s)'
+    )
+
+    parser.add_argument(
+        '--fetch-only',
+        action='store_true',
+        help='Only fetch and cache data, do not score (resumable with Ctrl-C)'
+    )
+
+    parser.add_argument(
+        '--score-only',
+        action='store_true',
+        help='Skip fetch phase, only score cached data'
     )
 
     args = parser.parse_args()
@@ -211,62 +198,87 @@ def main():
         # Default to composite SP1500 (all S&P indices combined)
         args.index = 'combined_sp'
 
-    if args.ticker and args.limit != 50:
+    if args.ticker and args.limit != 0:
         parser.error("--limit is only used with --index or --indices, not --ticker")
 
-    if args.parallel and args.workers < 1:
-        parser.error("--workers must be at least 1")
+    if args.workers < 1 or args.workers > 10:
+        parser.error("--workers must be between 1 and 10 (yfinance limitation)")
 
-    if args.timeout < 0:
-        parser.error("--timeout must be a positive number (use 0 for no timeout)")
+    if args.fetch_only and args.score_only:
+        parser.error("Cannot use --fetch-only and --score-only together. Choose one.")
 
     if args.ticker:
-        # Individual stock analysis
-        analyzer = IndividualStockAnalysis(ticker=args.ticker.upper())
-        analyzer.run()
-
-    else:
-        # Index analysis (single or multiple)
-        # Create watchlist config first
-        if args.index:
-            index_map = {
-                'sp500': WatchlistIndex.SP500,
-                'sp400': WatchlistIndex.SP400,
-                'sp600': WatchlistIndex.SP600,
-                'nasdaq100': WatchlistIndex.NASDAQ100,
-                'russell1000': WatchlistIndex.RUSSELL1000,
-                'russell2000': WatchlistIndex.RUSSELL2000,
-                'russell3000': WatchlistIndex.RUSSELL3000,
-                'combined_sp': WatchlistIndex.COMBINED_SP
-            }
-            config = WatchlistConfig(
-                index=index_map[args.index],
-                limit=args.limit if args.limit > 0 else None
-            )
-        else:
-            # Multiple indices
-            multi_indices = parse_indices(args.indices)
-            config = WatchlistConfig(
-                index=WatchlistIndex.MULTI,
-                multi_indices=multi_indices,
-                limit=args.limit if args.limit > 0 else None
-            )
-        
-        # Get tickers
-        all_tickers = config.get_tickers()
-        print(f"DEBUG: Fetched {len(all_tickers)} tickers from {args.index}")
-        
-        # Multi-day mode is disabled - SimFin has no daily call limit
-        # Processing always happens in single session now
-
-        # Run analysis with parallel options
-        script = QualityAnalysisScript(watchlist_config=config)
-        script.run(
-            watchlist_limit=args.limit if args.limit > 0 else None,
-            parallel=args.parallel,
-            max_workers=args.workers,
-            timeout_seconds=args.timeout
+        # Individual stock analysis - use opportunity scorer on single ticker
+        # Create a temporary index with just this ticker
+        config = WatchlistConfig(
+            index=WatchlistIndex.CUSTOM,
+            custom_tickers=[args.ticker.upper()]
         )
+        workflow = OpportunityDiscoveryWorkflow(
+            watchlist_config=config,
+            max_workers=1,
+            requests_per_second=args.rate,
+            top_n=1,
+        )
+        if args.score_only:
+            workflow.score([args.ticker.upper()])
+        else:
+            workflow.run(limit=1)
+        print(f"\nSingle-ticker analysis complete. Check outputs/opportunities_*.txt for {args.ticker.upper()}")
+        return
+
+    # Index analysis (single or multiple)
+    # Create watchlist config
+    if args.index:
+        index_map = {
+            'sp500': WatchlistIndex.SP500,
+            'sp400': WatchlistIndex.SP400,
+            'sp600': WatchlistIndex.SP600,
+            'nasdaq100': WatchlistIndex.NASDAQ100,
+            'russell1000': WatchlistIndex.RUSSELL1000,
+            'russell2000': WatchlistIndex.RUSSELL2000,
+            'russell3000': WatchlistIndex.RUSSELL3000,
+            'combined_sp': WatchlistIndex.COMBINED_SP
+        }
+        config = WatchlistConfig(
+            index=index_map[args.index],
+            limit=args.limit if args.limit > 0 else None
+        )
+    else:
+        # Multiple indices
+        multi_indices = parse_indices(args.indices)
+        config = WatchlistConfig(
+            index=WatchlistIndex.MULTI,
+            multi_indices=multi_indices,
+            limit=args.limit if args.limit > 0 else None
+        )
+
+    # Get tickers
+    all_tickers = config.get_tickers()
+    print(f"Universe: {len(all_tickers)} tickers from {args.index or args.indices}")
+
+    # Always use opportunity discovery workflow (academic research-based)
+    workflow = OpportunityDiscoveryWorkflow(
+        watchlist_config=config,
+        max_workers=min(args.workers, 10),  # yfinance does not like >10 concurrent
+        requests_per_second=args.rate,
+        top_n=args.top_n,
+    )
+    tickers = config.get_tickers()
+    if args.limit > 0:
+        tickers = tickers[: args.limit]
+
+    if args.fetch_only:
+        # Phase 1 only: fetch and cache (resumable with Ctrl-C)
+        workflow.gather(tickers)
+        print(f"\n✅ Fetch complete. Data cached in merged_opportunity_cache.pkl")
+        print(f"📊 Run scoring with: python main_quality_analysis.py --score-only")
+    elif args.score_only:
+        # Phase 2 only: score from cache
+        workflow.score(tickers)
+    else:
+        # Both phases: fetch then score
+        workflow.run(limit=args.limit if args.limit > 0 else None)
 
 
 if __name__ == "__main__":
