@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed — calendar optimizer crash on near-expiry (2026-06-06)
+
+- **`unsupported operand type(s) for -: 'NoneType' and 'float'`** during calendar optimization. The
+  calendar's "Near-term option expired" exit returned a Signal **without setting `position.current_price`**,
+  so `close_position` did `None - entry_price`. It only hit certain configs (e.g. small `dte_exit`) that
+  hold to near-expiry, which is why some Optuna trials failed while others succeeded. Fix: price that exit
+  off the remaining far long leg (near leg settles to 0), plus a defensive engine guard that falls back to
+  the entry price if any strategy ever emits an unpriced exit. Verified across 16 edge configs, 0 failures.
+
 ### Fixed — Iron Condor now runs, twice-daily chain logger (2026-06-05)
 
 - **Iron Condor repaired end-to-end** (was crashing/non-functional):

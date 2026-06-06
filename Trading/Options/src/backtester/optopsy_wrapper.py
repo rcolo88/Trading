@@ -299,8 +299,9 @@ class OptopsyBacktester:
                 )
 
                 if exit_signal:
-                    # Close position
-                    exit_price = position.current_price
+                    # Close position. Guard: if a strategy emitted an exit without pricing the
+                    # position, fall back to the entry price (breakeven) rather than crash on None.
+                    exit_price = position.current_price if position.current_price is not None else position.entry_price
                     strategy.close_position(
                         position=position,
                         exit_date=current_date,

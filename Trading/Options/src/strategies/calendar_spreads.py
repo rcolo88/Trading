@@ -348,7 +348,17 @@ class CalendarSpread(BaseStrategy):
             ]
 
             if near_option.empty:
-                # Near-term option expired, exit immediately
+                # Near-term leg expired/settled: close = sell the remaining far long leg (near -> 0).
+                far_leg = options_data[
+                    (options_data['strike'] == strike) &
+                    (options_data['option_type'] == option_type) &
+                    (options_data['expiration'] == far_expiration)
+                ]
+                position.current_price = (
+                    net_close([(far_leg.iloc[0]['bid'], far_leg.iloc[0]['ask'], True)], lf, extra)
+                    if not far_leg.empty else position.entry_price
+                )
+                position.unrealized_pnl = (position.current_price - position.entry_price) * position.contracts * 100
                 return Signal(
                     date=date,
                     signal_type='exit',
