@@ -15,6 +15,7 @@ from pandas.tseries.holiday import USFederalHolidayCalendar
 from pandas.tseries.offsets import CustomBusinessDay
 
 from ..strategies.base_strategy import BaseStrategy, Position, Signal
+from ..utils.execution import net_open
 
 
 class OptopsyBacktester:
@@ -24,16 +25,25 @@ class OptopsyBacktester:
     Handles data preparation, strategy execution, and performance tracking.
     """
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict, entry_gate=None):
         """
         Initialize backtester.
 
         Args:
             config: Configuration dictionary from config.yaml
+            entry_gate: optional callable(date) -> bool. When it returns False, no new position
+                is opened that day (existing positions are still managed). Used to overlay a
+                market-regime filter such as the SPY Trend Reversal signal.
         """
         self.config = config
+        self.entry_gate = entry_gate
         self.backtest_config = config.get('backtest', {})
         self.cost_config = config.get('costs', {})
+        # Fill model (see utils/execution.py): planned entries/exits use a limit fraction of the
+        # spread; stop-loss exits use the market fraction (no stop-limit available). extra = flat %/leg.
+        self.limit_frac = self.cost_config.get('limit_fill_fraction', 0.5)
+        self.market_frac = self.cost_config.get('market_fill_fraction', 1.0)
+        self.extra_slip = self.cost_config.get('extra_slippage_percent', 0.0)
 
         self.start_date = pd.to_datetime(self.backtest_config.get('start_date'))
         self.end_date = pd.to_datetime(self.backtest_config.get('end_date'))
@@ -56,38 +66,17 @@ class OptopsyBacktester:
         if not position.legs or len(position.legs) < 2:
             return 0.0
 
-        short_leg = position.legs[0]
-        long_leg = position.legs[1]
-        strike_width = abs(short_leg['strike'] - long_leg['strike'])
+        strike_width = abs(position.legs[0]['strike'] - position.legs[1]['strike'])
 
-        # Determine strategy type from position.strategy_name
-        strategy_lower = position.strategy_name.lower()
-
-        if 'put' in strategy_lower and 'bull' in strategy_lower:
-            # Bull Put Spread (credit spread)
-            # Max loss = strike_width - premium_received
-            # entry_price is positive (credit received)
-            max_loss_per_contract = (strike_width - position.entry_price) * 100
-
-        elif 'call' in strategy_lower and 'bull' in strategy_lower:
-            # Bull Call Spread (debit spread)
-            # Max loss = premium_paid
-            # entry_price is negative (we paid), so use abs
-            max_loss_per_contract = abs(position.entry_price) * 100
-
-        elif 'calendar' in strategy_lower:
-            # Calendar Spread (debit spread)
-            # Max loss = debit_paid
-            # entry_price is positive (debit we paid)
+        # entry_price is the signed open cost (>0 debit, <0 credit).
+        #   credit spread: max loss = width - credit = width + entry_price
+        #   debit spread / calendar: max loss = debit = entry_price
+        if position.entry_price < 0:
+            max_loss_per_contract = (strike_width + position.entry_price) * 100
+        else:
             max_loss_per_contract = position.entry_price * 100
 
-        else:
-            # Unknown strategy type, use conservative estimate
-            # Assume max loss = strike width
-            max_loss_per_contract = strike_width * 100
-
-        total_max_loss = max_loss_per_contract * position.contracts
-        return total_max_loss
+        return max(0.0, max_loss_per_contract) * position.contracts
 
     def _calculate_total_portfolio_risk(self, strategy) -> float:
         """
@@ -303,7 +292,10 @@ class OptopsyBacktester:
                     date=current_date,
                     position=position,
                     options_data=daily_options,
-                    underlying_price=underlying_price
+                    underlying_price=underlying_price,
+                    limit_fraction=self.limit_frac,
+                    market_fraction=self.market_frac,
+                    extra_slippage=self.extra_slip
                 )
 
                 if exit_signal:
@@ -368,7 +360,8 @@ class OptopsyBacktester:
 
             # Check for new entry signals
             # BACKTEST RULE: Maximum one trade per day per strategy
-            if trades_entered_today < 1:
+            gate_open = self.entry_gate is None or self.entry_gate(current_date)
+            if trades_entered_today < 1 and gate_open:
                 # Calculate available risk budget
                 available_risk_budget = self._calculate_available_risk_budget(strategy)
 
@@ -381,7 +374,9 @@ class OptopsyBacktester:
                         date=current_date,
                         options_data=daily_options,
                         underlying_price=underlying_price,
-                        vix=vix
+                        vix=vix,
+                        fill_fraction=self.limit_frac,
+                        extra_slippage=self.extra_slip
                     )
 
                     if entry_signal:
@@ -400,46 +395,29 @@ class OptopsyBacktester:
                         )
 
                         # Get entry price
-                        entry_price = self._get_entry_price(daily_options, entry_signal)
+                        entry_price = self._get_entry_price(daily_options, entry_signal, self.limit_frac, self.extra_slip)
 
                         if entry_price and contracts > 0:
-                            # Get leg details from options data
-                            option_type = 'put' if 'put' in strategy.spread_type else 'call'
+                            # Iron condor = 4 legs at one expiration; everything else = 2 legs.
+                            if getattr(entry_signal, 'put_short_strike', None) is not None:
+                                legs = self._ic_position_legs(daily_options, entry_signal)
+                            else:
+                                option_type = 'put' if 'put' in strategy.spread_type else 'call'
+                                short_d = self._get_leg_details(daily_options, entry_signal.short_strike, option_type, entry_signal)
+                                long_d = self._get_leg_details(daily_options, entry_signal.long_strike, option_type, entry_signal, is_long=True)
+                                legs = [
+                                    {'strike': entry_signal.short_strike, 'option_type': option_type, 'position': 'short',
+                                     'delta': short_d.get('delta'), 'price': short_d.get('price'), 'expiration': short_d.get('expiration')},
+                                    {'strike': entry_signal.long_strike, 'option_type': option_type, 'position': 'long',
+                                     'delta': long_d.get('delta'), 'price': long_d.get('price'), 'expiration': long_d.get('expiration')},
+                                ]
 
-                            # Get short leg details
-                            short_leg_data = self._get_leg_details(
-                                daily_options, entry_signal.short_strike, option_type, entry_signal
-                            )
-
-                            # Get long leg details
-                            long_leg_data = self._get_leg_details(
-                                daily_options, entry_signal.long_strike, option_type, entry_signal, is_long=True
-                            )
-
-                            # Create position
                             position = Position(
                                 strategy_name=strategy.name,
                                 entry_date=current_date,
                                 entry_price=entry_price,
                                 contracts=contracts,
-                                legs=[
-                                    {
-                                        'strike': entry_signal.short_strike,
-                                        'option_type': option_type,
-                                        'position': 'short',
-                                        'delta': short_leg_data.get('delta'),
-                                        'price': short_leg_data.get('price'),
-                                        'expiration': short_leg_data.get('expiration')
-                                    },
-                                    {
-                                        'strike': entry_signal.long_strike,
-                                        'option_type': option_type,
-                                        'position': 'long',
-                                        'delta': long_leg_data.get('delta'),
-                                        'price': long_leg_data.get('price'),
-                                        'expiration': long_leg_data.get('expiration')
-                                    }
-                                ],
+                                legs=legs,
                                 notes=entry_signal.notes
                             )
 
@@ -501,7 +479,7 @@ class OptopsyBacktester:
 
         # Close any remaining positions at end of backtest
         for position in strategy.get_open_positions():
-            final_price = position.current_price if position.current_price else position.entry_price
+            final_price = position.current_price if position.current_price is not None else position.entry_price
             strategy.close_position(
                 position=position,
                 exit_date=self.end_date,
@@ -518,78 +496,84 @@ class OptopsyBacktester:
     def _get_entry_price(
         self,
         options_data: pd.DataFrame,
-        signal: Signal
+        signal: Signal,
+        fraction: float = 0.5,
+        extra: float = 0.0,
     ) -> Optional[float]:
-        """Get entry price for a spread."""
-        option_type = 'put' if 'put' in signal.strategy_name.lower() else 'call'
+        """Signed cash to open the spread, per share (>0 debit, <0 credit), at the limit-fill price."""
+        # Iron condor: four legs pinned to one expiration; net_open is negative (a net credit).
+        if getattr(signal, 'put_short_strike', None) is not None:
+            legs = self._ic_leg_quotes(options_data, signal)
+            return net_open(legs, fraction, extra) if legs else None
 
-        # Check if this is a calendar spread (same strike, different DTEs)
+        option_type = 'put' if 'put' in signal.strategy_name.lower() else 'call'
         is_calendar = (signal.short_strike == signal.long_strike) and ('calendar' in signal.strategy_name.lower())
 
+        same = options_data[
+            (options_data['strike'] == signal.short_strike) & (options_data['option_type'] == option_type)
+        ]
+
         if is_calendar:
-            # For calendar spreads, use stored expiration dates from signal
+            # Near (short) and far (long) legs share a strike; pick them by stored expiration.
             if hasattr(signal, 'near_expiration') and hasattr(signal, 'far_expiration'):
-                near_term = options_data[
-                    (options_data['strike'] == signal.short_strike) &
-                    (options_data['option_type'] == option_type) &
-                    (options_data['expiration'] == signal.near_expiration)
-                ]
-
-                far_term = options_data[
-                    (options_data['strike'] == signal.short_strike) &
-                    (options_data['option_type'] == option_type) &
-                    (options_data['expiration'] == signal.far_expiration)
-                ]
-
-                if near_term.empty or far_term.empty:
-                    return None
-
-                # Use bid for sell (near-term), ask for buy (far-term)
-                short_price = near_term.iloc[0]['bid']
-                long_price = far_term.iloc[0]['ask']
-
-                # Calendar spread is a debit: we pay (far - near)
-                net_debit = long_price - short_price
-
-                return net_debit if net_debit > 0 else None
+                near = same[same['expiration'] == signal.near_expiration]
+                far = same[same['expiration'] == signal.far_expiration]
             else:
-                # Fallback: use shortest and longest DTE
-                short_option = options_data[
-                    (options_data['strike'] == signal.short_strike) &
-                    (options_data['option_type'] == option_type)
-                ].sort_values('dte')
-
-                if short_option.empty or len(short_option) < 2:
-                    return None
-
-                near_term = short_option.iloc[0]
-                far_term = short_option.iloc[-1]
-
-                short_price = near_term['bid']
-                long_price = far_term['ask']
-
-                net_debit = long_price - short_price
-
-                return net_debit if net_debit > 0 else None
-        else:
-            # Vertical spread - different strikes
-            short_option = options_data[
-                (options_data['strike'] == signal.short_strike) &
-                (options_data['option_type'] == option_type)
-            ]
-            long_option = options_data[
-                (options_data['strike'] == signal.long_strike) &
-                (options_data['option_type'] == option_type)
-            ]
-
-            if short_option.empty or long_option.empty:
+                legs = same.sort_values('dte')
+                near, far = legs.iloc[[0]], legs.iloc[[-1]]
+            if near.empty or far.empty:
                 return None
+            near, far = near.iloc[0], far.iloc[0]
+            debit = net_open([(near['bid'], near['ask'], False), (far['bid'], far['ask'], True)], fraction, extra)
+            return debit if debit > 0 else None
 
-            # Use mid price for entry
-            short_price = (short_option.iloc[0]['bid'] + short_option.iloc[0]['ask']) / 2
-            long_price = (long_option.iloc[0]['bid'] + long_option.iloc[0]['ask']) / 2
+        # Vertical spread - distinct strikes
+        long_option = options_data[
+            (options_data['strike'] == signal.long_strike) & (options_data['option_type'] == option_type)
+        ]
+        if same.empty or long_option.empty:
+            return None
+        short, long = same.iloc[0], long_option.iloc[0]
+        return net_open([(short['bid'], short['ask'], False), (long['bid'], long['ask'], True)], fraction, extra)
 
-            return short_price - long_price
+    def _ic_specs(self, signal: Signal):
+        """The four iron-condor legs as (strike, option_type, is_long, side) tuples."""
+        return [
+            (signal.put_short_strike, 'put', False, 'short'),
+            (signal.put_long_strike, 'put', True, 'long'),
+            (signal.call_short_strike, 'call', False, 'short'),
+            (signal.call_long_strike, 'call', True, 'long'),
+        ]
+
+    def _ic_leg_quotes(self, options_data: pd.DataFrame, signal: Signal):
+        """The four (bid, ask, is_long) quotes for an iron condor at its pinned expiration, or None."""
+        exp = getattr(signal, 'expiration', None)
+        legs = []
+        for strike, otype, is_long, _side in self._ic_specs(signal):
+            row = options_data[(options_data['strike'] == strike) & (options_data['option_type'] == otype)]
+            if exp is not None and 'expiration' in options_data.columns:
+                row = row[row['expiration'] == exp]
+            if row.empty:
+                return None
+            r = row.iloc[0]
+            legs.append((r['bid'], r['ask'], is_long))
+        return legs
+
+    def _ic_position_legs(self, options_data: pd.DataFrame, signal: Signal):
+        """Position leg dicts (4) for an iron condor, with delta/price/expiration for the trade log."""
+        exp = getattr(signal, 'expiration', None)
+        legs = []
+        for strike, otype, _is_long, side in self._ic_specs(signal):
+            row = options_data[(options_data['strike'] == strike) & (options_data['option_type'] == otype)]
+            if exp is not None and 'expiration' in options_data.columns:
+                row = row[row['expiration'] == exp]
+            r = row.iloc[0] if not row.empty else None
+            legs.append({
+                'strike': strike, 'option_type': otype, 'position': side, 'expiration': exp,
+                'delta': (r['delta'] if r is not None else None),
+                'price': ((r['bid'] if side == 'short' else r['ask']) if r is not None else None),
+            })
+        return legs
 
     def _get_leg_details(
         self,
@@ -662,10 +646,9 @@ class OptopsyBacktester:
         }
 
     def _calculate_commission(self, contracts: int) -> float:
-        """Calculate commission for a trade."""
+        """Commission for one side of a 2-leg spread (charged once on entry, once on exit)."""
         per_contract = self.cost_config.get('commission_per_contract', 0.65)
-        # 2 legs * 2 sides (entry + exit) * contracts
-        return per_contract * 2 * 2 * contracts
+        return per_contract * 2 * contracts  # 2 legs * contracts
 
     def _compile_results(self, strategy: BaseStrategy) -> Dict:
         """Compile backtest results."""

@@ -14,6 +14,7 @@ import pandas as pd
 import numpy as np
 
 from .base_strategy import BaseStrategy, Signal, Position
+from ..utils.execution import net_open, net_close
 
 
 class VerticalSpread(BaseStrategy):
@@ -67,43 +68,29 @@ class VerticalSpread(BaseStrategy):
 
         return None
 
+    def _leg_rows(self, chain, short_strike, long_strike, option_type):
+        """The (short_row, long_row) option quotes for this spread, or None if either is missing."""
+        s = chain[(chain['strike'] == short_strike) & (chain['option_type'] == option_type)]
+        l = chain[(chain['strike'] == long_strike) & (chain['option_type'] == option_type)]
+        if s.empty or l.empty:
+            return None
+        return s.iloc[0], l.iloc[0]
+
     def _get_spread_price(
         self,
         options_chain: pd.DataFrame,
         short_strike: float,
         long_strike: float,
-        option_type: str
+        option_type: str,
+        fraction: float = 0.5,
+        extra: float = 0.0,
     ) -> Optional[float]:
-        """
-        Calculate the net premium for the spread.
-
-        Args:
-            options_chain: Options chain data
-            short_strike: Strike price of short option
-            long_strike: Strike price of long option
-            option_type: 'call' or 'put'
-
-        Returns:
-            Net premium (positive for credit, negative for debit)
-        """
-        short_option = options_chain[
-            (options_chain['strike'] == short_strike) &
-            (options_chain['option_type'] == option_type)
-        ]
-        long_option = options_chain[
-            (options_chain['strike'] == long_strike) &
-            (options_chain['option_type'] == option_type)
-        ]
-
-        if short_option.empty or long_option.empty:
+        """Signed cash to OPEN the spread, per share: >0 = net debit paid, <0 = net credit received."""
+        rows = self._leg_rows(options_chain, short_strike, long_strike, option_type)
+        if rows is None:
             return None
-
-        # For credit spreads: receive premium (short - long is positive)
-        # For debit spreads: pay premium (short - long is negative)
-        short_price = short_option.iloc[0]['bid']  # We sell at bid
-        long_price = long_option.iloc[0]['ask']     # We buy at ask
-
-        return short_price - long_price
+        short, long = rows
+        return net_open([(short['bid'], short['ask'], False), (long['bid'], long['ask'], True)], fraction, extra)
 
     def generate_entry_signal(
         self,
@@ -113,6 +100,9 @@ class VerticalSpread(BaseStrategy):
         **kwargs
     ) -> Optional[Signal]:
         """Generate entry signal for vertical spread."""
+
+        fraction = kwargs.get('fill_fraction', 0.5)
+        extra = kwargs.get('extra_slippage', 0.0)
 
         # Filter options by DTE range
         dte_min = self.entry_config.get('dte_min', 30)
@@ -144,16 +134,16 @@ class VerticalSpread(BaseStrategy):
         short_strike = self._find_strike_by_delta(valid_options, short_delta, option_type)
         long_strike = self._find_strike_by_delta(valid_options, long_delta, option_type)
 
-        if not short_strike or not long_strike:
-            return None
+        if not short_strike or not long_strike or short_strike == long_strike:
+            return None  # Need two distinct strikes (degenerate spread otherwise)
 
-        # Get spread price
+        # Net debit (>0) or credit (<0) to open, at the limit-fill price
         spread_price = self._get_spread_price(
-            valid_options, short_strike, long_strike, option_type
+            valid_options, short_strike, long_strike, option_type, fraction, extra
         )
 
-        if spread_price is None or spread_price <= 0:
-            return None  # Invalid pricing or unprofitable spread
+        if spread_price is None:
+            return None  # A leg is missing from the chain
 
         # Get DTE for the selected expiration
         dte = valid_options[valid_options['strike'] == short_strike].iloc[0]['dte']
@@ -179,77 +169,57 @@ class VerticalSpread(BaseStrategy):
     ) -> Optional[Signal]:
         """Generate exit signal for open vertical spread position."""
 
-        # Get current position price
+        lf = kwargs.get('limit_fraction', 0.5)
+        mf = kwargs.get('market_fraction', 1.0)
+        extra = kwargs.get('extra_slippage', 0.0)
         short_leg = position.legs[0]  # Short option
         long_leg = position.legs[1]   # Long option
 
-        current_price = self._get_spread_price(
-            options_data,
-            short_leg['strike'],
-            long_leg['strike'],
-            short_leg['option_type']
-        )
-
-        if current_price is None:
+        rows = self._leg_rows(options_data, short_leg['strike'], long_leg['strike'], short_leg['option_type'])
+        if rows is None:
             return None
+        short, long = rows
 
-        position.current_price = current_price
-        position.unrealized_pnl = (current_price - position.entry_price) * position.contracts * 100
+        # Planned exits fill at the limit fraction; a stop-loss is a market order (handled below).
+        legs = [(short['bid'], short['ask'], False), (long['bid'], long['ask'], True)]
+        close_val = net_close(legs, lf, extra)
+        position.current_price = close_val
+        profit = close_val - position.entry_price  # per share, >0 = gain
+        position.unrealized_pnl = profit * position.contracts * 100
 
-        # Calculate profit/loss for exit checks
-        # For credit spreads: entry_price is positive (credit received)
-        # For debit spreads: entry_price is negative (debit paid)
-
-        # Determine strike width for max loss calculation
+        # Defined risk from the signed open cost: credit spread (entry<0) vs debit spread (entry>0).
         strike_width = abs(short_leg['strike'] - long_leg['strike'])
-
-        # For credit spreads (entry_price > 0):
-        #   Max profit = entry_price (credit received)
-        #   Max loss = strike_width - entry_price
-        # For debit spreads (entry_price < 0):
-        #   Max profit = strike_width - abs(entry_price)
-        #   Max loss = abs(entry_price) (debit paid)
-
-        is_credit_spread = position.entry_price > 0
-
-        if is_credit_spread:
-            max_profit = position.entry_price
-            max_loss = strike_width - position.entry_price
-            # Profit: spread decreases in value (current < entry)
-            current_profit = position.entry_price - current_price
+        if position.entry_price < 0:
+            max_profit = -position.entry_price          # credit collected
+            max_loss = strike_width - max_profit
         else:
-            # Debit spread
-            max_profit = strike_width - abs(position.entry_price)
-            max_loss = abs(position.entry_price)
-            # Profit: spread increases in value (current > entry)
-            current_profit = current_price - position.entry_price
+            max_profit = strike_width - position.entry_price
+            max_loss = position.entry_price             # debit paid
 
         # Check profit target (percentage of max profit)
         profit_target = self.exit_config.get('profit_target', 0.50)
-        if current_profit > 0:
-            current_profit_pct = current_profit / max_profit
-            if current_profit_pct >= profit_target:
-                return Signal(
-                    date=date,
-                    signal_type='exit',
-                    strategy_name=self.name,
-                    underlying_price=underlying_price,
-                    exit_reason=f"Profit target reached: {current_profit_pct:.1%} (target: {profit_target:.1%})"
-                )
+        if profit > 0 and max_profit > 0 and profit / max_profit >= profit_target:
+            return Signal(
+                date=date,
+                signal_type='exit',
+                strategy_name=self.name,
+                underlying_price=underlying_price,
+                exit_reason=f"Profit target reached: {profit / max_profit:.1%} (target: {profit_target:.1%})"
+            )
 
-        # Check stop loss (percentage of max loss)
+        # Check stop loss (percentage of max loss). A stop is a market order — refill at the wider
+        # market fraction so the booked exit reflects crossing the spread.
         stop_loss_pct = self.exit_config.get('stop_loss', 0.50)
-        if current_profit < 0:
-            current_loss = abs(current_profit)
-            current_loss_pct = current_loss / max_loss
-            if current_loss_pct >= stop_loss_pct:
-                return Signal(
-                    date=date,
-                    signal_type='exit',
-                    strategy_name=self.name,
-                    underlying_price=underlying_price,
-                    exit_reason=f"Stop loss triggered: {current_loss_pct:.1%} loss (limit: {stop_loss_pct:.1%})"
-                )
+        if profit < 0 and max_loss > 0 and (-profit) / max_loss >= stop_loss_pct:
+            position.current_price = net_close(legs, mf, extra)
+            position.unrealized_pnl = (position.current_price - position.entry_price) * position.contracts * 100
+            return Signal(
+                date=date,
+                signal_type='exit',
+                strategy_name=self.name,
+                underlying_price=underlying_price,
+                exit_reason=f"Stop loss triggered: {(-profit) / max_loss:.1%} loss (limit: {stop_loss_pct:.1%})"
+            )
 
         # Check DTE-based exit
         current_dte = options_data[

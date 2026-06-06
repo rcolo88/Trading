@@ -18,6 +18,7 @@ import pandas as pd
 import numpy as np
 
 from .base_strategy import BaseStrategy, Signal, Position
+from ..utils.execution import net_open, net_close
 
 
 class CalendarSpread(BaseStrategy):
@@ -119,35 +120,21 @@ class CalendarSpread(BaseStrategy):
         strike: float,
         near_dte: int,
         far_dte: int,
-        option_type: str
+        option_type: str,
+        fraction: float = 0.5,
+        extra: float = 0.0,
     ) -> Optional[float]:
+        """Net debit to open the calendar (sell near, buy far) at the limit-fill price.
+
+        Returns a positive debit, or None if the far leg isn't richer than the near (not a
+        valid calendar) or a leg is missing.
         """
-        Calculate the net debit for the calendar spread.
-
-        Calendar spreads are typically entered for a debit:
-        - Buy the far-term option (higher premium)
-        - Sell the near-term option (lower premium)
-        - Net debit = far_term_price - near_term_price
-
-        Args:
-            options_chain: Options chain data
-            strike: Strike price (same for both legs)
-            near_dte: DTE for near-term option (short leg)
-            far_dte: DTE for far-term option (long leg)
-            option_type: 'call' or 'put'
-
-        Returns:
-            Net debit (positive value for calendar spread)
-        """
-        # Find near-term option (we sell this)
         near_option = options_chain[
             (options_chain['strike'] == strike) &
             (options_chain['option_type'] == option_type) &
             (options_chain['dte'] >= near_dte - 2) &
             (options_chain['dte'] <= near_dte + 2)
         ]
-
-        # Find far-term option (we buy this)
         far_option = options_chain[
             (options_chain['strike'] == strike) &
             (options_chain['option_type'] == option_type) &
@@ -158,18 +145,11 @@ class CalendarSpread(BaseStrategy):
         if near_option.empty or far_option.empty:
             return None
 
-        # Use bid for sell (near-term), ask for buy (far-term)
-        near_price = near_option.iloc[0]['bid']  # We sell at bid
-        far_price = far_option.iloc[0]['ask']    # We buy at ask
-
-        # Calendar spread is a debit: we pay (far - near)
-        net_debit = far_price - near_price
-
-        # Verify this makes sense (far-term should be more expensive)
-        if net_debit <= 0:
-            return None
-
-        return net_debit
+        near, far = near_option.iloc[0], far_option.iloc[0]
+        net_debit = net_open(
+            [(near['bid'], near['ask'], False), (far['bid'], far['ask'], True)], fraction, extra
+        )
+        return net_debit if net_debit > 0 else None
 
     def generate_entry_signal(
         self,
@@ -181,6 +161,8 @@ class CalendarSpread(BaseStrategy):
         """Generate entry signal for calendar spread."""
 
         debug = kwargs.get('debug', False)
+        fraction = kwargs.get('fill_fraction', 0.5)
+        extra = kwargs.get('extra_slippage', 0.0)
 
         # Get DTE ranges - support both min/max (for optimizer) and center ± tolerance (for backward compatibility)
         near_dte_min = self.entry_config.get('near_dte_min', None)
@@ -288,7 +270,7 @@ class CalendarSpread(BaseStrategy):
 
         # Get spread price
         spread_price = self._get_spread_price(
-            options_data, strike, near_dte_actual, far_dte_actual, option_type
+            options_data, strike, near_dte_actual, far_dte_actual, option_type, fraction, extra
         )
 
         if spread_price is None or spread_price <= 0:
@@ -342,6 +324,10 @@ class CalendarSpread(BaseStrategy):
         **kwargs
     ) -> Optional[Signal]:
         """Generate exit signal for open calendar spread position."""
+
+        lf = kwargs.get('limit_fraction', 0.5)
+        mf = kwargs.get('market_fraction', 1.0)
+        extra = kwargs.get('extra_slippage', 0.0)
 
         # Get position details
         short_leg = position.legs[0]  # Near-term option (short)
@@ -409,11 +395,10 @@ class CalendarSpread(BaseStrategy):
             ]
 
         if far_option.empty:
-            # Far option may have expired, exit immediately
-            # Use near option price as current spread price (far = 0)
-            near_price = (current_near['bid'] + current_near['ask']) / 2
-            position.current_price = near_price  # Spread collapsed to near-term value
-            position.unrealized_pnl = (near_price - position.entry_price) * position.contracts * 100
+            # Far option expired: only the short near leg remains, bought back to close.
+            near_only = net_close([(current_near['bid'], current_near['ask'], False)], lf, extra)
+            position.current_price = near_only
+            position.unrealized_pnl = (near_only - position.entry_price) * position.contracts * 100
 
             return Signal(
                 date=date,
@@ -426,10 +411,11 @@ class CalendarSpread(BaseStrategy):
         # Get the far option (should be unique if filtered by expiration)
         current_far = far_option.iloc[0]
 
-        # Calculate current spread price
-        near_price = (current_near['bid'] + current_near['ask']) / 2
-        far_price = (current_far['bid'] + current_far['ask']) / 2
-        current_spread_price = far_price - near_price
+        # Value to close: sell the far leg, buy back the near. Planned exits fill at the limit
+        # fraction; a stop-loss is a market order (handled below) at the wider market fraction.
+        legs = [(current_near['bid'], current_near['ask'], False),
+                (current_far['bid'], current_far['ask'], True)]
+        current_spread_price = net_close(legs, lf, extra)
 
         # Update position
         position.current_price = current_spread_price
@@ -459,9 +445,12 @@ class CalendarSpread(BaseStrategy):
                 exit_reason=f"Profit target reached: {profit_pct:.1%}"
             )
 
-        # Check stop loss (spread collapsed)
+        # Check stop loss (spread collapsed). A stop is a market order — refill at the wider
+        # market fraction so the booked exit reflects crossing the spread, not a limit at mid.
         stop_loss_pct = self.exit_config.get('stop_loss', -0.50)
         if profit_pct <= stop_loss_pct:
+            position.current_price = net_close(legs, mf, extra)
+            position.unrealized_pnl = (position.current_price - position.entry_price) * position.contracts * 100
             return Signal(
                 date=date,
                 signal_type='exit',

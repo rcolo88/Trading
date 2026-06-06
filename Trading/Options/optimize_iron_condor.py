@@ -29,20 +29,23 @@ from src.analysis.metrics import PerformanceAnalyzer
 
 
 def create_param_combinations():
-    """Define parameter grid for Iron Condor optimization."""
+    """Reflective Iron Condor grid (tastytrade standard: ~45 DTE, ~16-20 delta shorts, 50% profit,
+    manage at 21 DTE). This is a FULL grid (Cartesian product), so each list is kept short to stay
+    feasible — 2^9 ≈ 512 combos here (~2-3h on full history). Widen only if you can afford the runtime.
+    """
     return {
-        'dte_min': [25, 30, 35],
-        'dte_max': [40, 45, 50],
-        'put_short_delta': [0.15, 0.20, 0.25],
-        'put_long_delta': [0.05, 0.10, 0.15],
-        'call_short_delta': [0.15, 0.20, 0.25],
-        'call_long_delta': [0.05, 0.10, 0.15],
-        'profit_target': [0.40, 0.50, 0.60],
-        'stop_loss': [0.60, 0.75, 0.90],
-        'dte_min_exit': [7, 14, 21],
-        'min_credit': [1.00, 1.50, 2.00],
-        'vix_min': [5, 10, 15, 20],
-        'vix_max': [25, 30, 35, 40],
+        'dte_min': [35, 40],
+        'dte_max': [45, 50],            # <=65 (synthetic data DTE cap)
+        'put_short_delta': [0.16, 0.20],
+        'put_long_delta': [0.08, 0.10],
+        'call_short_delta': [0.16, 0.20],
+        'call_long_delta': [0.08, 0.10],
+        'profit_target': [0.50],        # tastytrade 50% management
+        'stop_loss': [0.75],
+        'dte_min_exit': [21],           # close/roll at 21 DTE (gamma ramp)
+        'min_credit': [1.00, 1.50],
+        'vix_min': [10, 15],
+        'vix_max': [30, 40],
     }
 
 
@@ -60,7 +63,8 @@ def run_single_backtest(base_config, param_dict, options_data, underlying_data):
         # Update Iron Condor entry parameters
         for key, value in param_dict.items():
             if key in ['dte_min', 'dte_max', 'put_short_delta', 'put_long_delta',
-                       'call_short_delta', 'call_long_delta', 'min_credit']:
+                       'call_short_delta', 'call_long_delta', 'min_credit',
+                       'vix_min', 'vix_max', 'max_wing_width']:
                 config['strategies']['iron_condor']['entry'][key] = value
             elif key in ['profit_target', 'stop_loss']:
                 config['strategies']['iron_condor']['exit'][key] = value
@@ -91,10 +95,10 @@ def run_single_backtest(base_config, param_dict, options_data, underlying_data):
             **param_dict,
             'total_trades': len(results['trades']),
             'total_return_pct': results['total_return_pct'],
-            'win_rate': results['win_rate'],
+            'win_rate': results['win_rate_pct'],
             'profit_factor': results['profit_factor'],
-            'max_drawdown': results['max_drawdown'],
-            'sharpe_ratio': metrics.get('sharpe_ratio', 0),
+            'max_drawdown': results['max_drawdown_pct'],
+            'sharpe_ratio': metrics.get('sharpe_ratio', results.get('sharpe_ratio', 0)),
             'days_with_entry': results.get('days_with_entry', 0),
         }
 

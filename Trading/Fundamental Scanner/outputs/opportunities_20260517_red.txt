@@ -1,0 +1,270 @@
+==========================================================================================
+OPPORTUNITY DISCOVERY — GATE FAILURES (264 tickers)
+==========================================================================================
+
+Ticker    Failures                                                         Opp
+------------------------------------------------------------------------------------------
+OXM       f_score<5                                                       70.6
+SONO      f_score<5                                                       69.9
+SCHL      f_score<5                                                       69.7
+ETSY      f_score<5                                                       68.2
+STX       beneish_m>-1.78                                                 68.1
+RHI       f_score<5                                                       67.2
+FLO       f_score<5                                                       63.5
+WSM       f_score<5                                                       63.4
+M         beneish_m>-1.78                                                 62.7
+NTNX      asset_growth>0.4                                                62.0
+CALM      asset_growth>0.4                                                61.6
+AEO       f_score<5                                                       60.4
+HAS       f_score<5                                                       60.4
+KWR       f_score<5                                                       60.3
+TNDM      f_score<5                                                       59.8
+HIMS      asset_growth>0.4                                                59.8
+CNXC      f_score<5                                                       59.0
+VRSK      asset_growth>0.4                                                59.0
+MNRO      f_score<5                                                       57.9
+PDFS      f_score<5                                                       57.8
+KTB       asset_growth>0.4                                                57.8
+YOU       beneish_m>-1.78                                                 57.3
+INDV      f_score<5, accrual_ratio>0.1, beneish_m>-1.78                   56.9
+ASGN      f_score<5                                                       56.6
+ACAD      accrual_ratio>0.1, beneish_m>-1.78                              56.5
+NVDA      f_score<5, asset_growth>0.4, beneish_m>-1.78                    56.3
+EQH       f_score<5, beneish_m>-1.78                                      56.1
+ITW       f_score<5                                                       55.9
+RAL       f_score<5                                                       55.8
+ARWR      beneish_m>-1.78                                                 55.6
+NAVI      f_score<5                                                       55.4
+NSP       f_score<5, accrual_ratio>0.1                                    55.3
+ASO       beneish_m>-1.78                                                 55.2
+CPRX      beneish_m>-1.78                                                 55.1
+VITL      f_score<5, asset_growth>0.4                                     54.5
+OC        f_score<5                                                       53.8
+CRBG      f_score<5                                                       53.7
+AAMI      f_score<5, accrual_ratio>0.1, beneish_m>-1.78                   53.5
+BRC       f_score<5                                                       53.4
+CAR       f_score<5                                                       53.4
+TAP       f_score<5                                                       53.4
+TWO       f_score<5, beneish_m>-1.78                                      53.2
+ROCK      f_score<5                                                       53.1
+NABL      f_score<5                                                       53.0
+LOW       beneish_m>-1.78                                                 53.0
+UFPI      f_score<5                                                       52.8
+STAA      f_score<5                                                       52.7
+CVLT      f_score<5                                                       52.7
+EA        f_score<5                                                       52.5
+WMG       f_score<5                                                       52.5
+MIDD      f_score<5                                                       52.3
+EOG       f_score<5                                                       52.1
+NEOG      f_score<5                                                       52.0
+LLY       asset_growth>0.4                                                51.9
+HLIT      f_score<5                                                       51.8
+OMC       f_score<5, asset_growth>0.4, beneish_m>-1.78                    51.7
+SRPT      f_score<5                                                       51.6
+WSC       f_score<5                                                       51.5
+PTGX      f_score<5                                                       51.4
+TTWO      f_score<5                                                       51.4
+PTCT      asset_growth>0.4, beneish_m>-1.78                               51.3
+ALGM      f_score<5                                                       51.3
+CYTK      f_score<5, beneish_m>-1.78                                      51.2
+WABC      f_score<5                                                       51.1
+ON        f_score<5                                                       51.1
+PSKY      f_score<5                                                       51.0
+FTRE      f_score<5                                                       51.0
+LNC       f_score<5                                                       50.9
+PFBC      f_score<5                                                       50.9
+MAN       f_score<5                                                       50.8
+TPL       f_score<5                                                       50.7
+SFNC      f_score<5, beneish_m>-1.78                                      50.7
+LYFT      accrual_ratio>0.1                                               50.6
+UNM       f_score<5                                                       50.5
+AMWD      f_score<5                                                       50.4
+CTKB      f_score<5                                                       50.3
+HOPE      f_score<5                                                       50.3
+BYD       accrual_ratio>0.1                                               50.3
+MRK       f_score<5                                                       50.2
+MKTX      f_score<5                                                       50.1
+CMC       f_score<5                                                       50.0
+LAD       f_score<5                                                       50.0
+AFG       f_score<5                                                       49.9
+GKOS      f_score<5                                                       49.9
+OFG       f_score<5                                                       49.9
+MRP       asset_growth>0.4                                                49.8
+RITM      f_score<5                                                       49.7
+AFL       f_score<5                                                       49.7
+KBH       f_score<5                                                       49.6
+DHI       f_score<5                                                       49.5
+STEL      f_score<5                                                       49.5
+LUV       beneish_m>-1.78                                                 49.4
+WEN       f_score<5                                                       49.4
+ATEN      asset_growth>0.4                                                49.3
+POST      f_score<5                                                       49.3
+CNC       f_score<5                                                       49.3
+AMSF      f_score<5                                                       49.2
+JBSS      f_score<5                                                       49.2
+WFC       f_score<5                                                       49.1
+MUR       f_score<5                                                       49.1
+FLG       f_score<5                                                       49.0
+NWL       f_score<5                                                       49.0
+PLTR      asset_growth>0.4                                                49.0
+MAC       f_score<5                                                       48.9
+PK        f_score<5                                                       48.9
+PRA       f_score<5                                                       48.8
+TXRH      f_score<5                                                       48.8
+TRMB      f_score<5                                                       48.8
+UNIT      asset_growth>0.4, beneish_m>-1.78                               48.7
+JNJ       f_score<5                                                       48.7
+AXP       f_score<5                                                       48.6
+ERIE      f_score<5                                                       48.6
+TROW      f_score<5                                                       48.6
+VTRS      f_score<5                                                       48.5
+C         f_score<5                                                       48.4
+AOSL      beneish_m>-1.78                                                 48.4
+MBIN      f_score<5                                                       48.4
+DKS       f_score<5, asset_growth>0.4, beneish_m>-1.78                    48.4
+DUOL      f_score<5, asset_growth>0.4                                     48.3
+DASH      asset_growth>0.4                                                48.2
+GPK       f_score<5                                                       48.0
+ARR       asset_growth>0.4                                                47.9
+BTU       f_score<5                                                       47.8
+SGI       asset_growth>0.4                                                47.8
+ONB       f_score<5                                                       47.8
+TGTX      asset_growth>0.4, accrual_ratio>0.1, beneish_m>-1.78            47.8
+HUM       f_score<5                                                       47.7
+WCC       f_score<5                                                       47.7
+KD        f_score<5                                                       47.6
+EFC       f_score<5                                                       47.6
+SBCF      f_score<5                                                       47.6
+ADMA      accrual_ratio>0.1, beneish_m>-1.78                              47.6
+HASI      f_score<5                                                       47.6
+VSTS      f_score<5                                                       47.6
+VYX       f_score<5                                                       47.6
+AIN       f_score<5                                                       47.5
+UMBF      asset_growth>0.4, beneish_m>-1.78                               47.5
+PR        beneish_m>-1.78                                                 47.4
+SSB       asset_growth>0.4                                                47.4
+JHG       beneish_m>-1.78                                                 47.4
+NXPI      f_score<5                                                       47.4
+RNST      asset_growth>0.4                                                47.4
+XOM       f_score<5                                                       47.3
+MOH       f_score<5                                                       47.2
+ANET      f_score<5                                                       47.2
+WAL       f_score<5                                                       47.1
+LBRT      f_score<5                                                       47.0
+BGC       f_score<5                                                       46.9
+GEO       beneish_m>-1.78                                                 46.9
+IIPR      f_score<5, beneish_m>-1.78                                      46.9
+IP        f_score<5, asset_growth>0.4                                     46.9
+JBGS      f_score<5                                                       46.8
+GS        f_score<5                                                       46.8
+GRBK      f_score<5, beneish_m>-1.78                                      46.7
+JPM       f_score<5                                                       46.7
+PSA       beneish_m>-1.78                                                 46.7
+PMT       f_score<5, asset_growth>0.4, accrual_ratio>0.1, beneish_m>      46.6
+RWT       f_score<5, accrual_ratio>0.1, beneish_m>-1.78                   46.6
+SOLS      f_score<5                                                       46.6
+MS        f_score<5                                                       46.4
+TOL       f_score<5                                                       46.1
+AMR       f_score<5, beneish_m>-1.78                                      46.1
+AGX       asset_growth>0.4                                                46.0
+DCH       f_score<5                                                       46.0
+GEHC      f_score<5                                                       46.0
+IQV       f_score<5                                                       45.9
+PEB       f_score<5                                                       45.9
+XNCR      f_score<5                                                       45.9
+AESI      f_score<5                                                       45.9
+CNS       f_score<5, accrual_ratio>0.1, beneish_m>-1.78                   45.9
+INSW      beneish_m>-1.78                                                 45.8
+PKG       f_score<5                                                       45.8
+OLN       f_score<5                                                       45.7
+ONTO      f_score<5                                                       45.6
+ARCB      f_score<5                                                       45.6
+APD       f_score<5                                                       45.6
+BBT       asset_growth>0.4, beneish_m>-1.78                               45.5
+SMCI      asset_growth>0.4                                                45.5
+SATS      f_score<5                                                       45.4
+RDNT      f_score<5                                                       45.4
+FOUR      asset_growth>0.4                                                45.3
+MTH       f_score<5                                                       45.3
+REZI      f_score<5                                                       45.3
+HP        f_score<5                                                       45.2
+HL        beneish_m>-1.78                                                 45.1
+LYB       f_score<5                                                       45.0
+BLD       f_score<5                                                       45.0
+HNI       asset_growth>0.4, beneish_m>-1.78                               44.8
+HTLD      f_score<5                                                       44.5
+LEN       f_score<5                                                       44.5
+CSR       beneish_m>-1.78                                                 44.4
+INVA      beneish_m>-1.78                                                 44.3
+KNF       f_score<5                                                       44.2
+AVAV      f_score<5                                                       44.2
+PAYX      asset_growth>0.4                                                44.1
+MARA      f_score<5, beneish_m>-1.78                                      44.1
+TPH       f_score<5, beneish_m>-1.78                                      44.0
+VST       f_score<5                                                       43.9
+CR        asset_growth>0.4                                                43.9
+VRTS      f_score<5                                                       43.9
+CG        f_score<5, accrual_ratio>0.1                                    43.7
+CVNA      asset_growth>0.4                                                43.6
+SNEX      asset_growth>0.4                                                43.6
+EVRG      beneish_m>-1.78                                                 43.5
+LPG       beneish_m>-1.78                                                 43.5
+APH       asset_growth>0.4                                                43.3
+HCC       f_score<5                                                       43.3
+AVB       f_score<5                                                       43.2
+JBTM      f_score<5, asset_growth>0.4, beneish_m>-1.78                    43.2
+PBF       f_score<5                                                       43.1
+CELH      asset_growth>0.4                                                43.1
+MPT       f_score<5                                                       43.1
+F         f_score<5, beneish_m>-1.78                                      42.9
+AAON      accrual_ratio>0.1                                               42.9
+GME       asset_growth>0.4                                                42.9
+PNW       f_score<5                                                       42.8
+AXON      asset_growth>0.4                                                42.8
+LIF       asset_growth>0.4                                                42.7
+VCTR      f_score<5, asset_growth>0.4, beneish_m>-1.78                    42.5
+VNOM      f_score<5, asset_growth>0.4                                     42.4
+TLN       f_score<5, asset_growth>0.4                                     42.3
+WY        f_score<5                                                       42.2
+SLG       f_score<5                                                       42.2
+NVRI      f_score<5                                                       42.1
+WT        asset_growth>0.4                                                42.1
+CLF       f_score<5                                                       42.1
+CPAY      asset_growth>0.4                                                42.0
+DOW       f_score<5                                                       41.9
+LGIH      f_score<5                                                       41.8
+NXRT      f_score<5                                                       41.8
+ESE       f_score<5                                                       41.7
+JBLU      f_score<5                                                       41.6
+SXI       asset_growth>0.4                                                41.5
+BWXT      asset_growth>0.4                                                41.0
+MRNA      f_score<5                                                       40.9
+FN        f_score<5                                                       40.7
+FMC       f_score<5                                                       40.6
+NPK       f_score<5                                                       40.6
+JEF       f_score<5                                                       40.5
+SITM      asset_growth>0.4                                                40.4
+CNR       f_score<5, asset_growth>0.4                                     40.2
+DY        asset_growth>0.4                                                40.2
+BRO       asset_growth>0.4                                                40.0
+BLK       f_score<5                                                       39.8
+CTRE      asset_growth>0.4, beneish_m>-1.78                               39.7
+DNOW      f_score<5, asset_growth>0.4                                     39.6
+VIR       f_score<5                                                       39.5
+SABR      accrual_ratio>0.1, beneish_m>-1.78                              39.3
+FLR       f_score<5                                                       39.3
+GATX      asset_growth>0.4                                                39.2
+BG        f_score<5, asset_growth>0.4, beneish_m>-1.78                    39.2
+AMCR      asset_growth>0.4, beneish_m>-1.78                               39.1
+WD        f_score<5, accrual_ratio>0.1, beneish_m>-1.78                   39.1
+RCUS      f_score<5, accrual_ratio>0.1                                    38.8
+LGND      asset_growth>0.4                                                38.3
+RYN       beneish_m>-1.78                                                 38.3
+ACMR      f_score<5, asset_growth>0.4                                     38.1
+HOOD      asset_growth>0.4, beneish_m>-1.78                               38.0
+CME       asset_growth>0.4                                                37.6
+SNPS      f_score<5, asset_growth>0.4                                     36.9
+RGLD      asset_growth>0.4                                                36.4
+CLSK      asset_growth>0.4, accrual_ratio>0.1                             35.4
+ROIV      f_score<5, accrual_ratio>0.1                                    34.6
+MP        asset_growth>0.4                                                34.2

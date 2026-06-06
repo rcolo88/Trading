@@ -18,11 +18,14 @@ data_source:
   cache_enabled: true
   cache_dir: "data/processed"
 
-# Transaction costs
+# Transaction costs / fill model (see src/utils/execution.py)
 costs:
-  commission_per_contract: 0.65  # Per contract per side
-  slippage_percent: 0.02  # 2% slippage estimate
-  bid_ask_spread_percent: 0.02  # 2% bid-ask spread estimate
+  commission_per_contract: 0.65   # Per contract, per leg, per side
+  # Fills cross a FRACTION of the way from mid to the natural price (0=mid, 1=full bid/ask spread).
+  # Industry backtests (e.g. ORATS) assume ~0.56-0.75 of the spread; less for multi-leg.
+  limit_fill_fraction: 0.5        # entries + planned/profit-target/DTE exits (working limit orders)
+  market_fill_fraction: 1.0       # stop-loss exits ONLY — a market order (no stop-limit available)
+  extra_slippage_percent: 0.0     # optional flat extra %/leg on top, for illiquid names (SPY: ~0)
 
 # Strategy parameters
 strategies:
@@ -45,13 +48,27 @@ strategies:
     entry:
       dte_min: 30
       dte_max: 60
-      long_delta: 0.60      # Buy call with ~60 delta
-      short_delta: 0.60     # Sell call with ~40 delta
+      long_delta: 0.60      # Buy ~60 delta call (lower strike, richer)
+      short_delta: 0.30     # Sell ~30 delta call (higher strike) — distinct strike, real debit
       vix_min: 13           # Can enter in low VIX (cheaper debit)
       vix_max: 17           # Don't enter if VIX > 17 (too expensive)
     exit:
       profit_target: 0.75   # Target 75% of max profit
       stop_loss: 0.20       # Stop at 50% of max loss
+      dte_min: 14
+
+  bear_put_spread:          # Debit spread - moderately bearish (mirror of bull_call)
+    enabled: true
+    entry:
+      dte_min: 30
+      dte_max: 60
+      long_delta: 0.60      # Buy ~60 delta put (higher strike, richer)
+      short_delta: 0.30     # Sell ~30 delta put (lower strike)
+      vix_min: 13
+      vix_max: 17
+    exit:
+      profit_target: 0.75
+      stop_loss: 0.20
       dte_min: 14
 
   call_calendar:            # Time spread - neutral to slightly bullish
@@ -61,7 +78,7 @@ strategies:
       # Approach 1 (Default): Center ± Tolerance
       near_dte: 15           # Sell 30 DTE call (center point)
       far_dte: 50            # Buy 60 DTE call (center point)
-      dte_tolerance: 5       # +/- 5 days tolerance (creates range: 25-35 and 55-65)
+      dte_tolerance: 5       # +/- 1 day tolerance (creates range: 14-16 and 49-51)
 
       # Approach 2 (For Optimizer): Min/Max Ranges
       # Uncomment to use explicit ranges instead of center ± tolerance:
@@ -84,6 +101,25 @@ strategies:
       dte_exit: 5            # Exit when near-term has 7 DTE left
       max_underlying_move: 0.10  # Exit if underlying moves >10% from strike
 
+  iron_condor:              # Market-neutral credit spread (bull put + bear call)
+    enabled: true
+    entry:
+      dte_min: 35           # ~45 DTE entry window (tastytrade standard)
+      dte_max: 50
+      put_short_delta: 0.20  # sell ~16-20 delta short strikes
+      put_long_delta: 0.10   # buy further-OTM wings
+      call_short_delta: 0.20
+      call_long_delta: 0.10
+      min_credit: 0.5        # minimum total credit to enter
+      max_wing_width: 50.0   # generous: SPY delta-selected wings can be wide ($5 strike spacing)
+      vix_min: 15            # ICs prefer elevated IV (premium-rich)
+      vix_max: 40
+    exit:
+      profit_target: 0.50    # close at 50% of credit captured
+      stop_loss: 0.75        # stop at 75% of max loss
+      dte_min: 21            # close/roll at 21 DTE (gamma ramp)
+      breach_threshold: 0.02 # exit if price reaches within 2% of a short strike
+
 # Position sizing
 position_sizing:
   method: "fixed_risk"  # Options: fixed_risk, kelly
@@ -97,6 +133,7 @@ position_sizing:
     bull_put_spread: 0.06    # Example: 6% (Half Kelly of 12%)
     bull_call_spread: 0.04   # Example: 4% (Half Kelly of 8%)
     call_calendar: 0.05      # Example: 5% (Half Kelly of 10%)
+    iron_condor: 0.05        # Example: 5% (Half Kelly of 10%)
 
 # Market filters (global fallback - each strategy has its own VIX criteria in entry section)
 market_filters:

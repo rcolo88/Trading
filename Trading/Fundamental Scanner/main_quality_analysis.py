@@ -208,23 +208,130 @@ def main():
         parser.error("Cannot use --fetch-only and --score-only together. Choose one.")
 
     if args.ticker:
-        # Individual stock analysis - use opportunity scorer on single ticker
-        # Create a temporary index with just this ticker
-        config = WatchlistConfig(
-            index=WatchlistIndex.CUSTOM,
-            custom_tickers=[args.ticker.upper()]
-        )
-        workflow = OpportunityDiscoveryWorkflow(
-            watchlist_config=config,
-            max_workers=1,
-            requests_per_second=args.rate,
-            top_n=1,
-        )
-        if args.score_only:
-            workflow.score([args.ticker.upper()])
+        # Individual stock analysis
+        ticker = args.ticker.upper()
+
+        # For single-ticker, we want to score against the full cached universe (if available)
+        # to get meaningful cross-sectional z-scores. Otherwise z-scores are all 0.0 (N=1).
+        from pathlib import Path
+        import pickle
+
+        cache_file = Path(__file__).parent / "merged_opportunity_cache.pkl"
+        cached_universe = []
+
+        if cache_file.exists() and args.score_only:
+            # Load all cached tickers to use as universe
+            try:
+                with cache_file.open("rb") as f:
+                    cache_data = pickle.load(f)
+                    cached_universe = list(cache_data.keys())
+                if len(cached_universe) > 1:
+                    print(f"[single-ticker] Scoring {ticker} against cached universe of {len(cached_universe)} tickers")
+                    print(f"[single-ticker] This provides meaningful cross-sectional z-scores")
+            except Exception as e:
+                print(f"[single-ticker] Could not load cache: {e}")
+
+        # Create workflow
+        if cached_universe and args.score_only:
+            # Score against full universe, then filter to target ticker
+            config = WatchlistConfig(
+                index=WatchlistIndex.CUSTOM,
+                custom_tickers=cached_universe
+            )
+            workflow = OpportunityDiscoveryWorkflow(
+                watchlist_config=config,
+                max_workers=1,
+                requests_per_second=args.rate,
+                top_n=len(cached_universe),  # Get all reports
+                write_outputs=False,  # We'll write custom filtered output
+            )
+            reports = workflow.score(cached_universe)
+
+            # Filter to target ticker and write custom output
+            target_report = next((r for r in reports if r.ticker == ticker), None)
+            if target_report:
+                # Write single-ticker output files
+                from datetime import datetime
+                import json
+                from pathlib import Path
+
+                outputs_dir = Path(__file__).parent / "outputs"
+                outputs_dir.mkdir(parents=True, exist_ok=True)
+                stamp = datetime.now().strftime("%Y%m%d")
+
+                # JSON output (single ticker)
+                json_path = outputs_dir / f"opportunities_{stamp}_single_{ticker}.json"
+                with json_path.open("w") as f:
+                    json.dump(target_report.to_dict(), f, indent=2, default=str)
+
+                # Human-readable output
+                txt_path = outputs_dir / f"opportunities_{stamp}_single_{ticker}.txt"
+                with txt_path.open("w") as f:
+                    f.write(f"Single Ticker Analysis: {ticker}\n")
+                    f.write(f"Universe: {len(cached_universe)} tickers from cache\n")
+                    f.write("=" * 80 + "\n\n")
+                    f.write(f"Rank:              {reports.index(target_report) + 1} of {len(reports)}\n")
+                    f.write(f"Opportunity Score: {target_report.opportunity_score:.1f} / 100\n")
+                    if target_report.qarp_score:
+                        f.write(f"QARP Score:        {target_report.qarp_score:.1f} / 100\n")
+                    f.write(f"Tier:              {target_report.tier}\n")
+                    f.write(f"Gates Passed:      {'✅ Yes' if target_report.gates_passed else '❌ No'}\n")
+                    if target_report.gate_failures:
+                        f.write(f"Gate Failures:     {', '.join(target_report.gate_failures)}\n")
+                    f.write(f"Sector:            {target_report.sector or 'N/A'}\n")
+                    f.write(f"Market Cap:        ${target_report.market_cap:,.0f}\n" if target_report.market_cap else "")
+                    f.write("\n" + "=" * 80 + "\n")
+                    f.write("SIGNALS (Raw Values)\n")
+                    f.write("=" * 80 + "\n")
+                    for k, v in target_report.signals.items():
+                        if v is not None:
+                            if isinstance(v, float):
+                                if abs(v) < 0.01:
+                                    f.write(f"{k:25s} {v:.4f}\n")
+                                elif abs(v) < 1:
+                                    f.write(f"{k:25s} {v:.3f}\n")
+                                else:
+                                    f.write(f"{k:25s} {v:.2f}\n")
+                            else:
+                                f.write(f"{k:25s} {v}\n")
+                    f.write("\n" + "=" * 80 + "\n")
+                    f.write("Z-SCORES (Cross-Sectional Rankings)\n")
+                    f.write("=" * 80 + "\n")
+                    for k, v in target_report.z_scores.items():
+                        percentile = 50 + (v / 3) * 50  # Rough percentile estimate
+                        percentile = max(0, min(100, percentile))
+                        f.write(f"{k:25s} {v:6.2f}  (~{percentile:.0f}th percentile)\n")
+
+                print(f"\n✅ Single-ticker analysis complete:")
+                print(f"   Rank: {reports.index(target_report) + 1} / {len(reports)}")
+                print(f"   Opp Score: {target_report.opportunity_score:.1f}")
+                print(f"   QARP Score: {target_report.qarp_score:.1f}" if target_report.qarp_score else "")
+                print(f"   Tier: {target_report.tier}")
+                print(f"\n📄 Details: {txt_path}")
+                print(f"📊 JSON: {json_path}")
+            else:
+                print(f"❌ {ticker} not found in cached universe")
         else:
-            workflow.run(limit=1)
-        print(f"\nSingle-ticker analysis complete. Check outputs/opportunities_*.txt for {args.ticker.upper()}")
+            # Fallback: analyze in isolation (z-scores will be 0.0)
+            if not args.score_only:
+                print(f"[single-ticker] Fetching data for {ticker} (isolated analysis)")
+                print(f"[single-ticker] ⚠️  Z-scores will be 0.0 (N=1). Run --fetch-only on an index first, then --ticker {ticker} --score-only for cross-sectional rankings.")
+
+            config = WatchlistConfig(
+                index=WatchlistIndex.CUSTOM,
+                custom_tickers=[ticker]
+            )
+            workflow = OpportunityDiscoveryWorkflow(
+                watchlist_config=config,
+                max_workers=1,
+                requests_per_second=args.rate,
+                top_n=1,
+            )
+            if args.score_only:
+                workflow.score([ticker])
+            else:
+                workflow.run(limit=1)
+            print(f"\nSingle-ticker analysis complete. Check outputs/opportunities_*.txt for {ticker}")
         return
 
     # Index analysis (single or multiple)

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  macOS LaunchAgent: log the SPY option chain twice every weekday — 10:00 and 15:00 LOCAL time.
+  Install:
+    cp data_collection/com.robert.spychainlogger.plist ~/Library/LaunchAgents/
+    launchctl load  ~/Library/LaunchAgents/com.robert.spychainlogger.plist   # enable
+    launchctl start com.robert.spychainlogger                                # run once now to test
+    launchctl unload ~/Library/LaunchAgents/com.robert.spychainlogger.plist  # disable
+  Times are LOCAL — adjust the Hours if you are not on US Eastern (market is 09:30-16:00 ET).
+  Weekday 1=Mon..5=Fri. Each run writes data/raw/chains/SPY_chain_YYYY-MM-DD_HHMM.csv (snapshots coexist).
+  For the Schwab source, add an <EnvironmentVariables> dict with SCHWAB_APP_KEY / SCHWAB_APP_SECRET /
+  SCHWAB_TOKEN_PATH (see README.md); without it the script uses the free yfinance source.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.robert.spychainlogger</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/robertcologero/GitHub/Trading/Options/opt_venv/bin/python</string>
+        <string>/Users/robertcologero/GitHub/Trading/Options/data_collection/chain_logger.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/robertcologero/GitHub/Trading/Options</string>
+
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>2</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>3</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>4</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>10</integer><key>Minute</key><integer>0</integer></dict>
+        <dict><key>Weekday</key><integer>5</integer><key>Hour</key><integer>15</integer><key>Minute</key><integer>0</integer></dict>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>/Users/robertcologero/GitHub/Trading/Options/data_collection/logger.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/robertcologero/GitHub/Trading/Options/data_collection/logger.err</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>

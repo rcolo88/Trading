@@ -77,11 +77,12 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     return options_data, underlying_data
 
 
-def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlying_data: pd.DataFrame) -> ParameterOptimizer:
-    """Create and configure parameter optimizer."""
+def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlying_data: pd.DataFrame,
+                    entry_gate=None) -> ParameterOptimizer:
+    """Create and configure parameter optimizer (optionally with a SPY Trend Reversal entry gate)."""
     print("Setting up optimizer...")
 
-    backtester: OptopsyBacktester = OptopsyBacktester(config)
+    backtester: OptopsyBacktester = OptopsyBacktester(config, entry_gate=entry_gate)
 
     optimizer: ParameterOptimizer = ParameterOptimizer(
         strategy_type='calendar',
@@ -92,17 +93,21 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
         base_config=config
     )
 
-    # Define parameter ranges to test
-    # Calendar spread parameters: near_dte (sell), far_dte (buy)
-    # Note: VIX range to find optimal - 5 to 80 with step 5
-    optimizer.set_parameter_range('near_dte', min=10, max=35, step=5)       
-    optimizer.set_parameter_range('far_dte', min=45, max=75, step=5)      
-    optimizer.set_parameter_range('target_delta', min=0.40, max=0.60, step=0.05)  
-    optimizer.set_parameter_range('profit_target', min=0.10, max=0.70, step=0.1)  
-    optimizer.set_parameter_range('stop_loss', min=-0.60, max=-0.10, step=0.10)
-    optimizer.set_parameter_range('vix_min', min=5, max=50, step=5)
-    optimizer.set_parameter_range('vix_max', min=5, max=50, step=5)
-    optimizer.set_parameter_range('dte_exit', min=1, max=21, step=2)
+    # Reflective parameter ranges (Optuna samples N_TRIALS of these, so the span is free —
+    # runtime is governed by N_TRIALS below, not the combination count).
+    #   * far_dte is capped at 63: the synthetic chains only carry options out to ~65 DTE, so a
+    #     longer far leg silently finds nothing. To test 60-90 DTE far legs, regenerate the data
+    #     with a higher max_dte (generate_synthetic_data.py) first.
+    #   * near_dte < far_dte and vix_min < vix_max by construction, so no trial is wasted on an
+    #     invalid ordering.
+    optimizer.set_parameter_range('near_dte', min=7, max=35, step=7)        # sell the near leg
+    optimizer.set_parameter_range('far_dte', min=42, max=63, step=7)        # buy the far leg (<=65 data cap)
+    optimizer.set_parameter_range('target_delta', min=0.40, max=0.55, step=0.05)  # ATM-ish
+    optimizer.set_parameter_range('profit_target', min=0.10, max=0.60, step=0.10)
+    optimizer.set_parameter_range('stop_loss', min=-0.50, max=-0.10, step=0.10)
+    optimizer.set_parameter_range('vix_min', min=5, max=20, step=5)
+    optimizer.set_parameter_range('vix_max', min=25, max=60, step=5)
+    optimizer.set_parameter_range('dte_exit', min=2, max=14, step=3)        # close the near leg early
 
     total: int = optimizer.get_total_combinations()
     print(f"  ✓ Optimizer configured")
@@ -124,7 +129,9 @@ def run_optimization(optimizer: ParameterOptimizer) -> pd.DataFrame:
     # RECOMMENDED: Use Optuna for large search spaces (>1000 combinations)
     if total_combinations > 1000:
         MODE = 'optuna'
-        N_TRIALS = 1500  # 200-1000 recommended
+        # ~15.9s per full-history backtest, so 1000 trials ~= 4.4h (under the 5h budget). Raise
+        # only if you shorten the date range or speed up the engine.
+        N_TRIALS = 1000
     else:
         # Use grid search for small search spaces
         MODE = 'grid'
@@ -227,7 +234,16 @@ def main() -> int:
 
         config = load_configuration()
         options_data, underlying_data = load_data()
-        optimizer = setup_optimizer(config, options_data, underlying_data)
+
+        # --TR overlays the SPY Trend Reversal signal: only open trades on 'green' (bullish) days.
+        entry_gate = None
+        if '--TR' in sys.argv:
+            from src.utils.trend_gate import spy_trend_gate
+            end = options_data['quote_date'].max().strftime('%Y-%m-%d')
+            entry_gate = spy_trend_gate(end, 'bull')
+            print("  --TR ON: gating entries to SPY Trend Reversal 'green' (bullish) days only.\n")
+
+        optimizer = setup_optimizer(config, options_data, underlying_data, entry_gate)
         results = run_optimization(optimizer)
         save_results(results, optimizer, config)
 

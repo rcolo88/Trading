@@ -311,10 +311,37 @@ Delete either file to force a full refresh.
 
 ## Individual Stock Analysis
 
+**Cross-sectional z-scores require a universe** — analyzing a single ticker in isolation produces z-scores of 0.0.
+
+### Recommended Workflow (Meaningful Rankings)
+
 ```bash
-# Analyze a single ticker (uses same opportunity scorer)
+# Step 1: Build a cached universe (one-time)
+python main_quality_analysis.py --fetch-only
+
+# Step 2: Score a single ticker against the full universe
+python main_quality_analysis.py --ticker NVDA --score-only
+```
+
+This scores NVDA against all ~1500 cached tickers, producing:
+- **Cross-sectional z-scores** (where NVDA ranks vs. the universe)
+- **Rank** (e.g., "45 of 1502")
+- **Percentile estimates** for each signal
+
+**Output files:**
+```
+outputs/opportunities_20260424_single_NVDA.txt  # Human-readable with rank & percentiles
+outputs/opportunities_20260424_single_NVDA.json # Full scoring data
+```
+
+### Fallback: Isolated Analysis (No Rankings)
+
+```bash
+# Fetch + analyze a single ticker (z-scores will be 0.0)
 python main_quality_analysis.py --ticker NVDA
 ```
+
+This fetches NVDA's data and shows raw signals, but **z-scores are meaningless** (N=1).
 
 ---
 

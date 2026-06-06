@@ -1,0 +1,41 @@
+==========================================================================================
+OPPORTUNITY DISCOVERY — TOP 25  (2026-05-17T20:02:09)
+==========================================================================================
+
+Rank  Ticker    Tier                     Opp    QARP    GPOA    F  Sector                  
+------------------------------------------------------------------------------------------
+   1  CL        Neutral                 83.7    70.3   75.0%    5  Consumer Defensive      
+   2  RNG       Cash Return             82.6    73.3  121.0%    8  Technology              
+   3  YELP      Cash Return             79.8    78.6  138.0%    7  Communication Services  
+   4  CARG      Cash Return             78.3    69.9  127.1%    7  Consumer Cyclical       
+   5  ACI       Cash Return             76.1    66.6   84.5%    5  Consumer Defensive      
+   6  MTD       Neutral                 75.1    65.1   64.4%    6  Healthcare              
+   7  COKE      Cash Return             74.4    65.5   66.8%    6  Consumer Defensive      
+   8  TPR       Cash Return             74.2    62.6   80.4%    7  Consumer Cyclical       
+   9  LZ        Cash Return             74.1    67.9   97.4%    6  Industrials             
+  10  DPZ       Cash Return             73.0    65.3  115.0%    9  Consumer Cyclical       
+  11  APPF      Rising Quality          72.8    63.1   87.9%    6  Technology              
+  12  VRSN      Neutral                 72.5    63.0  110.1%    8  Technology              
+  13  PEGA      Cash Return             72.0    65.5   81.2%    9  Technology              
+  14  ANF       Cash Return             72.0    69.0   91.4%    5  Consumer Cyclical       
+  15  DBX       Cash Return             71.9    68.2   71.0%    6  Technology              
+  16  WINA      Rising Quality          71.9    62.6  333.4%    7  Consumer Cyclical       
+  17  IT        Cash Return             71.8    67.0   55.0%    6  Technology              
+  18  SAM       Cash Return             71.2    66.3   79.8%    7  Consumer Defensive      
+  19  BOX       Cash Return             71.1    64.1   60.3%    7  Technology              
+  20  EHC       Rising Quality          71.0    63.1   80.1%    9  Healthcare              
+  21  CART      Cash Return             71.0    64.9   74.8%    6  Consumer Cyclical       
+  22  SEZL      Rising Quality          71.0    63.3   78.8%    8  Financial Services      
+  23  UHS       Cash Return             71.0    66.7  101.1%    8  Healthcare              
+  24  YETI      Cash Return             70.9    63.1   86.8%    5  Consumer Cyclical       
+  25  BAH       Cash Return             70.3    66.2   89.7%    8  Industrials             
+
+Tiers:
+  Compounder          — top 10% quality, all gates pass
+  Discount Compounder — top 20% QARP (quality + value), all gates pass
+  Rising Quality      — positive quality acceleration + quality > median
+  Cash Return         — shareholder yield > 5% + GPOA > 30%
+
+Methodology: Novy-Marx & Medhat (2025) — profitability anchors the
+composite. Hard gates applied for F-Score, asset growth, accruals,
+Beneish M, Altman Z, and interest coverage.

@@ -76,11 +76,12 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     return options_data, underlying_data
 
 
-def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlying_data: pd.DataFrame) -> ParameterOptimizer:
-    """Create and configure parameter optimizer."""
+def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlying_data: pd.DataFrame,
+                    entry_gate=None) -> ParameterOptimizer:
+    """Create and configure parameter optimizer (optionally with a SPY Trend Reversal entry gate)."""
     print("Setting up optimizer...")
 
-    backtester: OptopsyBacktester = OptopsyBacktester(config)
+    backtester: OptopsyBacktester = OptopsyBacktester(config, entry_gate=entry_gate)
 
     optimizer: ParameterOptimizer = ParameterOptimizer(
         strategy_type='vertical',
@@ -91,15 +92,15 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
         base_config=config
     )
 
-    # Define parameter ranges to test
-    # Customize these ranges based on your research
-    optimizer.set_parameter_range('dte', min=20, max=50, step=5)
-    optimizer.set_parameter_range('short_delta', min=0.20, max=0.60, step=0.05)
-    optimizer.set_parameter_range('long_delta', min=0.10, max=0.60, step=0.05)
-    optimizer.set_parameter_range('profit_target', min=0.15, max=0.70, step=0.05)
-    optimizer.set_parameter_range('stop_loss', min=-0.70, max=-0.30, step=0.10)
-    optimizer.set_parameter_range('dte_min', min=1, max=25, step=1)
-    optimizer.set_parameter_range('vix', min=5, max=80, step=5)
+    # Reflective credit-vertical ranges (tastytrade's ~200k-trade study: 30-45 DTE entry, 16-30 delta
+    # short, manage at ~50% profit / ~21 DTE, in elevated IV). short_delta > long_delta = real credit.
+    optimizer.set_parameter_range('dte', min=30, max=45, step=5)                  # 30-45 DTE
+    optimizer.set_parameter_range('short_delta', min=0.16, max=0.30, step=0.02)   # sell 16-30 delta
+    optimizer.set_parameter_range('long_delta', min=0.08, max=0.16, step=0.02)    # protective wing
+    optimizer.set_parameter_range('profit_target', min=0.40, max=0.60, step=0.05) # manage ~50%
+    optimizer.set_parameter_range('stop_loss', min=-0.60, max=-0.30, step=0.10)   # % of max loss
+    optimizer.set_parameter_range('dte_min', min=18, max=24, step=2)              # exit near 21 DTE
+    optimizer.set_parameter_range('vix', min=15, max=40, step=5)                  # premium-rich IV
 
     total: int = optimizer.get_total_combinations()
     print(f"  ✓ Optimizer configured")
@@ -223,7 +224,16 @@ def main() -> int:
 
         config = load_configuration()
         options_data, underlying_data = load_data()
-        optimizer = setup_optimizer(config, options_data, underlying_data)
+
+        # --TR overlays the SPY Trend Reversal signal: only open trades on 'green' (bullish) days.
+        entry_gate = None
+        if '--TR' in sys.argv:
+            from src.utils.trend_gate import spy_trend_gate
+            end = options_data['quote_date'].max().strftime('%Y-%m-%d')
+            entry_gate = spy_trend_gate(end, 'bull')
+            print("  --TR ON: gating entries to SPY Trend Reversal 'green' (bullish) days only.\n")
+
+        optimizer = setup_optimizer(config, options_data, underlying_data, entry_gate)
         results = run_optimization(optimizer)
         save_results(results, optimizer, config)
 

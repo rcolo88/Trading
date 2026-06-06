@@ -4,6 +4,74 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed — Iron Condor now runs, twice-daily chain logger (2026-06-05)
+
+- **Iron Condor repaired end-to-end** (was crashing/non-functional):
+  - `Signal()` no longer crashes — the four IC strikes + credit + expiration are attached as attributes
+    instead of being passed as unknown kwargs.
+  - The backtester now builds a true **4-leg** IC position (it previously only ever built 2 legs, so IC
+    never entered). New `_ic_position_legs` / `_ic_leg_quotes` helpers; `_get_entry_price` prices the
+    4-leg net credit.
+  - IC adopts the **signed cash-flow P&L** convention (`net_open`/`net_close`), so a credit bought back
+    cheaper books a WIN (it was sign-inverted before). All four legs are **pinned to one expiration**.
+  - Optimizer fixes: added the missing `strategies.iron_condor` block to `config.yaml`; `--TR`-style key
+    map now also applies `vix_min`/`vix_max`/`max_wing_width`; result dict read wrong keys
+    (`win_rate`/`max_drawdown` → `win_rate_pct`/`max_drawdown_pct`). Verified: 159 trades, signs correct.
+- **Chain logger runs twice every weekday — 10:00 and 15:00** (was once at 16:15). Files are stamped
+  `SPY_chain_YYYY-MM-DD_HHMM.csv` so the morning and afternoon snapshots coexist. README updated with the
+  intraday-timing/sleep nuance.
+
+### Fixed — realistic fills & slippage (2026-06-05)
+
+- **Asymmetric, industry-standard fill model** (new `src/utils/execution.py`: `net_open`/`net_close`).
+  Fills cross a configurable FRACTION of the way from mid to the natural price (ORATS-style ~0.5-0.75
+  for spreads). Planned entries/profit-target/DTE exits use `limit_fill_fraction` (default 0.5); only
+  stop-loss exits use `market_fill_fraction` (1.0), since stop-limit orders aren't available. Previously
+  exits filled at **mid** and `slippage_percent`/`bid_ask_spread_percent` were **never read**.
+  - The Call Calendar stays **profitable across the whole fill spectrum** (+164% at frac 0.5, +144% even
+    at full natural-price exits) — so the strategy isn't "broken." The real red flag is its **Sharpe 7-8
+    / ~100% win rate**, which is a SYNTHETIC-DATA artifact: IV is flat across strikes AND expiries, so
+    the near-leg theta decay is near-deterministic. Real calendars face term-structure shifts / vol
+    crush / skew. The binding constraint is now the DATA, not the fills → use real chains (DoltHub/OptionsDX).
+  - (An earlier same-day pass over-penalised exits — full spread + 2%/leg on *every* exit — which wrongly
+    showed the calendar at −24%. Corrected here. Do NOT "restore +359%" as on 2025-12-03 either: that was
+    the opposite error, mid-price exits.)
+- **Credit-spread P&L sign fixed.** Winners (e.g. a 1.20 credit bought back at ~0) were booked as
+  **losses**; the signed cash-flow convention (`entry_price` = net debit>0 / credit<0) corrects it.
+- **Debit verticals can now enter.** The `spread_price <= 0` guard rejected every bull-call/bear-put;
+  removed (a debit *is* a positive open cost now). Fixed degenerate `bull_call_spread` deltas (0.60/0.60
+  → 0.60/0.30) and added a `bear_put_spread` config block.
+- **Commission double-count fixed.** `_calculate_commission` billed 2 legs × 2 sides but was called at
+  both entry and exit (~2× too high); now bills one side (2 legs) per call.
+
+### Added — `--TR` flag, research-backed ranges, real-data logger (2026-06-05)
+
+- **`--TR` flag on the optimizers** (`optimize_call_calendar_spread.py`, `optimize_bull_call_spread.py`,
+  `optimize_bull_put_spread.py`): overlays the SPY Trend Reversal signal so trades only open on 'green'
+  (bullish) days. Backed by `src/utils/trend_gate.py` (`spy_trend_gate(end, direction)`), a causal
+  (shift-1) gate reused by `research_trend_overlay.py`. e.g. `python optimize_call_calendar_spread.py --TR`.
+- **Reflective parameter ranges** from published studies (ORATS / tastytrade): credit spreads & iron
+  condor 30-45 DTE, 16-30Δ short, manage ~50% / ~21 DTE; debit verticals 30-60 DTE, buy 50-70Δ / sell
+  25-40Δ, take 50-75%; calendars sell ~near / buy ~far ATM, `far_dte ≤ 63` (synthetic DTE cap). Calendar
+  optimizer trials cut 1500→1000 to fit a 5h budget (~15.9s/backtest on full history).
+- **`data_collection/chain_logger.py`** — appends today's real SPY chain (Schwab via schwab-py, else
+  yfinance with greeks filled from IV) to `data/raw/chains/`, in the backtester's schema. Plus a
+  `launchd` plist + `data_collection/README.md` detailing macOS scheduling (launchd vs cron vs n8n vs
+  GitHub Actions). Build real point-in-time history to replace the synthetic chains.
+- Iron condor optimizer ranges tightened to the tastytrade standard (IC strategy repaired below).
+
+### Added — Trend Reversal integration (ask #2/#3)
+
+- `research_trend_overlay.py` — gates options entries by the SPY Trend Reversal signal (bull-call on
+  green, bear-put on red), with a clean REAL-DATA cross-check via the trendrev engine. Honest finding:
+  bull calls outpace buy & hold on the long side (leverage), bear puts lose (shorting a riser); the
+  green gate trades participation for drawdown/regime control, which the real-data row isolates cleanly.
+- `scanner_options_watchlist.py` — Fundamental-Scanner top-N quality names × Trend Reversal (3-day bars)
+  → broker-ready defined-risk call-debit-spread templates for names that *freshly* flip green. A live
+  screen (no hindsight, no synthetic P&L).
+- `OptopsyBacktester(config, entry_gate=...)` — optional `callable(date)->bool` market-regime gate.
+- `test_execution.py` — guards the fill-model signs and that slippage always hurts.
+
 ### Reverted
 
 - **Risk Calculation Changes Reverted** (2025-12-03):

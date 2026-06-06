@@ -14,6 +14,7 @@ import pandas as pd
 import numpy as np
 
 from .base_strategy import BaseStrategy, Signal, Position
+from ..utils.execution import net_close
 
 
 class IronCondor(BaseStrategy):
@@ -237,6 +238,13 @@ class IronCondor(BaseStrategy):
                 print(f"  ❌ VIX filter failed: {vix:.1f}, range=[{vix_min}, {vix_max}]")
             return None
 
+        # Pin ALL four legs to a single expiration (the one nearest the DTE-window midpoint) so the
+        # spread is priced and managed consistently — otherwise strikes leak across expirations.
+        target_dte = (dte_min + dte_max) / 2
+        exp_dte = valid_options.groupby('expiration')['dte'].first()
+        chosen_exp = (exp_dte - target_dte).abs().idxmin()
+        valid_options = valid_options[valid_options['expiration'] == chosen_exp]
+
         # Find put spread strikes (below current price)
         put_strikes = self._find_put_strikes(valid_options, underlying_price)
         if not put_strikes:
@@ -276,22 +284,25 @@ class IronCondor(BaseStrategy):
             return None
 
         # Get DTE for tracking
-        dte = valid_options.iloc[0]['dte']
+        dte = int(valid_options.iloc[0]['dte'])
 
-        return Signal(
+        # Signal carries only the base dataclass fields; the four IC strikes + credit + expiration
+        # are attached as attributes (the engine and calculate_position_size read them back).
+        signal = Signal(
             date=date,
             signal_type='entry',
             strategy_name=self.name,
             underlying_price=underlying_price,
-            # Store all four strikes
-            put_short_strike=put_short,
-            put_long_strike=put_long,
-            call_short_strike=call_short,
-            call_long_strike=call_long,
-            total_credit=total_credit,
             dte=dte,
             notes=f"IC: Sell {put_short:.0f}P/{call_short:.0f}C, Buy {put_long:.0f}P/{call_long:.0f}C (${total_credit:.2f} credit)"
         )
+        signal.put_short_strike = put_short
+        signal.put_long_strike = put_long
+        signal.call_short_strike = call_short
+        signal.call_long_strike = call_long
+        signal.total_credit = total_credit
+        signal.expiration = chosen_exp
+        return signal
 
     def generate_exit_signal(
         self,
@@ -302,125 +313,78 @@ class IronCondor(BaseStrategy):
         **kwargs
     ) -> Optional[Signal]:
         """Generate exit signal for open Iron Condor position."""
+        lf = kwargs.get('limit_fraction', 0.5)
+        mf = kwargs.get('market_fraction', 1.0)
+        extra = kwargs.get('extra_slippage', 0.0)
 
-        # Extract strikes from 4-leg position
         if len(position.legs) < 4:
             return None
+        exp = position.legs[0].get('expiration')
 
-        put_short = position.legs[0]['strike']  # Sell put
-        put_long = position.legs[1]['strike']   # Buy put
-        call_short = position.legs[2]['strike']  # Sell call
-        call_long = position.legs[3]['strike']   # Buy call
+        # Current quotes for all four legs, matched to the position's expiration.
+        legs_q = []
+        for leg in position.legs:
+            row = options_data[
+                (options_data['strike'] == leg['strike']) &
+                (options_data['option_type'] == leg['option_type'])
+            ]
+            if exp is not None and 'expiration' in options_data.columns:
+                row = row[row['expiration'] == exp]
+            if row.empty:
+                return None  # a leg isn't quoted today; managed (DTE) exit fires before expiry
+            r = row.iloc[0]
+            legs_q.append((r['bid'], r['ask'], leg['position'] == 'long'))
 
-        # Get current Iron Condor value
-        current_value = self._get_current_iron_condor_value(
-            options_data, put_short, put_long, call_short, call_long
-        )
+        # Value to close (signed). entry_price is the signed open cost (<0 = net credit received).
+        close_val = net_close(legs_q, lf, extra)
+        position.current_price = close_val
+        profit = close_val - position.entry_price          # per share, >0 = gain
+        position.unrealized_pnl = profit * position.contracts * 100
 
-        if current_value is None:
-            return None
+        # Defined risk from the wings and the credit collected.
+        put_width = position.legs[0]['strike'] - position.legs[1]['strike']
+        call_width = position.legs[3]['strike'] - position.legs[2]['strike']
+        credit = -position.entry_price
+        max_profit = credit
+        max_loss = max(put_width, call_width) - credit
 
-        position.current_price = current_value
-        position.unrealized_pnl = (position.entry_price - current_value) * position.contracts * 100
-
-        # Calculate profit/loss for exit checks
-        current_profit = position.entry_price - current_value
-
-        # Determine max risk (wider wing - credit)
-        put_width = put_short - put_long
-        call_width = call_long - call_short
-        max_width = max(put_width, call_width)
-        max_loss = (max_width - position.entry_price) * position.contracts * 100
-
-        # Check profit target (percentage of max profit)
+        # Profit target (fraction of the credit captured)
         profit_target = self.exit_config.get('profit_target', 0.50)
-        max_profit = position.entry_price * position.contracts * 100
+        if profit > 0 and max_profit > 0 and profit / max_profit >= profit_target:
+            return Signal(date=date, signal_type='exit', strategy_name=self.name,
+                          underlying_price=underlying_price,
+                          exit_reason=f"Profit target reached: {profit / max_profit:.1%} (target: {profit_target:.1%})")
 
-        if current_profit > 0 and max_profit > 0:
-            current_profit_pct = (current_profit * position.contracts * 100) / max_profit
-            if current_profit_pct >= profit_target:
-                return Signal(
-                    date=date,
-                    signal_type='exit',
-                    strategy_name=self.name,
-                    underlying_price=underlying_price,
-                    exit_reason=f"Profit target reached: {current_profit_pct:.1%} (target: {profit_target:.1%})"
-                )
-
-        # Check stop loss (percentage of max loss)
+        # Stop loss — a market order: refill at the wider market fraction.
         stop_loss_pct = self.exit_config.get('stop_loss', 0.75)
-        if current_profit < 0 and max_loss > 0:
-            current_loss = abs(current_profit * position.contracts * 100)
-            current_loss_pct = current_loss / max_loss
-            if current_loss_pct >= stop_loss_pct:
-                return Signal(
-                    date=date,
-                    signal_type='exit',
-                    strategy_name=self.name,
-                    underlying_price=underlying_price,
-                    exit_reason=f"Stop loss triggered: {current_loss_pct:.1%} loss (limit: {stop_loss_pct:.1%})"
-                )
+        if profit < 0 and max_loss > 0 and (-profit) / max_loss >= stop_loss_pct:
+            position.current_price = net_close(legs_q, mf, extra)
+            position.unrealized_pnl = (position.current_price - position.entry_price) * position.contracts * 100
+            return Signal(date=date, signal_type='exit', strategy_name=self.name,
+                          underlying_price=underlying_price,
+                          exit_reason=f"Stop loss triggered: {(-profit) / max_loss:.1%} loss (limit: {stop_loss_pct:.1%})")
 
-        # Check DTE-based exit
-        current_dte = options_data.iloc[0]['dte'] if not options_data.empty else 0
-        dte_min = self.exit_config.get('dte_min', 14)
-
+        # DTE exit (gamma ramps inside ~21 DTE) — days to the position's expiration.
+        dte_min = self.exit_config.get('dte_min', 21)
+        current_dte = (pd.Timestamp(exp) - pd.Timestamp(date)).days if exp is not None else 0
         if current_dte <= dte_min:
-            return Signal(
-                date=date,
-                signal_type='exit',
-                strategy_name=self.name,
-                underlying_price=underlying_price,
-                exit_reason=f"DTE exit: {current_dte} <= {dte_min}"
-            )
+            return Signal(date=date, signal_type='exit', strategy_name=self.name,
+                          underlying_price=underlying_price,
+                          exit_reason=f"DTE exit: {current_dte} <= {dte_min}")
 
-        # Check price breach (early warning system)
-        breach_threshold = self.exit_config.get('breach_threshold', 0.02)
+        # Breach warnings (price reaches a short strike)
+        breach = self.exit_config.get('breach_threshold', 0.02)
+        put_short, call_short = position.legs[0]['strike'], position.legs[2]['strike']
+        if underlying_price <= put_short * (1 + breach):
+            return Signal(date=date, signal_type='exit', strategy_name=self.name,
+                          underlying_price=underlying_price,
+                          exit_reason=f"Put breach: {underlying_price:.0f} <= {put_short * (1 + breach):.0f}")
+        if underlying_price >= call_short * (1 - breach):
+            return Signal(date=date, signal_type='exit', strategy_name=self.name,
+                          underlying_price=underlying_price,
+                          exit_reason=f"Call breach: {underlying_price:.0f} >= {call_short * (1 - breach):.0f}")
 
-        # Check if price approaching short put
-        put_breach_price = put_short * (1 + breach_threshold)
-        if underlying_price <= put_breach_price:
-            return Signal(
-                date=date,
-                signal_type='exit',
-                strategy_name=self.name,
-                underlying_price=underlying_price,
-                exit_reason=f"Put breach warning: price {underlying_price:.0f} <= {put_breach_price:.0f}"
-            )
-
-        # Check if price approaching short call
-        call_breach_price = call_short * (1 - breach_threshold)
-        if underlying_price >= call_breach_price:
-            return Signal(
-                date=date,
-                signal_type='exit',
-                strategy_name=self.name,
-                underlying_price=underlying_price,
-                exit_reason=f"Call breach warning: price {underlying_price:.0f} >= {call_breach_price:.0f}"
-            )
-
-        return None  # No exit conditions met
-
-    def _get_current_iron_condor_value(
-        self,
-        options_chain: pd.DataFrame,
-        put_short: float,
-        put_long: float,
-        call_short: float,
-        call_long: float
-    ) -> Optional[float]:
-        """Calculate current buyback cost for entire Iron Condor."""
-        put_spread_value = self._get_spread_price(
-            options_chain, put_short, put_long, 'put'
-        )
-        call_spread_value = self._get_spread_price(
-            options_chain, call_short, call_long, 'call'
-        )
-
-        if put_spread_value is None or call_spread_value is None:
-            return None
-
-        return put_spread_value + call_spread_value
+        return None
 
     def calculate_position_size(
         self,

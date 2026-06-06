@@ -14,7 +14,8 @@
       "Bash(python -c \"import pickle; cache = pickle.load\\(open\\('merged_opportunity_cache.pkl', 'rb'\\)\\); tickers = list\\(cache.keys\\(\\)\\); print\\(f'Cached: {len\\(tickers\\)} tickers'\\); print\\(f'Sample: {tickers[:5]}'\\)\")",
       "Bash(python -c \"from data.watchlist_config import WatchlistConfig, WatchlistIndex; config = WatchlistConfig\\(index=WatchlistIndex.COMBINED_SP\\); tickers = config.get_tickers\\(\\); print\\(f'Combined_SP \\(S&P 1500\\) should have: {len\\(tickers\\)} tickers'\\)\")",
       "Bash(python -c \"from main_quality_analysis import WatchlistIndex; print\\('✅ WatchlistIndex imported successfully'\\)\")",
-      "Bash(python -c \"import main_quality_analysis; print\\('✅ Module loads without errors'\\)\")"
+      "Bash(python -c \"import main_quality_analysis; print\\('✅ Module loads without errors'\\)\")",
+      "Bash(python main_quality_analysis.py --ticker AAPL --score-only)"
     ],
     "deny": [],
     "ask": []

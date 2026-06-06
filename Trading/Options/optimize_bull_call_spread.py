@@ -75,11 +75,12 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
     return options_data, underlying_data
 
 
-def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlying_data: pd.DataFrame) -> ParameterOptimizer:
-    """Create and configure parameter optimizer."""
+def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlying_data: pd.DataFrame,
+                    entry_gate=None) -> ParameterOptimizer:
+    """Create and configure parameter optimizer (optionally with a SPY Trend Reversal entry gate)."""
     print("Setting up optimizer...")
 
-    backtester: OptopsyBacktester = OptopsyBacktester(config)
+    backtester: OptopsyBacktester = OptopsyBacktester(config, entry_gate=entry_gate)
 
     optimizer: ParameterOptimizer = ParameterOptimizer(
         strategy_type='vertical',
@@ -90,12 +91,12 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
         base_config=config
     )
 
-    # Define parameter ranges to test
-    # Bull Call Spread parameters: long_delta (buy call), short_delta (sell call)
-    optimizer.set_parameter_range('dte', min=30, max=60, step=10)          # 4 values
-    optimizer.set_parameter_range('long_delta', min=0.55, max=0.70, step=0.05)   # 4 values
-    optimizer.set_parameter_range('short_delta', min=0.35, max=0.50, step=0.05)  # 4 values
-    optimizer.set_parameter_range('profit_target', min=0.50, max=0.75, step=0.25)  # 2 values
+    # Reflective debit-vertical ranges (industry practice: 30-60 DTE, buy ITM-ish, sell OTM,
+    # manage at 50-75% of max profit — see ORATS / tastytrade debit-spread studies).
+    optimizer.set_parameter_range('dte', min=30, max=60, step=10)                 # 30-60 DTE
+    optimizer.set_parameter_range('long_delta', min=0.50, max=0.70, step=0.05)    # buy 50-70 delta
+    optimizer.set_parameter_range('short_delta', min=0.25, max=0.40, step=0.05)   # sell 25-40 delta
+    optimizer.set_parameter_range('profit_target', min=0.50, max=0.75, step=0.05) # take 50-75% of max
 
     total: int = optimizer.get_total_combinations()
     print(f"  ✓ Optimizer configured")
@@ -219,7 +220,16 @@ def main() -> int:
 
         config = load_configuration()
         options_data, underlying_data = load_data()
-        optimizer = setup_optimizer(config, options_data, underlying_data)
+
+        # --TR overlays the SPY Trend Reversal signal: only open trades on 'green' (bullish) days.
+        entry_gate = None
+        if '--TR' in sys.argv:
+            from src.utils.trend_gate import spy_trend_gate
+            end = options_data['quote_date'].max().strftime('%Y-%m-%d')
+            entry_gate = spy_trend_gate(end, 'bull')
+            print("  --TR ON: gating entries to SPY Trend Reversal 'green' (bullish) days only.\n")
+
+        optimizer = setup_optimizer(config, options_data, underlying_data, entry_gate)
         results = run_optimization(optimizer)
         save_results(results, optimizer, config)
 
