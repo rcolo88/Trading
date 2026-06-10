@@ -33,6 +33,16 @@ SYMBOL = "SPY"
 R, Q = 0.04, 0.015  # risk-free, SPY dividend yield (for filling greeks on the yfinance path)
 
 
+def _current_vix() -> float | None:
+    """Latest ^VIX close (the regime gate strategies filter on). None if unavailable."""
+    try:
+        import yfinance as yf
+        hist = yf.Ticker("^VIX").history(period="5d")["Close"].dropna()
+        return float(hist.iloc[-1]) if not hist.empty else None
+    except Exception:
+        return None
+
+
 def from_yfinance(max_dte: int) -> pd.DataFrame:
     import yfinance as yf
 
@@ -119,6 +129,10 @@ def main() -> int:
     df.insert(0, "quote_date", pd.Timestamp.today().normalize())
     df.insert(1, "underlying_symbol", SYMBOL)
     df["abs_delta"] = df["delta"].abs() if "delta" in df else None
+
+    # Capture the current VIX so logged chains satisfy the strategies' VIX gates without a post-hoc
+    # merge (and so compile_chains.py doesn't have to backfill it).
+    df["vix"] = _current_vix()
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     # Stamp date + HHMM so multiple intraday snapshots (e.g. 10:00 and 15:00) coexist instead of
     # overwriting each other.

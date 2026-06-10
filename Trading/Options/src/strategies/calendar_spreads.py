@@ -315,6 +315,28 @@ class CalendarSpread(BaseStrategy):
 
         return signal
 
+    def _leg_quote(self, options_data, strike, option_type, expiration, tol):
+        """Quote row for a held leg: exact strike if present, else the NEAREST strike within `tol`.
+
+        Real chains (e.g. DoltHub) sample only a handful of strikes per day at irregular spacing, so
+        a calendar's exact strike is often not quoted on a later day. Re-marking at the closest
+        available strike for that expiration — a bounded approximation of the leg's value — lets the
+        position live its full intended duration instead of being force-closed as "expired" after a
+        few days (which is why stop_loss/profit/dte exits never fired on real data). Returns None only
+        when that expiration has no quote within `tol` (a genuine gap or true expiry).
+        """
+        cand = options_data[
+            (options_data['option_type'] == option_type) &
+            (options_data['expiration'] == expiration)
+        ]
+        if cand.empty:
+            return None
+        idx = (cand['strike'] - strike).abs().idxmin()
+        row = cand.loc[idx]
+        if abs(float(row['strike']) - float(strike)) > tol:
+            return None
+        return row
+
     def generate_exit_signal(
         self,
         date: datetime,
@@ -328,6 +350,7 @@ class CalendarSpread(BaseStrategy):
         lf = kwargs.get('limit_fraction', 0.5)
         mf = kwargs.get('market_fraction', 1.0)
         extra = kwargs.get('extra_slippage', 0.0)
+        stop_slip = kwargs.get('stop_slippage', 0.0)
 
         # Get position details
         short_leg = position.legs[0]  # Near-term option (short)
@@ -335,28 +358,27 @@ class CalendarSpread(BaseStrategy):
         strike = short_leg['strike']
         option_type = short_leg['option_type']
 
-        # Use stored expiration dates if available (calendar spread specific)
-        if hasattr(position, 'near_expiration') and hasattr(position, 'far_expiration'):
-            near_expiration = position.near_expiration
-            far_expiration = position.far_expiration
+        # Tolerance for re-marking a held leg at the nearest quoted strike (real chains are sparse).
+        # 0.01 (~$7 on SPY) is the smallest tolerance that bridges the median ATM strike gap; P&L is
+        # flat for any larger value, so this minimises the snap approximation. 0 disables snapping.
+        tol = self.exit_config.get('strike_snap_pct', 0.01) * float(underlying_price)
+        today = pd.Timestamp(date).normalize()
+        near_expiration = getattr(position, 'near_expiration', None)
+        far_expiration = getattr(position, 'far_expiration', None)
 
-            # Find options matching the original expirations
-            near_option = options_data[
-                (options_data['strike'] == strike) &
-                (options_data['option_type'] == option_type) &
-                (options_data['expiration'] == near_expiration)
-            ]
-
-            if near_option.empty:
-                # Near-term leg expired/settled: close = sell the remaining far long leg (near -> 0).
-                far_leg = options_data[
-                    (options_data['strike'] == strike) &
-                    (options_data['option_type'] == option_type) &
-                    (options_data['expiration'] == far_expiration)
-                ]
+        # --- Near leg: re-mark at exact-or-nearest strike for the stored near expiration ---
+        if near_expiration is not None and far_expiration is not None:
+            current_near = self._leg_quote(options_data, strike, option_type, near_expiration, tol)
+            if current_near is None:
+                # No near-leg quote near this strike. If the near expiration has actually passed, the
+                # near leg is settled -> close by selling the remaining far long leg. Otherwise it's
+                # just a data gap for this strike today -> hold and re-check on a later day.
+                if pd.Timestamp(near_expiration).normalize() > today:
+                    return None
+                far_leg = self._leg_quote(options_data, strike, option_type, far_expiration, tol)
                 position.current_price = (
-                    net_close([(far_leg.iloc[0]['bid'], far_leg.iloc[0]['ask'], True)], lf, extra)
-                    if not far_leg.empty else position.entry_price
+                    net_close([(far_leg['bid'], far_leg['ask'], True)], lf, extra)
+                    if far_leg is not None else position.entry_price
                 )
                 position.unrealized_pnl = (position.current_price - position.entry_price) * position.contracts * 100
                 return Signal(
@@ -366,50 +388,37 @@ class CalendarSpread(BaseStrategy):
                     underlying_price=underlying_price,
                     exit_reason="Near-term option expired"
                 )
-
-            current_near = near_option.iloc[0]
             current_near_dte = current_near['dte']
         else:
-            # Fallback for positions without stored expirations
+            # Fallback for positions without stored expirations: nearest strike, shortest DTE.
             near_option = options_data[
                 (options_data['strike'] == strike) &
                 (options_data['option_type'] == option_type)
             ]
-
             if near_option.empty:
                 return None
-
-            # Get the option closest to original near-term DTE
-            near_option_sorted = near_option.sort_values('dte')
-            current_near = near_option_sorted.iloc[0] if len(near_option_sorted) > 0 else None
-
-            if current_near is None:
-                return None
-
+            current_near = near_option.sort_values('dte').iloc[0]
             current_near_dte = current_near['dte']
 
-        # Calculate current spread value FIRST (needed for all exit conditions)
-        if hasattr(position, 'far_expiration'):
-            # Use stored far expiration
-            far_option = options_data[
-                (options_data['strike'] == strike) &
-                (options_data['option_type'] == option_type) &
-                (options_data['expiration'] == far_expiration)
-            ]
+        # --- Far leg: same exact-or-nearest re-marking ---
+        if far_expiration is not None:
+            current_far = self._leg_quote(options_data, strike, option_type, far_expiration, tol)
         else:
-            # Fallback: find options with DTE > near-term
             far_option = options_data[
                 (options_data['strike'] == strike) &
                 (options_data['option_type'] == option_type) &
                 (options_data['dte'] > current_near_dte)
             ]
+            current_far = None if far_option.empty else far_option.iloc[0]
 
-        if far_option.empty:
-            # Far option expired: only the short near leg remains, bought back to close.
+        if current_far is None:
+            # Far expiration passed -> only the short near leg remains, bought back to close.
+            # Still in the future but unquoted near this strike -> data gap -> hold.
+            if far_expiration is not None and pd.Timestamp(far_expiration).normalize() > today:
+                return None
             near_only = net_close([(current_near['bid'], current_near['ask'], False)], lf, extra)
             position.current_price = near_only
             position.unrealized_pnl = (near_only - position.entry_price) * position.contracts * 100
-
             return Signal(
                 date=date,
                 signal_type='exit',
@@ -417,9 +426,6 @@ class CalendarSpread(BaseStrategy):
                 underlying_price=underlying_price,
                 exit_reason="Far-term option data unavailable"
             )
-
-        # Get the far option (should be unique if filtered by expiration)
-        current_far = far_option.iloc[0]
 
         # Value to close: sell the far leg, buy back the near. Planned exits fill at the limit
         # fraction; a stop-loss is a market order (handled below) at the wider market fraction.
@@ -457,16 +463,20 @@ class CalendarSpread(BaseStrategy):
 
         # Check stop loss (spread collapsed). A stop is a market order — refill at the wider
         # market fraction so the booked exit reflects crossing the spread, not a limit at mid.
+        # On top of that, a multi-leg stop can't rest on the book (e.g. Robinhood), so the exit
+        # lands LATER and WORSE than the trigger: book an extra `stop_slip` of the entry debit of
+        # monitoring-lag overshoot (stop_slip=0.10 turns an intended -10% stop into a ~-20% fill).
         stop_loss_pct = self.exit_config.get('stop_loss', -0.50)
         if profit_pct <= stop_loss_pct:
-            position.current_price = net_close(legs, mf, extra)
+            position.current_price = net_close(legs, mf, extra) - stop_slip * abs(position.entry_price)
             position.unrealized_pnl = (position.current_price - position.entry_price) * position.contracts * 100
+            realized_pct = (position.current_price - position.entry_price) / position.entry_price
             return Signal(
                 date=date,
                 signal_type='exit',
                 strategy_name=self.name,
                 underlying_price=underlying_price,
-                exit_reason=f"Stop loss triggered: {profit_pct:.1%}"
+                exit_reason=f"Stop loss triggered: {profit_pct:.1%} (filled {realized_pct:.1%} after slippage)"
             )
 
         # Check if underlying moved too far from strike

@@ -25,7 +25,11 @@ from datetime import datetime, timedelta
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from src.data_fetchers.synthetic_generator import SyntheticOptionsGenerator
+from src.data_fetchers.synthetic_generator import (
+    SyntheticOptionsGenerator,
+    synthetic_data_filename,
+    _load_options_config,
+)
 
 
 def main():
@@ -46,11 +50,17 @@ def main():
     print("\nWARNING: This may take several minutes to complete.")
     print("The script will download ~2 years of price data and generate options chains.")
 
-    # Configuration
-    symbol = "SPY"
-    start_date = "2024-01-01"
-    end_date = "2026-04-09"
-    max_dte_ = 65
+    # Configuration -- single source of truth lives in config/config.yaml -> synthetic_data
+    config = _load_options_config()
+    sd = config["synthetic_data"]
+    symbol = sd["symbol"]
+    start_date = sd["start_date"]
+    end_date = sd["end_date"]
+    max_dte_ = sd["max_dte"]
+
+    # Derive the output path from the SAME helper the loaders use, so the file we
+    # write is exactly the file they look for.
+    output_path = f"data/processed/{synthetic_data_filename(config)}"
 
     print(f"\nConfiguration:")
     print(f"  Symbol: {symbol}")
@@ -89,7 +99,8 @@ def main():
             end_date=end_date,
             include_weekly=True,
             max_dte=max_dte_,
-            save_to_csv=True
+            save_to_csv=True,
+            output_path=output_path
         )
 
         print("\n" + "="*70)
@@ -97,7 +108,7 @@ def main():
         print("="*70)
         print(f"\nGenerated {len(options_df):,} option contracts")
         print(f"\nThe data has been saved to:")
-        print(f"  data/processed/{symbol}_synthetic_options_{start_date}_{end_date}.csv")
+        print(f"  {output_path}")
 
         print("\nData Summary:")
         print(f"  Calls: {len(options_df[options_df['option_type']=='call']):,}")

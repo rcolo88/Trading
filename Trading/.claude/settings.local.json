@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "WebSearch"
+      "WebSearch",
+      "Bash(grep -nE \"^#{1,4} \" README.md)",
+      "Bash(grep -nE \"^#{1,4} \" guides/WORKFLOWS.md)"
     ],
     "deny": [],
     "ask": [],

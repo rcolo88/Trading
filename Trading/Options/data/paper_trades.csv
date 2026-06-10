@@ -1,0 +1,2 @@
+checked_at,strategy,option_type,strike,near_expiration,far_expiration,entry_debit,contracts,mark,profit_pct,exit_signal,exit_reason
+2026-06-09T17:34:19,call_calendar,call,738.0,2026-06-09,2026-06-11,2.5,2,1.7175,-0.313,True,Near-term expiration approaching: 4 DTE <= 5

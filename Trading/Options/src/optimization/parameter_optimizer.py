@@ -28,6 +28,74 @@ except ImportError:
 from ..backtester.optopsy_wrapper import OptopsyBacktester
 from ..strategies.base_strategy import BaseStrategy
 from ..analysis.metrics import calculate_performance_metrics
+
+
+# Tie-break keys (applied after the primary metric) so a cluster of equal-Sharpe results sorts
+# deterministically. Without this, pandas' default (non-stable) sort surfaces an arbitrary member
+# of a tie, which is why the printed "Best parameters" could disagree with the top row of "TOP 5".
+# Higher is better for all of these (max_drawdown_pct is negative, so higher = shallower drawdown).
+_TIE_BREAK_KEYS = ["total_return_pct", "max_drawdown_pct", "win_rate_pct"]
+
+
+def sort_results_stable(df: pd.DataFrame, metric: str) -> pd.DataFrame:
+    """Sort results by `metric` (desc) with deterministic tie-breakers; stable + reindexed.
+
+    Use this everywhere results are ranked so the single "best" and the top of the leaderboard
+    always agree, and re-runs are reproducible.
+    """
+    keys = [metric] + [k for k in _TIE_BREAK_KEYS if k in df.columns and k != metric]
+    return df.sort_values(keys, ascending=False, kind="stable").reset_index(drop=True)
+
+
+def _grid_step(values) -> float:
+    """Smallest positive gap between distinct grid values (the spacing of one parameter axis)."""
+    uniq = np.unique(np.asarray(values, dtype=float))
+    if len(uniq) < 2:
+        return 0.0
+    return float(np.min(np.diff(uniq)))
+
+
+def add_stability_scores(
+    results_df: pd.DataFrame,
+    parameter_ranges: Optional[Dict] = None,
+    metric: str = "sharpe_ratio",
+) -> pd.DataFrame:
+    """Add `stability_score` / `stability_n`: the neighborhood-averaged metric for each row.
+
+    A genuine edge sits on a *plateau* — its grid neighbors (parameters one step away on each axis)
+    score similarly well. A knife-edge / overfit optimum scores high alone but its neighbors don't.
+    `stability_score` is the mean `metric` over a row's grid neighborhood (inclusive); ranking by it
+    instead of the single best cell prefers robust regions and de-emphasises lucky spikes.
+    """
+    df = results_df.copy()
+    param_cols = [c for c in (parameter_ranges or {}).keys() if c in df.columns]
+    if not param_cols or metric not in df.columns:
+        df["stability_score"] = df.get(metric, np.nan)
+        df["stability_n"] = 1
+        return df
+
+    # One grid step per axis (from the configured grid if given, else inferred from the results).
+    steps = []
+    for c in param_cols:
+        vals = parameter_ranges[c].get("values") if parameter_ranges and "values" in parameter_ranges[c] else df[c]
+        steps.append(_grid_step(vals) or _grid_step(df[c]))
+    steps = np.asarray(steps, dtype=float)
+    steps[steps == 0] = np.inf  # a fixed axis never separates neighbors
+
+    A = df[param_cols].to_numpy(dtype=float)
+    m = df[metric].to_numpy(dtype=float)
+    tol = steps * 1.0001  # adjacent-or-equal on each axis, with a float-safe margin
+
+    scores = np.empty(len(df))
+    counts = np.empty(len(df), dtype=int)
+    for i in range(len(df)):
+        mask = (np.abs(A - A[i]) <= tol).all(axis=1) & ~np.isnan(m)
+        counts[i] = int(mask.sum())
+        scores[i] = float(np.nanmean(m[mask])) if counts[i] else np.nan
+
+    df["stability_score"] = scores
+    df["stability_n"] = counts
+    return df
 from .results_compiler import get_completed_combinations
 
 
@@ -772,12 +840,9 @@ class ParameterOptimizer:
         # Convert to DataFrame
         self.results = pd.DataFrame(results)
 
-        # Sort by optimization metric (descending)
+        # Sort by optimization metric (descending) with deterministic tie-breakers.
         if optimization_metric in self.results.columns:
-            self.results = self.results.sort_values(
-                optimization_metric,
-                ascending=False
-            ).reset_index(drop=True)
+            self.results = sort_results_stable(self.results, optimization_metric)
 
         # Calculate actual runtime
         actual_runtime = time.time() - start_time

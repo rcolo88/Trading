@@ -322,6 +322,10 @@ Exit conditions:
 
 This is **expected behavior** and matches how options behave in practice with end-of-day management.
 
+**Re-Entry After a Stop (No Cooldown)**: Within each trading day the backtester processes **exits before entries**, and a stop-loss exit does *not* consume the day's one-trade budget. So when a position is stopped out, a new position in the same strategy **can be opened the same day** if an entry signal still fires (VIX in range, a valid strike/debit, risk budget available). There is **no post-stop cooldown and no consecutive-loss circuit breaker** — if the regime keeps triggering stops, the backtester will keep re-entering one position per day. This is intentional: the backtest models a "re-enter whenever a fresh signal exists" rule. If you instead trade a *wait-after-stop* rule live, the backtest will over-trade relative to you. (Source of truth: the main loop in `src/backtester/optopsy_wrapper.py`.)
+
+**Minimum Holding Period (No Same-Day Round Trips)**: Because exits are evaluated before entries, a position opened on day *T* is not eligible for an exit check until day *T+1*. A position therefore **cannot be opened and closed on the same day** — the minimum hold is one trading bar. (The only exception is the forced close of any still-open position at the end of the backtest window.) One consequence: an intraday move that would breach a stop on the *entry* day is not captured at daily resolution — such a position is first re-priced at the next day's bar, consistent with the once-a-day-check assumption behind the `stop_slippage_percent` cost.
+
 ## Configuration
 
 Key configuration parameters in `config/config.yaml`:

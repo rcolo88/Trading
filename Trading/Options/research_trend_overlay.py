@@ -41,8 +41,6 @@ from src.data_fetchers.synthetic_generator import load_sample_spy_options_data  
 from src.data_fetchers.yahoo_options import fetch_spy_data                 # noqa: E402
 from src.utils.trend_gate import spy_trend_state, spy_trend_gate           # noqa: E402
 
-OPTIONS_FILE = "SPY_synthetic_options_2022-10-01_2026-04-09.csv"  # longest history = most signals
-
 
 def run(name, strategy_cls, cfg_key, cfg, opts, und, gate=None):
     scfg = {**cfg["strategies"][cfg_key]}
@@ -54,7 +52,8 @@ def run(name, strategy_cls, cfg_key, cfg, opts, und, gate=None):
 
 def main():
     cfg = yaml.safe_load(open("config/config.yaml"))
-    opts = load_sample_spy_options_data(specific_file=OPTIONS_FILE)
+    # Longest-history dataset now comes from config.yaml -> synthetic_data range.
+    opts = load_sample_spy_options_data(config=cfg)
     start = opts["quote_date"].min().strftime("%Y-%m-%d")
     end = opts["quote_date"].max().strftime("%Y-%m-%d")
     und = fetch_spy_data(start, end)

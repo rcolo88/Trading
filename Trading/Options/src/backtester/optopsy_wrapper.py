@@ -41,9 +41,11 @@ class OptopsyBacktester:
         self.cost_config = config.get('costs', {})
         # Fill model (see utils/execution.py): planned entries/exits use a limit fraction of the
         # spread; stop-loss exits use the market fraction (no stop-limit available). extra = flat %/leg.
+        # stop_slip = extra monitoring-lag overshoot booked on STOP exits only (fraction of entry debit).
         self.limit_frac = self.cost_config.get('limit_fill_fraction', 0.5)
         self.market_frac = self.cost_config.get('market_fill_fraction', 1.0)
         self.extra_slip = self.cost_config.get('extra_slippage_percent', 0.0)
+        self.stop_slip = self.cost_config.get('stop_slippage_percent', 0.0)
 
         self.start_date = pd.to_datetime(self.backtest_config.get('start_date'))
         self.end_date = pd.to_datetime(self.backtest_config.get('end_date'))
@@ -295,7 +297,8 @@ class OptopsyBacktester:
                     underlying_price=underlying_price,
                     limit_fraction=self.limit_frac,
                     market_fraction=self.market_frac,
-                    extra_slippage=self.extra_slip
+                    extra_slippage=self.extra_slip,
+                    stop_slippage=self.stop_slip
                 )
 
                 if exit_signal:

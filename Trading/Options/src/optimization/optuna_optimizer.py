@@ -306,12 +306,11 @@ def run_optuna_optimization(
     # Create DataFrame
     results_df: pd.DataFrame = pd.DataFrame(results_list)
 
-    # Sort by optimization metric (descending)
+    # Sort by optimization metric (descending) with deterministic tie-breakers, so the reported
+    # "best" matches the top of the saved leaderboard even when many trials tie on Sharpe.
+    from .parameter_optimizer import sort_results_stable
     if optimization_metric in results_df.columns:
-        results_df = results_df.sort_values(
-            optimization_metric,
-            ascending=False
-        ).reset_index(drop=True)
+        results_df = sort_results_stable(results_df, optimization_metric)
 
     # Calculate total time (including post-processing)
     total_time: float = time.time() - start_time
@@ -328,10 +327,22 @@ def run_optuna_optimization(
         print(f"Post-processing time: {total_time - elapsed_time:.1f} seconds ({(total_time - elapsed_time)/60:.1f} minutes)")
         print(f"Total runtime: {total_time:.1f} seconds ({total_time/60:.1f} minutes)")
         print(f"Average time per trial: {elapsed_time/n_trials:.2f} seconds")
-        print(f"\nBest {optimization_metric}: {study.best_value:.4f}")
-        print(f"Best parameters:")
-        for param_name, param_value in study.best_params.items():
-            print(f"  {param_name}: {param_value}")
+        # Report the best from the SORTED leaderboard (not study.best_params): with ties on the
+        # objective, Optuna's best_trial and the sorted top row can differ, so this guarantees the
+        # printed "Best parameters" match the top of "TOP 5". Falls back to the study if empty.
+        if not results_df.empty and optimization_metric in results_df.columns:
+            best_row = results_df.iloc[0]
+            param_names = list(parameter_optimizer.parameter_ranges.keys())
+            print(f"\nBest {optimization_metric}: {best_row[optimization_metric]:.4f}")
+            print(f"Best parameters:")
+            for param_name in param_names:
+                if param_name in best_row:
+                    print(f"  {param_name}: {best_row[param_name]}")
+        else:
+            print(f"\nBest {optimization_metric}: {study.best_value:.4f}")
+            print(f"Best parameters:")
+            for param_name, param_value in study.best_params.items():
+                print(f"  {param_name}: {param_value}")
         print(f"{'='*70}\n")
 
     return results_df

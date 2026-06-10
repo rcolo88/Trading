@@ -55,8 +55,28 @@ class SyntheticOptionsGenerator:
         self.volatility_window = volatility_window
         self.use_vix_for_iv = use_vix_for_iv
 
+        # IV-surface shape (so synthetic chains have real skew + term structure, not one flat IV).
+        # Without these every strike/expiration shares one IV, which makes calendars a free lunch and
+        # produces the degenerate ties + inflated Sharpe. Values are deliberately modest and SPY-like.
+        self.skew_slope = 0.60   # IV rises as strike falls (equity put skew); per unit log-moneyness
+        self.skew_curv = 1.50    # smile convexity (both deep wings richer)
+        self.term_slope = 0.10   # mild contango: longer-dated slightly higher IV (per year past 30d)
+        self.min_half_spread = 0.025  # floor on half bid/ask ($) so cheap options aren't priced tight
+
         self.underlying_data = None
         self.volatility = None
+
+    def _iv_surface(self, spot: float, strike: float, dte: int, base_vol: float) -> float:
+        """IV for one (strike, dte) from a base level: equity skew × mild term structure.
+
+        This is what makes the synthetic data non-degenerate — a calendar's near/far legs and a
+        vertical's two strikes now carry *different* IVs, so skew/term-structure risk is modelled
+        rather than assumed away. Still a model: use real data (data_source.mode=real) for conclusions.
+        """
+        m = np.log(strike / spot) if spot > 0 and strike > 0 else 0.0  # log-moneyness (<0 = low strike)
+        skew = 1.0 - self.skew_slope * m + self.skew_curv * m * m
+        term = 1.0 + self.term_slope * (dte - 30.0) / 365.0
+        return float(np.clip(base_vol * skew * term, 0.03, 3.0))
 
     def fetch_underlying_data(
         self,
@@ -282,13 +302,16 @@ class SyntheticOptionsGenerator:
         options = []
 
         for strike in strikes:
+            # Per-strike, per-expiration IV from the surface (skew + term structure), not a flat vol.
+            iv_k = self._iv_surface(spot_price, strike, dte, volatility)
+
             # Calculate call option
             call_data = calculate_all_greeks(
                 S=spot_price,
                 K=strike,
                 T=T,
                 r=self.risk_free_rate,
-                sigma=volatility,
+                sigma=iv_k,
                 option_type='call',
                 q=self.dividend_yield
             )
@@ -299,14 +322,14 @@ class SyntheticOptionsGenerator:
                 K=strike,
                 T=T,
                 r=self.risk_free_rate,
-                sigma=volatility,
+                sigma=iv_k,
                 option_type='put',
                 q=self.dividend_yield
             )
 
             # Add call option
             if add_spread:
-                spread = call_data['price'] * spread_pct / 2
+                spread = max(self.min_half_spread, call_data['price'] * spread_pct / 2)
                 call_bid = max(0.01, call_data['price'] - spread)
                 call_ask = call_data['price'] + spread
             else:
@@ -326,7 +349,7 @@ class SyntheticOptionsGenerator:
                 'last': call_data['price'],
                 'volume': np.random.randint(100, 5000),  # Synthetic volume
                 'open_interest': np.random.randint(500, 20000),  # Synthetic OI
-                'iv': volatility,
+                'iv': iv_k,
                 'delta': call_data['delta'],
                 'abs_delta': abs(call_data['delta']),  # Absolute delta for filtering
                 'gamma': call_data['gamma'],
@@ -336,7 +359,7 @@ class SyntheticOptionsGenerator:
 
             # Add put option
             if add_spread:
-                spread = put_data['price'] * spread_pct / 2
+                spread = max(self.min_half_spread, put_data['price'] * spread_pct / 2)
                 put_bid = max(0.01, put_data['price'] - spread)
                 put_ask = put_data['price'] + spread
             else:
@@ -521,7 +544,50 @@ def generate_spy_synthetic_data(
     )
 
 
-def load_sample_spy_options_data(specific_file: str = None) -> pd.DataFrame:
+def synthetic_data_filename(config: dict) -> str:
+    """Return the canonical synthetic-data CSV name for the `synthetic_data` config block.
+
+    This is the ONE place the naming convention lives -- the generator saves to this
+    name and every loader reads from it, so they can never drift apart.
+    """
+    sd = config["synthetic_data"]
+    return f"{sd['symbol']}_synthetic_options_{sd['start_date']}_{sd['end_date']}.csv"
+
+
+def real_data_filename(config: dict) -> str:
+    """Return the canonical CSV name for a REAL (DoltHub/logged) options dataset.
+
+    Mirrors `synthetic_data_filename` so `real_chain_loader.py` writes exactly the file this
+    module's loader reads when `data_source.mode: real`.
+    """
+    rd = config["real_data"]
+    return f"{rd['symbol']}_real_options_{rd['start_date']}_{rd['end_date']}.csv"
+
+
+def _load_options_config() -> dict:
+    """Read config/config.yaml from the project root (parent of src/)."""
+    import yaml
+    from pathlib import Path
+    config_path = Path(__file__).parent.parent.parent / "config" / "config.yaml"
+    with open(config_path, "r") as f:
+        return yaml.safe_load(f)
+
+
+def _read_options_csv(csv_file) -> pd.DataFrame:
+    """Read an options CSV, normalize the date columns, and print a short summary."""
+    import os
+    print(f"Loading data from: {os.path.basename(csv_file)}")
+    data = pd.read_csv(csv_file)
+    data['quote_date'] = pd.to_datetime(data['quote_date'])
+    data['expiration'] = pd.to_datetime(data['expiration'])
+    print(f"✓ Loaded {len(data):,} option contracts")
+    print(f"  Date range: {data['quote_date'].min().date()} to {data['quote_date'].max().date()}")
+    print(f"  Trading days: {data['quote_date'].nunique()}")
+    print(f"  Expirations: {data['expiration'].nunique()}")
+    return data
+
+
+def load_sample_spy_options_data(specific_file: str = None, config: dict = None) -> pd.DataFrame:
     """
     Load SPY options data from pre-generated synthetic data CSV.
 
@@ -533,8 +599,10 @@ def load_sample_spy_options_data(specific_file: str = None) -> pd.DataFrame:
     with option prices calculated using the Black-Scholes-Merton model.
 
     Args:
-        specific_file: Optional specific filename to load (e.g., "SPY_synthetic_options_2022-10-01_2026-04-09.csv")
-                       If None, loads the most recent file
+        specific_file: Optional explicit filename to load (escape hatch). If given,
+                       it overrides the config-derived dataset.
+        config: Optional pre-loaded config dict. If None (and no specific_file),
+                config/config.yaml is read to derive the dataset filename.
 
     Returns:
         DataFrame with synthetic options data
@@ -549,61 +617,62 @@ def load_sample_spy_options_data(specific_file: str = None) -> pd.DataFrame:
     project_root = Path(__file__).parent.parent.parent
     data_dir = project_root / "data" / "processed"
 
+    # Escape hatch: an explicit filename always wins.
     if specific_file:
         csv_file = data_dir / specific_file
         if not csv_file.exists():
             raise FileNotFoundError(f"Specified file not found: {csv_file}")
-        print(f"Loading data from: {os.path.basename(csv_file)}")
+        return _read_options_csv(csv_file)
 
-        data = pd.read_csv(csv_file)
+    cfg = config or _load_options_config()
 
-        # Convert date columns to datetime
-        data['quote_date'] = pd.to_datetime(data['quote_date'])
-        data['expiration'] = pd.to_datetime(data['expiration'])
+    # Real-data mode: load the DoltHub/logged dataset named by the real_data config block.
+    # This is the honest dataset (true skew + term structure); synthetic stays the default
+    # only for fast plumbing/CI runs.
+    if cfg.get("data_source", {}).get("mode") == "real":
+        real_name = real_data_filename(cfg)
+        real_path = data_dir / real_name
+        if not real_path.exists():
+            rd = cfg["real_data"]
+            raise FileNotFoundError(
+                f"data_source.mode=real but '{real_name}' is missing from data/processed/.\n"
+                f"   Build it first:\n"
+                f"   opt_venv/bin/python -m src.data_fetchers.real_chain_loader "
+                f"--start {rd['start_date']} --end {rd['end_date']}"
+            )
+        print(f"Loading REAL dataset: {real_name}")
+        return _read_options_csv(real_path)
 
-        print(f"✓ Loaded {len(data):,} option contracts")
-        print(f"  Date range: {data['quote_date'].min().date()} to {data['quote_date'].max().date()}")
-        print(f"  Trading days: {data['quote_date'].nunique()}")
-        print(f"  Expirations: {data['expiration'].nunique()}")
+    # Default: derive the canonical filename from the synthetic_data config block,
+    # so the file the generator wrote is exactly the file we load here.
+    derived_name = synthetic_data_filename(cfg)
+    derived_path = data_dir / derived_name
 
-        return data
-    else:
-        pattern = str(data_dir / "SPY_synthetic_options_*.csv")
-        csv_files = glob.glob(pattern)
+    if derived_path.exists():
+        print(f"Loading config-derived dataset: {derived_name}")
+        return _read_options_csv(derived_path)
 
-        if csv_files:
-            # Use the most recent file (by filename)
-            csv_file = sorted(csv_files)[-1]
-            print(f"Loading data from: {os.path.basename(csv_file)}")
+    # Config points at a dataset that hasn't been generated yet. Fall back to the
+    # MOST RECENTLY GENERATED csv (by mtime, not filename order) so work continues.
+    pattern = str(data_dir / "SPY_synthetic_options_*.csv")
+    csv_files = glob.glob(pattern)
+    if csv_files:
+        csv_file = max(csv_files, key=os.path.getmtime)
+        print(f"⚠️  Config dataset not found: {derived_name}")
+        print(f"   Falling back to most recently generated file: {os.path.basename(csv_file)}")
+        print(f"   (Run: python generate_synthetic_data.py  to build the config dataset.)")
+        return _read_options_csv(csv_file)
 
-            data = pd.read_csv(csv_file)
+    # If no CSV found at all, generate a small sample (2 months for quick testing)
+    print("⚠️  No synthetic data CSV found in data/processed/")
+    print("   Run: python generate_synthetic_data.py")
+    print("   Generating minimal sample dataset...")
 
-            # Convert date columns to datetime
-            data['quote_date'] = pd.to_datetime(data['quote_date'])
-            data['expiration'] = pd.to_datetime(data['expiration'])
-
-            print(f"✓ Loaded {len(data):,} option contracts")
-            print(f"  Date range: {data['quote_date'].min().date()} to {data['quote_date'].max().date()}")
-            print(f"  Trading days: {data['quote_date'].nunique()}")
-            print(f"  Expirations: {data['expiration'].nunique()}")
-
-            return data
-        else:
-            # If no CSV found, generate a small sample
-            print("⚠️  No synthetic data CSV found in data/processed/")
-            print("   Run: python generate_synthetic_data.py")
-            print("   Generating minimal sample dataset...")
-
-    # Generate a small sample dataset (2 months for quick testing)
     generator = SyntheticOptionsGenerator(symbol="SPY")
-
-    # Generate limited dataset for quick tests
-    data = generator.generate_historical_chains(
+    return generator.generate_historical_chains(
         start_date="2024-01-01",
         end_date="2024-02-29",
         include_weekly=False,  # Monthly only for speed
         max_dte=45,
         save_to_csv=False
     )
-
-    return data

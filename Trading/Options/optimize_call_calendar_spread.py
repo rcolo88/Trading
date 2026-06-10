@@ -30,12 +30,16 @@ warnings.filterwarnings('ignore')
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+import copy
+
 from src.strategies.calendar_spreads import CallCalendarSpread
 from src.backtester.optopsy_wrapper import OptopsyBacktester
 from src.data_fetchers.synthetic_generator import load_sample_spy_options_data
 from src.data_fetchers.yahoo_options import fetch_spy_data
-from src.optimization.parameter_optimizer import ParameterOptimizer
+from src.optimization.parameter_optimizer import ParameterOptimizer, add_stability_scores
 from src.optimization.results_compiler import compile_results
+from src.optimization import walk_forward
+from src.analysis.overfitting import summarize_overfitting
 
 
 def print_header() -> None:
@@ -56,14 +60,12 @@ def load_configuration() -> Dict[str, Any]:
     return config
 
 
-def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """Load options and underlying data."""
+def load_data(config: Dict[str, Any]) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Load options and underlying data (dataset is the config-derived synthetic file)."""
     print("Loading market data...")
 
-    # Load options data - use specific file for full date range
-    options_data: pd.DataFrame = load_sample_spy_options_data(
-        specific_file="SPY_synthetic_options_2022-10-01_2026-04-09.csv"
-    )
+    # Load options data -- the file named by config/config.yaml -> synthetic_data
+    options_data: pd.DataFrame = load_sample_spy_options_data(config=config)
 
     # Load underlying data
     start_date: str = options_data['quote_date'].min().strftime('%Y-%m-%d')
@@ -95,13 +97,19 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
 
     # Reflective parameter ranges (Optuna samples N_TRIALS of these, so the span is free —
     # runtime is governed by N_TRIALS below, not the combination count).
-    #   * far_dte is capped at 63: the synthetic chains only carry options out to ~65 DTE, so a
-    #     longer far leg silently finds nothing. To test 60-90 DTE far legs, regenerate the data
-    #     with a higher max_dte (generate_synthetic_data.py) first.
+    #   * The far leg can't exceed the longest DTE actually present in the data, or those
+    #     trials silently find no contract. We derive that cap from the loaded data (which is
+    #     governed by config/config.yaml -> synthetic_data.max_dte at generation time) and
+    #     round it down to the step grid -- no more hand-coding it against the generator.
     #   * near_dte < far_dte and vix_min < vix_max by construction, so no trial is wasted on an
     #     invalid ordering.
+    FAR_DTE_STEP = 7
+    FAR_DTE_FLOOR = 42
+    data_max_dte = int(options_data['dte'].max())
+    far_dte_cap = max(FAR_DTE_FLOOR, (data_max_dte // FAR_DTE_STEP) * FAR_DTE_STEP)
+
     optimizer.set_parameter_range('near_dte', min=7, max=35, step=7)        # sell the near leg
-    optimizer.set_parameter_range('far_dte', min=42, max=63, step=7)        # buy the far leg (<=65 data cap)
+    optimizer.set_parameter_range('far_dte', min=FAR_DTE_FLOOR, max=far_dte_cap, step=FAR_DTE_STEP)  # buy the far leg
     optimizer.set_parameter_range('target_delta', min=0.40, max=0.55, step=0.05)  # ATM-ish
     optimizer.set_parameter_range('profit_target', min=0.10, max=0.60, step=0.10)
     optimizer.set_parameter_range('stop_loss', min=-0.50, max=-0.10, step=0.10)
@@ -111,6 +119,7 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
 
     total: int = optimizer.get_total_combinations()
     print(f"  ✓ Optimizer configured")
+    print(f"  ✓ far_dte cap from data: max DTE {data_max_dte} → far_dte ∈ [{FAR_DTE_FLOOR}, {far_dte_cap}]")
     print(f"  ✓ Total combinations: {total:,}")
     print(f"  ⏱  Estimated runtime: {total * 1.5 / 60:.1f} - {total * 2 / 60:.1f} minutes\n")
 
@@ -187,6 +196,9 @@ def save_results(results: pd.DataFrame, optimizer: ParameterOptimizer, config: D
     filename: str = f'CallCalendarSpread_{timestamp}.csv'
     filepath: Path = results_dir / filename
 
+    # Add neighborhood-stability scores so robust plateaus are visible next to lucky spikes.
+    results = add_stability_scores(results, optimizer.parameter_ranges, metric='sharpe_ratio')
+
     # Save full results
     results.to_csv(filepath, index=False)
 
@@ -195,7 +207,8 @@ def save_results(results: pd.DataFrame, optimizer: ParameterOptimizer, config: D
 
     # Determine which columns to display (parameters + key metrics)
     param_cols: list = list(optimizer.parameter_ranges.keys())
-    metric_cols: list = ['sharpe_ratio', 'total_return_pct', 'max_drawdown_pct', 'win_rate_pct']
+    metric_cols: list = ['sharpe_ratio', 'stability_score', 'total_return_pct',
+                         'max_drawdown_pct', 'win_rate_pct']
     display_cols: list = [col for col in param_cols + metric_cols if col in best.columns]
 
     # Print summary
@@ -208,6 +221,17 @@ def save_results(results: pd.DataFrame, optimizer: ParameterOptimizer, config: D
     print("-"*70)
     print(best[display_cols].to_string(index=False))
     print("="*70)
+
+    # Overfitting check: deflate the best Sharpe for the number of trials searched.
+    bt = config.get('backtest', {})
+    n_obs = max(len(pd.bdate_range(bt.get('start_date'), bt.get('end_date'))), 2)
+    try:
+        diag = summarize_overfitting(results, n_obs=n_obs, metric='sharpe_ratio')
+        print("OVERFITTING / SELECTION CHECK (deflated Sharpe):")
+        print(f"  {diag.get('note', diag)}")
+        print("="*70)
+    except Exception as exc:  # never let reporting break a completed run
+        print(f"  (deflated-Sharpe check skipped: {exc})")
     print(f"Completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*70 + "\n")
 
@@ -219,6 +243,64 @@ def save_results(results: pd.DataFrame, optimizer: ParameterOptimizer, config: D
         config=config
     )
     print(f"✓ Compiled results saved to: {master_path}\n")
+
+
+def run_walk_forward(config, options_data, underlying_data, entry_gate) -> int:
+    """Optimize on an in-sample window, then score the chosen params on an untouched OOS window.
+
+    This is the honest test: a real edge keeps most of its Sharpe out-of-sample; an overfit optimum
+    collapses. Enable with `--wf` (and optionally `--oos-frac=0.25`).
+    """
+    from src.optimization.parameter_optimizer import sort_results_stable
+
+    bt = config['backtest']
+    oos_frac = 0.30
+    for a in sys.argv:
+        if a.startswith('--oos-frac='):
+            oos_frac = float(a.split('=', 1)[1])
+
+    is_win, oos_win = walk_forward.split_window(bt['start_date'], bt['end_date'], oos_frac)
+    print("\n" + "=" * 70)
+    print(f"WALK-FORWARD  in-sample {is_win[0]}..{is_win[1]}  |  out-of-sample {oos_win[0]}..{oos_win[1]}")
+    print("=" * 70 + "\n")
+
+    # Optimize on IS only.
+    is_config = copy.deepcopy(config)
+    is_config['backtest']['start_date'], is_config['backtest']['end_date'] = is_win
+    optimizer = setup_optimizer(is_config, options_data, underlying_data, entry_gate)
+    results = sort_results_stable(run_optimization(optimizer), 'sharpe_ratio')
+
+    # Pull the chosen (best IS) parameters, casting integral grid values back to int.
+    row = results.iloc[0]
+    def _cast(v):
+        f = float(v)
+        return int(f) if f.is_integer() else f
+    best_params = {p: _cast(row[p]) for p in optimizer.parameter_ranges.keys() if p in row}
+
+    # Score those exact params on the held-out OOS window.
+    oos = walk_forward.evaluate_params(
+        config, 'calendar', CallCalendarSpread, options_data, underlying_data,
+        oos_win, best_params, entry_gate,
+    )
+    is_sharpe = float(row['sharpe_ratio'])
+    oos_sharpe = float(oos.get('sharpe_ratio', float('nan')))
+
+    print("\n" + "=" * 70)
+    print("WALK-FORWARD RESULT (best in-sample params scored on the untouched OOS window)")
+    print("=" * 70)
+    print(f"  params: {best_params}")
+    print(f"  IS  Sharpe: {is_sharpe:7.3f}  | IS  return: {float(row.get('total_return_pct', float('nan'))):7.2f}%")
+    print(f"  OOS Sharpe: {oos_sharpe:7.3f}  | OOS return: {float(oos.get('total_return_pct', float('nan'))):7.2f}%"
+          f"  | OOS trades: {oos.get('total_trades', '?')}")
+    if 'error' in oos:
+        print(f"  OOS note: {oos['error']}")
+    verdict = 'healthy — edge survives OOS' if (oos_sharpe > 1.0 and oos_sharpe > 0.5 * is_sharpe) \
+        else 'LARGE degradation — treat the IS optimum as overfit'
+    print(f"  IS→OOS Sharpe drop: {is_sharpe - oos_sharpe:7.3f}  ({verdict})")
+    print("=" * 70 + "\n")
+
+    save_results(results, optimizer, is_config)
+    return 0
 
 
 def main() -> int:
@@ -233,7 +315,7 @@ def main() -> int:
             print("   Recommended: caffeinate -i python optimize_call_calendar_spread.py\n")
 
         config = load_configuration()
-        options_data, underlying_data = load_data()
+        options_data, underlying_data = load_data(config)
 
         # --TR overlays the SPY Trend Reversal signal: only open trades on 'green' (bullish) days.
         entry_gate = None
@@ -242,6 +324,10 @@ def main() -> int:
             end = options_data['quote_date'].max().strftime('%Y-%m-%d')
             entry_gate = spy_trend_gate(end, 'bull')
             print("  --TR ON: gating entries to SPY Trend Reversal 'green' (bullish) days only.\n")
+
+        # --wf: optimize in-sample, then score the winner out-of-sample (overfit check).
+        if '--wf' in sys.argv:
+            return run_walk_forward(config, options_data, underlying_data, entry_gate)
 
         optimizer = setup_optimizer(config, options_data, underlying_data, entry_gate)
         results = run_optimization(optimizer)

@@ -1,0 +1,12 @@
+[
+  {
+    "strategy": "call_calendar",
+    "option_type": "call",
+    "strike": 738.0,
+    "near_expiration": "2026-06-09",
+    "far_expiration": "2026-06-11",
+    "entry_debit": 2.5,
+    "contracts": 2,
+    "entry_date": "2026-06-05"
+  }
+]

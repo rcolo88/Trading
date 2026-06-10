@@ -5,18 +5,42 @@ underlying:
   symbol: SPY
   name: "SPDR S&P 500 ETF Trust"
 
-# Backtesting period
+# Synthetic data generation spec (single source of truth for generate + optimize).
+# generate_synthetic_data.py writes a CSV named from these values, and every
+# consumer (optimizers, research scripts) loads that same derived filename.
+# Change the dataset here once -- no script edits needed.
+synthetic_data:
+  symbol: SPY
+  start_date: "2024-01-01"
+  end_date: "2026-06-01"
+  max_dte: 90
+
+# Backtesting period (the window a backtest runs over; may be a SUBSET of the
+# synthetic_data range above -- these are distinct from the generation range).
 backtest:
-  start_date: "2024-01-01"  # Matches synthetic data start date
-  end_date: "2026-04-01"    # Matches synthetic data end date
+  start_date: "2025-10-01"
+  end_date: "2026-06-01"
   initial_capital: 10000
 
 # Data source configuration
 data_source:
+  # Which options dataset the loader (load_sample_spy_options_data) serves:
+  #   synthetic -> Black-Scholes model data (flat IV, no skew/term structure) — FAST, for
+  #                plumbing/CI only; results are NOT tradeable (calendar Sharpe is an artifact).
+  #   real      -> DoltHub/logged chains with true skew + term structure — use for any real
+  #                conclusion. Build with: python -m src.data_fetchers.real_chain_loader ...
+  mode: "real"        # synthetic | real
   primary: "quantconnect"  # Options: quantconnect, yahoo, polygon, schwab
   backup: "yahoo"  # For underlying price data
   cache_enabled: true
   cache_dir: "data/processed"
+
+# Real options dataset spec (used when data_source.mode == real). The real_chain_loader writes
+# data/processed/SPY_real_options_<start>_<end>.csv from these values, and the loader reads it.
+real_data:
+  symbol: SPY
+  start_date: "2025-10-01"
+  end_date: "2026-06-08"
 
 # Transaction costs / fill model (see src/utils/execution.py)
 costs:
@@ -26,6 +50,10 @@ costs:
   limit_fill_fraction: 0.5        # entries + planned/profit-target/DTE exits (working limit orders)
   market_fill_fraction: 1.0       # stop-loss exits ONLY — a market order (no stop-limit available)
   extra_slippage_percent: 0.0     # optional flat extra %/leg on top, for illiquid names (SPY: ~0)
+  stop_slippage_percent: 0.10     # STOP exits ONLY: extra loss as a fraction of the entry debit, for
+                                  #   monitoring-lag overshoot when no resting multi-leg stop exists
+                                  #   (Robinhood). 0.10 turns an intended -10% stop into a ~-20% fill.
+                                  #   SPY calendars: 0.05-0.10 is reasonable; set 0 to disable.
 
 # Strategy parameters
 strategies:
@@ -76,8 +104,8 @@ strategies:
     entry:
       # DTE Configuration - Two approaches supported:
       # Approach 1 (Default): Center ± Tolerance
-      near_dte: 15           # Sell 30 DTE call (center point)
-      far_dte: 50            # Buy 60 DTE call (center point)
+      near_dte: 14           # Sell 30 DTE call (center point)
+      far_dte: 42            # Buy 60 DTE call (center point)
       dte_tolerance: 5       # +/- 1 day tolerance (creates range: 14-16 and 49-51)
 
       # Approach 2 (For Optimizer): Min/Max Ranges
@@ -92,14 +120,17 @@ strategies:
       target_delta: 0.4     # Used if strike_selection = "delta"
       moneyness: 0.0         # Used if strike_selection = "moneyness" (0.0 = ATM)
       min_debit: 0.5         # Minimum debit to enter (optional)
-      max_debit: 28.0        # Maximum debit to enter (increased for SPY ~$530)
+      max_debit: 10.0        # Maximum debit to enter (increased for SPY ~$530)
       vix_min: 5            # Calendars prefer low VIX environment
-      vix_max: 20            # Don't enter if VIX > 20 (defeats calendar purpose)
+      vix_max: 25            # Don't enter if VIX > 20 (defeats calendar purpose)
     exit:
       profit_target: 0.3    # Close at 30% profit
       stop_loss: -0.1        # Stop at 10% loss
       dte_exit: 5            # Exit when near-term has 7 DTE left
       max_underlying_move: 0.10  # Exit if underlying moves >10% from strike
+      strike_snap_pct: 0.01  # Re-mark a held leg at the nearest quoted strike within this % of spot
+                             #   when its exact strike isn't quoted (real chains are sparse). 0.01
+                             #   (~$7 on SPY) bridges the median gap with minimal distortion; 0 = off.
 
   iron_condor:              # Market-neutral credit spread (bull put + bear call)
     enabled: true
@@ -123,7 +154,7 @@ strategies:
 # Position sizing
 position_sizing:
   method: "fixed_risk"  # Options: fixed_risk, kelly
-  max_risk_percent: 50.0  # Maximum portfolio risk exposure (% of current portfolio value)
+  max_risk_percent: 10.0  # Maximum portfolio risk exposure (% of current portfolio value)
 
   # Kelly Criterion percentages (manually updated from Kelly_Criteria notebook)
   # Workflow:
