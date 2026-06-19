@@ -153,8 +153,13 @@ def _pit_from_changes(current: list[str], changes: pd.DataFrame,
     return pd.DataFrame(records).sort_values("date")
 
 
+# PIT history always goes back this far regardless of the analysis start_date in config.
+# Changing start_date in config.yaml never requires re-running fetch.
+_PIT_HISTORY_START = "2010-01-01"
+
+
 def build_pit_membership(cache_dir: Path,
-                         start: str = "2010-01-01") -> pd.DataFrame:
+                         start: str = _PIT_HISTORY_START) -> pd.DataFrame:
     """Load or build the point-in-time S&P 1500 membership table.
 
     Returns a DataFrame with columns: date (Timestamp), ticker (str), sub_index (str).
@@ -163,7 +168,13 @@ def build_pit_membership(cache_dir: Path,
     """
     cache_path = cache_dir / "universe_pit.parquet"
     if cache_path.exists():
-        return pd.read_parquet(cache_path)
+        cached = pd.read_parquet(cache_path)
+        # Rebuild if the cached PIT doesn't cover our full history start
+        if not cached.empty and pd.to_datetime(cached["date"].min()) > pd.Timestamp(_PIT_HISTORY_START) + pd.Timedelta(days=365):
+            print(f"PIT cache only starts {cached['date'].min().date()} — rebuilding from {_PIT_HISTORY_START} …")
+            cache_path.unlink()
+        else:
+            return cached
 
     print("Building point-in-time S&P 1500 membership (Wikipedia) …")
     all_records: list[pd.DataFrame] = []
@@ -173,7 +184,7 @@ def build_pit_membership(cache_dir: Path,
             tables  = _fetch_html(url)
             current = _current_tickers(tables)
             changes = _parse_changes(tables)
-            pit     = _pit_from_changes(current, changes, history_start=start)
+            pit     = _pit_from_changes(current, changes, history_start=_PIT_HISTORY_START)
             pit["sub_index"] = sub_idx
             all_records.append(pit)
             print(f"  {sub_idx}: {len(current)} current members, "
@@ -209,10 +220,12 @@ def get_members_on(pit_df: pd.DataFrame, query_date: pd.Timestamp) -> set[str]:
 
     For each ticker, the most recent 'add' event on or before query_date counts.
     If the ticker's most recent event is 'remove', it is excluded.
+    If query_date precedes all PIT events, falls back to the earliest snapshot.
     """
     past = pit_df[pit_df["date"] <= query_date]
     if past.empty:
-        return set()
+        # query_date is before the PIT history starts — use earliest available snapshot
+        past = pit_df[pit_df["date"] == pit_df["date"].min()]
     latest = past.sort_values("date").groupby("ticker").last().reset_index()
     return set(latest.loc[latest["action"] == "add", "ticker"])
 

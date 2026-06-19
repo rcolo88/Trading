@@ -66,7 +66,7 @@ def cmd_fetch(cfg: dict) -> None:
     cache_dir = _HERE / cfg["data"]["cache_dir"]
 
     print("─── Point-in-time S&P 1500 membership ──────────────────────────────")
-    pit_df = univ_mod.build_pit_membership(cache_dir, start=cfg["data"]["start_date"])
+    pit_df = univ_mod.build_pit_membership(cache_dir)   # always builds from 2010
     ever   = univ_mod.get_all_ever_members(pit_df)
     today  = univ_mod.get_members_on(pit_df, pd.Timestamp.today())
     print(f"  Ever in S&P 1500: {len(ever)} unique tickers")
@@ -198,6 +198,25 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
 
     today  = prices.index[-1]
     stocks = prices.drop(columns=["SPY"], errors="ignore")
+
+    # ── Staleness guard: SPY must be fresh ───────────────────────────────────
+    spy_last = prices["SPY"].dropna().index.max() if "SPY" in prices.columns else None
+    if spy_last is None or (today - spy_last).days > 7:
+        print(f"\nERROR: SPY price data is stale (last real close: "
+              f"{spy_last.date() if spy_last else 'N/A'}, panel end: {today.date()}).")
+        print("  The market factor, regime filter, and residual signals are unreliable.")
+        print("  Run `python csmom.py fetch` to refresh the price cache, then try again.")
+        return
+
+    # ── Drop tickers whose last real close is stale ──────────────────────────
+    last_valid = stocks.apply(lambda c: c.dropna().index.max() if c.notna().any() else pd.NaT)
+    stale_mask = last_valid < (today - pd.Timedelta(days=7))
+    stale_cols = list(last_valid[stale_mask].index)
+    if stale_cols:
+        print(f"\nWARNING: {len(stale_cols)} tickers have stale prices (last close > 7 days ago).")
+        print(f"  Excluded from ideas: {', '.join(stale_cols[:10])}"
+              + (f" … +{len(stale_cols)-10} more" if len(stale_cols) > 10 else ""))
+        stocks = stocks.drop(columns=stale_cols)
 
     # Current PIT members
     if pit_df is not None:

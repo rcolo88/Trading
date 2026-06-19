@@ -64,7 +64,7 @@ class PurgedKFoldPanel:
 
         # Sort by event date (level 1) to ensure calendar ordering
         event_dates = X.index.get_level_values("date")
-        sort_order  = np.argsort(event_dates, stable=True)
+        sort_order  = np.argsort(event_dates.to_numpy(), stable=True)
         indices     = np.arange(len(X))
 
         # Split sorted indices into n_splits contiguous calendar blocks
@@ -99,7 +99,7 @@ class PurgedKFoldPanel:
                 )
                 # Also allow training samples that come AFTER the embargo cutoff
                 after_embargo = ed_train >= embargo_cutoff
-                train_idx = train_candidates[keep | after_embargo.values]
+                train_idx = train_candidates[keep | np.asarray(after_embargo)]
             else:
                 # No t1: use simple embargo on event dates
                 ed_train  = pd.DatetimeIndex(event_dates[train_candidates])

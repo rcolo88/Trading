@@ -7,12 +7,13 @@ universe:
 
 data:
   # ── DATE RANGE ──────────────────────────────────────────────────────
-  # Change these to restrict or extend the backtest window.
-  # NOTE: the signal needs 12 months of warmup (set by signal.window below),
-  # so the first usable trade signals appear ~1 year after start_date.
-  # You do NOT need to re-run "fetch" just because you change these dates
-  # (the price cache already covers 2010-2025).
-  start_date: "2023-01-01"   # ← change this (e.g. "2023-01-01" for recent-only)
+  # start_date controls the ANALYSIS window (IS + OOS split).
+  # The cache always stores data from 2010 onward for warmup headroom,
+  # so changing start_date never requires re-running "fetch".
+  # With a 70/30 walk-forward split, OOS ≈ the last 30% of this range:
+  #   start 2015 → OOS covers roughly 2022–2026 (recent dynamics)
+  #   start 2010 → OOS covers roughly 2018–2026 (longer historical view)
+  start_date: "2015-01-01"   # ← change this; OOS (30%) naturally covers ~2022–2026
   end_date:   "2026-06-01"   # ← change this (e.g. "2026-06-01")
   cache_dir:  "outputs/cache"
 

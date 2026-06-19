@@ -32,7 +32,11 @@ def _rolling_capm_beta(stocks: pd.DataFrame, mkt: pd.Series, window: int) -> pd.
 
 
 def _log_ret(prices: pd.DataFrame) -> pd.DataFrame:
-    return np.log1p(prices.ffill(limit=3).pct_change().replace([np.inf, -np.inf], np.nan))
+    # ffill(limit=3) handles genuine ≤3-day halts; fill_method=None ensures
+    # longer gaps stay NaN (prevents phantom signals from stale tickers).
+    return np.log1p(
+        prices.ffill(limit=3).pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -59,7 +63,7 @@ def residual_momentum(prices: pd.DataFrame, window: int = 252, skip: int = 21) -
 
 def naive_momentum(prices: pd.DataFrame, window: int = 252, skip: int = 21) -> pd.DataFrame:
     """Standard 12-1 cross-sectional price momentum (raw cumulative return, skip last month)."""
-    ret    = prices.ffill(limit=3).pct_change().replace([np.inf, -np.inf], np.nan)
+    ret    = prices.ffill(limit=3).pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan)
     stocks = ret.drop(columns=["SPY"], errors="ignore")
     return stocks.rolling(window).sum() - stocks.rolling(skip).sum()
 
