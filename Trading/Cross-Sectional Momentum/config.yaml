@@ -14,7 +14,9 @@ data:
   #   start 2015 → OOS covers roughly 2022–2026 (recent dynamics)
   #   start 2010 → OOS covers roughly 2018–2026 (longer historical view)
   start_date: "2015-01-01"   # ← change this; OOS (30%) naturally covers ~2022–2026
-  end_date:   "2026-06-01"   # ← change this (e.g. "2026-06-01")
+  end_date:   "2026-06-01"   # BACKTEST analysis window only. `fetch`/`ideas` ignore
+                             #   this and always pull through today's close, so live
+                             #   trade ideas price off current market data.
   cache_dir:  "outputs/cache"
 
 signal:

@@ -57,6 +57,17 @@ def load_config(path: Path = _HERE / "config.yaml") -> dict:
         return yaml.safe_load(f)
 
 
+def _live_end() -> str:
+    """End date for LIVE commands (`fetch`, `ideas`).
+
+    Returns *tomorrow* (yfinance's `end` is exclusive) so the download always
+    includes the most recent available close. The config `end_date` only bounds
+    the *backtest* analysis window — live trade ideas must price off current
+    market data, never a hard-coded historical date.
+    """
+    return (pd.Timestamp.today().normalize() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  fetch
 # ─────────────────────────────────────────────────────────────────────────────
@@ -73,10 +84,12 @@ def cmd_fetch(cfg: dict) -> None:
     print(f"  In index today  : {len(today)} tickers")
 
     print("\n─── Price panel download ─────────────────────────────────────────────")
+    live_end = _live_end()   # always refresh through the latest available close
+    print(f"  Refreshing prices through {live_end} (today) — config end_date is backtest-only.")
     prices = data_mod.load_price_panel(
         tickers  = ever,
         start    = cfg["data"]["start_date"],
-        end      = cfg["data"]["end_date"],
+        end      = live_end,
         cache_dir= cache_dir,
     )
     spy = prices.get("SPY", None)
@@ -192,14 +205,27 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
     prices = data_mod.load_price_panel(
         tickers  = ever,
         start    = cfg["data"]["start_date"],
-        end      = cfg["data"]["end_date"],
+        end      = _live_end(),   # live ideas price off the latest available close
         cache_dir= cache_dir,
     )
 
     today  = prices.index[-1]
     stocks = prices.drop(columns=["SPY"], errors="ignore")
 
-    # ── Staleness guard: SPY must be fresh ───────────────────────────────────
+    # ── Freshness guard #1: panel must be current vs the real calendar ───────
+    # The panel's own last date is "today" for scoring, but if that date lags
+    # the wall-clock by more than a few days the whole snapshot is stale and we
+    # would price entries/stops/targets off old closes. Catch that explicitly.
+    wall_today = pd.Timestamp.today().normalize()
+    panel_lag  = (wall_today - today).days
+    if panel_lag > 5:
+        print(f"\nERROR: price panel is stale — latest close is {today.date()}, "
+              f"{panel_lag} days behind today ({wall_today.date()}).")
+        print("  Entry/stop/target prices and momentum would be computed off old data.")
+        print("  Run `python csmom.py fetch` to refresh the price cache, then try again.")
+        return
+
+    # ── Freshness guard #2: SPY must be consistent with the rest of the panel ─
     spy_last = prices["SPY"].dropna().index.max() if "SPY" in prices.columns else None
     if spy_last is None or (today - spy_last).days > 7:
         print(f"\nERROR: SPY price data is stale (last real close: "

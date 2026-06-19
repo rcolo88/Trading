@@ -57,18 +57,24 @@ def load_price_panel(
 
         missing = [t for t in needed_yf if inv_map.get(t, t) not in cached.columns]
         if not missing:
+            # Freshness is judged by the MOST RECENT close in the cache (the latest
+            # market trading day we hold), NOT by every individual ticker. Names that
+            # have legitimately stopped trading (delisted/acquired/halted) will never
+            # update again, so requiring *all* tickers to be current would force a
+            # full re-download on every run. Individually-stale tickers are dropped
+            # downstream by the per-ticker freshness guard in `ideas`.
             last_valid = cached.apply(lambda c: c.dropna().index.max())
-            stale = last_valid[last_valid < (target_end - pd.tseries.offsets.BDay(5))]
-            if stale.empty:
+            cutoff     = target_end - pd.tseries.offsets.BDay(5)
+            panel_last = last_valid.max()           # latest market close we hold
+            if panel_last >= cutoff:
                 present = [t for t in tickers + ["SPY"] if t in cached.columns]
                 panel   = cached[present].loc[start:end]
                 print(f"Loaded price cache: {len(present)} tickers × {len(panel)} days  "
                       f"(history from {cached.index.min().date()}, "
-                      f"fresh through {cached.index.max().date()})")
+                      f"fresh through {panel_last.date()})")
                 return panel
-            print(f"Cache STALE: {len(stale)} tickers last valid before "
-                  f"{(target_end - pd.tseries.offsets.BDay(5)).date()} "
-                  f"(oldest: {stale.min().date()}).  Re-downloading all …")
+            print(f"Cache STALE: latest close {panel_last.date()} is behind "
+                  f"{cutoff.date()}.  Re-downloading all …")
         else:
             print(f"Cache missing {len(missing)} tickers; re-downloading all …")
 
