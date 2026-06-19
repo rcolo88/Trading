@@ -42,73 +42,30 @@ That's it. Ideas are written to `outputs/ideas_TIMESTAMP.txt` and `.json`.
 
 ## What each command does (plain English)
 
-### `fetch` — download data (run once, then re-run monthly)
+### Step 1 — `fetch` (run once, then monthly)
 
-**This is the step that upgrades the universe from S&P 500 → S&P 1500.**
+Downloads prices for every stock ever in the S&P 500/400/600 from Yahoo Finance
+and reconstructs *which* stocks were in the index *on each date*, so the backtest
+never looks ahead.  First run takes 20–40 minutes; after that the cache makes it
+under a minute.
 
-Downloads historical daily prices for every stock that has ever been in the
-S&P 500, S&P 400, and S&P 600 from Yahoo Finance, and also reconstructs
-*which* stocks were in each index *on each date* (so the backtest doesn't
-cheat by knowing in advance which stocks later made it into the index).
+### Step 2 — `backtest --meta`
 
-- First run: 20–40 minutes (≈1 500 tickers, 15+ years of daily prices).
-- Subsequent runs: under a minute — data is cached to `outputs/cache/prices.parquet`.
-- Until you run this, `backtest` and `ideas` use the current S&P 500 only and
-  print a warning to remind you.
-- Output: `outputs/cache/universe_pit.parquet` (point-in-time index membership)
-  and `outputs/cache/prices.parquet` (price history).
-
-### `backtest` — walk-forward backtest
-
-Splits the date range in `config.yaml` 70% in-sample / 30% out-of-sample,
-fits the strategy on the in-sample window, and reports performance only on
-the out-of-sample period.  This is the standard guard against overfitting.
-
-Also runs the **Deflated Sharpe Ratio** test automatically, which adjusts the
-Sharpe ratio downward to account for the fact that you tried multiple parameter
-configurations — a Sharpe of 1.0 after testing 10 variations isn't as
-impressive as a Sharpe of 1.0 from the first try.
-
-```
-python csmom.py backtest                   # primary signal only, fast (~30 sec)
-python csmom.py backtest --meta            # adds the ML filter (RandomForest trained
-                                           # on IS data, predicts take/skip each trade)
-python csmom.py backtest --mcpt 1000       # also runs 1 000 permutation shuffles to
-                                           # compute a p-value ("could this be luck?")
-python csmom.py backtest --oos-frac 0.40   # use 40% as the OOS holdout instead of 30%
-```
+Splits the date range 70% in-sample / 30% out-of-sample, validates the strategy
+on the out-of-sample period only, and trains a RandomForest ML filter (the "meta
+model") on the in-sample data.  The trained model is saved to `outputs/meta_model.pkl`
+so that `ideas` can use it.  Also runs the Deflated Sharpe Ratio test to guard
+against overfitting.
 
 Output: `outputs/backtest_TIMESTAMP.[txt|json|png]`
 
-### `ideas` — today's ranked trade ideas
+### Step 3 — `ideas`
 
-Scores every current index member as of the latest data date, ranks them by
-residual momentum, and prints the top-N longs with:
-- Signal score (higher = stronger momentum relative to market)
-- **P(take)** — the ML meta-model's probability that this position will hit its profit target (real predictions when the model is available; 100% placeholder otherwise)
-- Suggested entry price (last close)
-- Stop-loss level (based on stock's own volatility)
-- Profit-target level
-- Suggested holding horizon (42 trading days ≈ 2 months, adjustable in config)
-
-**To get real P(take) scores:** run `backtest --meta` first.  That trains the
-RandomForest meta-model and saves it to `outputs/meta_model.pkl`.  The `ideas`
-command then loads it automatically and filters to candidates with P(take) ≥ 55%
-(configurable via `meta_labeling.min_prob_take` in `config.yaml`), sorted by
-P(take) descending.  If no model file is found, a warning is printed and the
-signal-score ranking is used with a 100% placeholder.
-
-**Recommended workflow:**
-```
-python csmom.py fetch               # Step 1: build universe + download prices
-python csmom.py backtest --meta     # Step 2: walk-forward backtest, saves ML model
-python csmom.py ideas --top 25      # Step 3: real ML-filtered trade ideas
-```
-
-```
-python csmom.py ideas --top 25    # top 25 ideas (default)
-python csmom.py ideas --top 50    # top 50
-```
+Scores every current index member, loads the saved ML model, filters to stocks
+where the model predicts P(take) ≥ 55% (i.e. likely to hit their profit target),
+and prints the top ranked longs with entry price, stop-loss, profit target, and
+holding horizon.  If no model file exists yet, it falls back to the raw signal
+ranking with a warning.
 
 Output: `outputs/ideas_TIMESTAMP.[txt|json]`
 
