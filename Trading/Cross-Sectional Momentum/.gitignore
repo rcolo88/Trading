@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+
+# generated data files
+outputs/cache/
+spike_cache/
+
+# generated report artifacts
+outputs/backtest_*.txt
+outputs/backtest_*.json
+outputs/backtest_*.png
+outputs/ideas_*.txt
+outputs/ideas_*.json
+spike_output.log

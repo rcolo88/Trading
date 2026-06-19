@@ -1,0 +1,62 @@
+# Cross-Sectional Residual Momentum — Strategy Config
+# All date/numeric parameters are exposed here; no magic numbers in code.
+
+universe:
+  index: combined_sp            # sp500 | sp400 | sp600 | combined_sp
+  min_pit_history_days: 126     # require a name to have been in index ≥ 6 months before using it
+
+data:
+  # ── DATE RANGE ──────────────────────────────────────────────────────
+  # Change these to restrict or extend the backtest window.
+  # NOTE: the signal needs 12 months of warmup (set by signal.window below),
+  # so the first usable trade signals appear ~1 year after start_date.
+  # You do NOT need to re-run "fetch" just because you change these dates
+  # (the price cache already covers 2010-2025).
+  start_date: "2023-01-01"   # ← change this (e.g. "2023-01-01" for recent-only)
+  end_date:   "2026-06-01"   # ← change this (e.g. "2026-06-01")
+  cache_dir:  "outputs/cache"
+
+signal:
+  window: 252                   # momentum lookback (trading days, ≈12 months)
+  skip:   21                    # skip recent bars (trading days, ≈1 month reversal filter)
+  quantile: 0.80                # top-quantile threshold for long selection (0.80 = top quintile)
+
+regime_filter:
+  enabled: true
+  spy_ma_days: 200              # SPY must be above its N-day MA to take new longs
+  vol_cap: 0.25                 # annualised SPY vol above which exposure is reduced
+
+vol_scaling:
+  enabled: true
+  target_vol: 0.15              # target annualised portfolio vol (15%)
+  estimation_window: 63         # trailing days for realised vol estimate
+
+portfolio:
+  rebal_freq: 5                 # rebalance every N trading days (5 = weekly)
+  max_names: 100                # cap number of longs (avoid hairline weights)
+  min_names: 10                 # need at least this many longs to trade
+
+meta_labeling:
+  enabled: true
+  barrier_window: 42            # triple-barrier vertical barrier (trading days, ≈2 months)
+  pt_multiple: 1.5              # profit-take = pt_multiple × idio_vol
+  sl_multiple: 1.0              # stop-loss    = sl_multiple × idio_vol
+  n_estimators: 300
+  max_depth: 4
+  min_samples_leaf: 20
+  min_prob_take: 0.55           # meta-model must give P(take) > this to size a position
+  n_splits: 5                   # PurgedKFoldPanel folds
+  pct_embargo: 0.02             # 2% embargo fraction
+
+costs:
+  commission_bps: 5             # one-way commission in basis points
+  half_spread_bps: 5            # one-way half-spread (total one-way = 10 bps)
+
+validation:
+  n_perm_mcpt: 1000             # MCPT permutations (≥1000 for publication-grade p-value)
+  n_partitions_pbo: 16          # CSCV partitions for PBO estimate
+  walk_forward_oos_frac: 0.30   # 30% OOS for walk-forward split
+
+output:
+  top_n_ideas: 25               # number of ranked ideas in the ideas report
+  equity_png: true
