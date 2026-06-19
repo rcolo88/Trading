@@ -21,21 +21,22 @@ overfitting tests so results are honest, not optimistic curve-fits.
 ## Quick start
 
 ```bash
-cd "Cross-Sectional Momentum"
+# 0. Install dependencies (once)
 pip install -r requirements.txt
 
-python csmom.py          # launches an interactive menu — the easiest starting point
+# 1. Download prices and build the S&P 1500 universe (20–40 min first time, <1 min after)
+python csmom.py fetch
+
+# 2. Run the backtest and train the ML filter
+python csmom.py backtest --meta
+
+# 3. Generate today's trade ideas
+python csmom.py ideas
 ```
 
-Or run subcommands directly:
+That's it. Ideas are written to `outputs/ideas_TIMESTAMP.txt` and `.json`.
 
-```
-python csmom.py fetch                   Step 1: download prices + build universe
-python csmom.py backtest                Step 2: run a full walk-forward backtest
-python csmom.py backtest --meta         Step 2b: backtest WITH the ML filter layer
-python csmom.py backtest --mcpt 1000    Step 2c: backtest + permutation significance test
-python csmom.py ideas --top 25          Step 3: generate today's ranked trade ideas
-```
+> **Tip:** `python csmom.py` with no arguments opens an interactive menu if you prefer.
 
 ---
 
