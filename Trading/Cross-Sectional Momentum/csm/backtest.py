@@ -140,12 +140,22 @@ def walk_forward(
     if not meta_enabled or not cfg.get("meta_labeling", {}).get("enabled", True):
         return primary_oos, None
 
-    # --- Meta-labeling: train on IS, apply on OOS ---
-    print("  Fitting primary signal on IS window …")
-    is_signals = sig_mod.primary_signal(is_prices, cfg)
-    is_pos     = port_mod.build_positions(is_signals, is_prices, cfg, pit_df=pit_df)
+    # --- Meta-labeling on the CONTINUOUS signal (mirrors the primary OOS fix) ---
+    # Compute the signal & positions ONCE on the full panel — leak-free, because every
+    # date's signal/features use only data up to that date (rolling windows look back) —
+    # then slice IS for training and OOS for application. The old path recomputed the
+    # signal on each slice ALONE, re-burning ~2×window warmup inside OOS, which both
+    # understated the meta result and made it non-comparable to the (now continuous)
+    # primary OOS curve.
+    print("  Computing continuous signal & positions on the full panel …")
+    full_signals = sig_mod.primary_signal(prices, cfg)
+    full_pos     = port_mod.build_positions(full_signals, prices, cfg, pit_df=pit_df)
+    is_pos       = full_pos.loc[:is_end]
 
     print("  Computing triple-barrier labels on IS …")
+    # Label IS on is_prices (close TRUNCATED at is_end): a late-IS entry's vertical
+    # barrier then cannot resolve using OOS prices, so no future data leaks into a
+    # training label. Unresolved boundary labels drop out naturally (NaN bin).
     bins, weights = label_universe(is_prices, is_pos, cfg)
     if len(bins) < 30:
         print("  WARNING: too few IS labels; skipping meta-labeling.")
@@ -154,7 +164,9 @@ def walk_forward(
     print(f"  IS labels: {len(bins)} entries, take-rate={int((bins['bin']==1).mean()*100)}%")
 
     print("  Building feature matrix …")
-    X = build_feature_matrix(bins, is_prices, cfg)
+    # Features on the full (warmed) panel; leak-free because each feature at event_date
+    # uses only rolling windows ending on/before that date.
+    X = build_feature_matrix(bins, prices, cfg)
     if X.empty or len(X) < 30:
         print("  WARNING: feature matrix too sparse; skipping meta-labeling.")
         return primary_oos, None
@@ -170,17 +182,18 @@ def walk_forward(
     if out_dir is not None:
         save_meta_model(clf, X.columns.tolist(), is_end, out_dir)
 
-    # --- Apply meta-model to OOS window ---
+    # --- Apply meta-model to OOS, using the SAME continuous positions/features ---
     print("  Applying meta-model to OOS candidates …")
-    oos_signals = sig_mod.primary_signal(oos_prices, cfg)
-    oos_pos     = port_mod.build_positions(oos_signals, oos_prices, cfg, pit_df=pit_df)
-
-    oos_bins, _ = label_universe(oos_prices, oos_pos, cfg)
+    # Detect entries on the full continuous positions (so a holding carried across the
+    # IS/OOS boundary isn't mis-flagged as a new entry), label with full close for warmed
+    # vol/barriers, then keep OOS entries only.
+    all_bins, _ = label_universe(prices, full_pos, cfg)
+    oos_bins    = all_bins[all_bins.index.get_level_values("date") >= oos_start]
     if len(oos_bins) < 5:
         print("  WARNING: too few OOS entries to apply meta-model.")
         return primary_oos, None
 
-    X_oos = build_feature_matrix(oos_bins, oos_prices, cfg)
+    X_oos = build_feature_matrix(oos_bins, prices, cfg)
     if X_oos.empty:
         return primary_oos, None
 
@@ -189,12 +202,12 @@ def walk_forward(
         return primary_oos, None
     oos_prob_oos = clf.predict_proba(X_oos)[:, col1]
 
-    meta_pos_oos = apply_meta_filter(
-        oos_pos, oos_prices, oos_bins, clf, X_oos, oos_prob_oos, cfg
-    )
-    meta_net_ret = port_mod.portfolio_returns(meta_pos_oos, oos_prices, cfg)
-    meta_exec    = meta_pos_oos.shift(1).fillna(0.0)
-    bench_ret    = oos_prices["SPY"].pct_change().fillna(0.0)
+    # Filter the continuous positions, score continuously, then slice to OOS so the meta
+    # curve is measured on exactly the same dates and benchmark as primary_oos.
+    meta_pos_full = apply_meta_filter(full_pos, prices, oos_bins, clf, X_oos, oos_prob_oos, cfg)
+    meta_net_ret  = port_mod.portfolio_returns(meta_pos_full, prices, cfg).loc[oos_start:]
+    meta_exec     = meta_pos_full.shift(1).fillna(0.0).loc[oos_start:]
+    bench_ret     = prices["SPY"].pct_change().fillna(0.0).loc[oos_start:]
 
     meta_oos = BacktestResult(
         net_ret      = meta_net_ret,
