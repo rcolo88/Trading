@@ -63,6 +63,45 @@ def run_primary_backtest(
     )
 
 
+def evaluate_oos_continuous(
+    prices:    pd.DataFrame,
+    cfg:       dict,
+    oos_start: pd.Timestamp,
+    pit_df:    pd.DataFrame | None = None,
+    label:     str = "primary (OOS)",
+) -> BacktestResult:
+    """Primary backtest scored on OOS dates using a CONTINUOUS full-history signal.
+
+    The signal/positions/returns are computed ONCE on the entire panel — each date
+    uses only data up to that date (rolling windows look backward), so there is no
+    look-ahead leakage — and only then sliced to the OOS window for reporting.
+
+    This is the leak-free, realistic evaluation: at any live OOS date the signal
+    legitimately sees all prior history (IS data is the past, available in real
+    time).  It fixes the artifact in run_primary_backtest(oos_prices), which
+    recomputes the signal on the OOS slice ALONE and so re-burns ~2×window days of
+    warmup *inside* OOS — starving long-window configs and measuring them on a
+    shorter, more recent, non-comparable tail (e.g. window=252 fell from a true
+    OOS Sharpe ~0.88 to ~0.01 purely from this artifact).
+    """
+    signals  = sig_mod.primary_signal(prices, cfg)
+    pos      = port_mod.build_positions(signals, prices, cfg, pit_df=pit_df)
+    net_ret  = port_mod.portfolio_returns(pos, prices, cfg)
+    exec_pos = pos.shift(1).fillna(0.0)
+    bench    = prices["SPY"].pct_change().fillna(0.0)
+
+    nr = net_ret.loc[oos_start:]
+    br = bench.loc[oos_start:]
+    return BacktestResult(
+        net_ret      = nr,
+        equity       = _equity(nr),
+        bench_ret    = br,
+        bench_equity = _equity(br),
+        exec_pos     = exec_pos.loc[oos_start:],
+        label        = label,
+    )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Walk-forward backtest
 # ─────────────────────────────────────────────────────────────────────────────
@@ -92,8 +131,11 @@ def walk_forward(
         raise ValueError(f"OOS window too short ({len(oos_prices)} days).  "
                          "Extend the backtest date range.")
 
-    # --- Primary strategy on OOS only ---
-    primary_oos = run_primary_backtest(oos_prices, cfg, pit_df=pit_df, label="primary (OOS)")
+    # --- Primary strategy scored on OOS using a continuous full-history signal ---
+    # (NOT run_primary_backtest(oos_prices), which would re-burn ~2×window warmup
+    #  inside OOS and badly understate long-window configs — see evaluate_oos_continuous.)
+    primary_oos = evaluate_oos_continuous(prices, cfg, oos_start, pit_df=pit_df,
+                                          label="primary (OOS)")
 
     if not meta_enabled or not cfg.get("meta_labeling", {}).get("enabled", True):
         return primary_oos, None

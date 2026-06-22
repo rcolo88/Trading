@@ -13,10 +13,22 @@ data:
   # With a 70/30 walk-forward split, OOS ≈ the last 30% of this range:
   #   start 2015 → OOS covers roughly 2022–2026 (recent dynamics)
   #   start 2010 → OOS covers roughly 2018–2026 (longer historical view)
-  start_date: "2015-01-01"   # ← change this; OOS (30%) naturally covers ~2022–2026
-  end_date:   "2026-06-01"   # BACKTEST analysis window only. `fetch`/`ideas` ignore
-                             #   this and always pull through today's close, so live
-                             #   trade ideas price off current market data.
+  start_date: "2015-01-01"   # FIXED, far-back analysis anchor (keep it long: the
+                             #   signal burns ~2×window≈504 days of warmup INSIDE the
+                             #   window, and long history spans more regimes → honest
+                             #   OOS). "auto"/blank → cache floor (2010). Reproducible.
+  end_date:   auto           # AUTO-ANCHORED by _backtest_window(): today − barrier_window
+                             #   (~42 trading days), so the backtest always tracks fresh
+                             #   data yet never evaluates on the last ~2 months where
+                             #   triple-barrier labels can't resolve. Set a literal date
+                             #   to pin a reproducible end (still clamped to that ceiling).
+                             #   `fetch`/`ideas` ignore this and price off today's close.
+  # `ideas` is fully decoupled from start_date/end_date above: it scores only the
+  # latest row, so its window start is pure signal WARMUP measured back from today.
+  # The residual-momentum signal stacks two 252-day windows (~504 trading days ≈ 24
+  # months minimum); 30 months adds a cushion for halts/NaN gaps. Raise if you see
+  # names dropping out for "stale"/insufficient-history reasons.
+  ideas_warmup_months: 30
   cache_dir:  "outputs/cache"
 
 signal:

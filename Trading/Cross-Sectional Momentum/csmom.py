@@ -68,6 +68,68 @@ def _live_end() -> str:
     return (pd.Timestamp.today().normalize() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
 
 
+def _ideas_start(cfg: dict) -> str:
+    """Start date for the LIVE `ideas` window — decoupled from config start_date.
+
+    `ideas` only ever scores the *latest* row, so the window start is pure warmup,
+    not analysis. The residual-momentum signal stacks two 252-day windows (a 252-day
+    rolling CAPM beta must be valid before the 252-day rolling residual sum resolves),
+    so today's value needs ~504 trading days (~24 months) of history. We therefore
+    anchor the start to a fixed warmup measured back from *today*, NOT to
+    config.start_date (which is a backtest-window knob). This keeps live ideas
+    identical no matter how the backtest window is set, and prevents a short
+    backtest start from silently starving the signal.
+
+    Default warmup is 30 months — the ~24-month floor plus a ~6-month cushion to
+    absorb halts / NaN gaps. Override with data.ideas_warmup_months in config.
+    """
+    months = int(cfg.get("data", {}).get("ideas_warmup_months", 30))
+    start  = pd.Timestamp.today().normalize() - pd.DateOffset(months=months)
+    return start.strftime("%Y-%m-%d")
+
+
+def _backtest_window(cfg: dict) -> tuple[str, str]:
+    """Resolve the backtest [start, end] window — auto-anchored to today.
+
+    Two different knobs with two different jobs:
+
+    START stays a FIXED, far-back analysis anchor. We do NOT roll it forward,
+    because the residual-momentum signal needs ~2×signal.window (~504 trading
+    days for window=252) of warmup *inside* the window before it yields a single
+    valid row (see _ideas_start). A short rolling start would starve the backtest
+    and collapse the OOS sample — long history also spans more market regimes,
+    which is what makes the OOS Sharpe honest. `start_date: auto`/blank falls back
+    to the cache floor (2010) for maximum regime coverage.
+
+    END is AUTO-ANCHORED so the window tracks fresh data with no hand-editing and
+    never runs past where labels can resolve:
+      * `end_date: auto`/blank → today − barrier_window (business days)
+      * a real date            → clamped to that same label-completeness ceiling
+    The lag equals meta_labeling.barrier_window (~42 trading days ≈ 2 months):
+    triple-barrier labels for the final ~42 days cannot resolve (the vertical
+    barrier extends past the data), so evaluating/scoring there would use
+    truncated labels. Clamping is harmless for primary-only runs and correct for
+    meta runs, so we apply it uniformly.
+    """
+    data_cfg = cfg.get("data", {})
+
+    start = data_cfg.get("start_date")
+    if start in (None, "", "auto"):
+        start = data_mod._CACHE_HISTORY_START
+    start = pd.Timestamp(start)
+
+    bw      = int(cfg.get("meta_labeling", {}).get("barrier_window", 42))
+    ceiling = pd.Timestamp.today().normalize() - pd.tseries.offsets.BDay(bw)
+
+    end_cfg = data_cfg.get("end_date")
+    if end_cfg in (None, "", "auto"):
+        end = ceiling
+    else:
+        end = min(pd.Timestamp(end_cfg), ceiling)
+
+    return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  fetch
 # ─────────────────────────────────────────────────────────────────────────────
@@ -125,10 +187,18 @@ def cmd_backtest(cfg: dict, args: argparse.Namespace) -> None:
         ever   = pd.read_html(StringIO(r.text))[0]["Symbol"].tolist()
         pit_df = None
 
+    bt_start, bt_end = _backtest_window(cfg)   # fixed long start, end auto-lagged to today
+    window  = int(cfg.get("signal", {}).get("window", 252))
+    skip    = int(cfg.get("signal", {}).get("skip", 21))
+    warmup  = 2 * window + skip                 # ~504+ days before the signal is valid
+    print(f"  Backtest window: {bt_start} → {bt_end}  "
+          f"(end auto-lagged ~{cfg.get('meta_labeling', {}).get('barrier_window', 42)} "
+          f"trading days for label completeness)")
+    print(f"  Signal warmup: ~{warmup} trading days (2×window+skip) consumed before first valid row.")
     prices = data_mod.load_price_panel(
         tickers  = ever,
-        start    = cfg["data"]["start_date"],
-        end      = cfg["data"]["end_date"],
+        start    = bt_start,
+        end      = bt_end,
         cache_dir= cache_dir,
     )
 
@@ -202,9 +272,10 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
         ever   = pd.read_html(StringIO(r.text))[0]["Symbol"].tolist()
         pit_df = None
 
+    ideas_start = _ideas_start(cfg)   # fixed warmup back from today, NOT config start_date
     prices = data_mod.load_price_panel(
         tickers  = ever,
-        start    = cfg["data"]["start_date"],
+        start    = ideas_start,
         end      = _live_end(),   # live ideas price off the latest available close
         cache_dir= cache_dir,
     )
