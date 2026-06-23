@@ -174,7 +174,7 @@ regime_filter:
 
 portfolio:
   rebal_freq: 5          # rebalance every 5 trading days (weekly) — run `ideas` on this cadence
-  max_names: 100         # cap on number of longs held
+  max_names: 25          # hold the 25 highest-conviction names (ranked by signal)
 ```
 
 ---
@@ -205,10 +205,15 @@ with drift between, costs on real turnover — the **same book `ideas` gives you
 
 | Strategy | Sharpe | CAGR | Max Drawdown | Ann. turnover |
 |---|---|---|---|---|
-| Primary (OOS) | +1.03 | +16.6% | -16.6% | 14.5× |
+| Primary (OOS) | +1.38 | +23.9% | -11.4% | 16.6× |
 | SPY buy-and-hold | +1.46 | +23.4% | -18.8% | — |
 
-DSR = 0.97 (pass).
+DSR = 0.994 (pass), MCPT p = 0.000 (pass).
+
+> **Concentration:** the book holds the **25 highest-conviction** names of the top
+> quintile (`max_names: 25`), ranked by signal strength. A sweep showed Sharpe
+> decays monotonically as the cap grows — the long tail of the quintile dilutes
+> the strongest signals and worsens drawdowns. `sweep_max_names.py` reproduces it.
 
 > **Note on meta-labeling (removed):** an ML "meta filter" (RandomForest on
 > triple-barrier labels) was tested and **removed**. When re-scored every

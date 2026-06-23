@@ -48,7 +48,11 @@ vol_scaling:
 
 portfolio:
   rebal_freq: 5                 # rebalance every N trading days (5 = weekly)
-  max_names: 100                # cap number of longs (avoid hairline weights)
+  max_names: 25                 # hold the 25 HIGHEST-CONVICTION names of the top
+                                #   quintile (ranked by signal). Sweep showed Sharpe
+                                #   decays monotonically as the cap grows (the long
+                                #   tail of the quintile dilutes the strongest signals
+                                #   and worsens drawdowns); ~20-30 is the sweet spot.
   min_names: 10                 # need at least this many longs to trade
 
 # NOTE: meta-labeling was tested and REMOVED — when re-scored every rebalance (the

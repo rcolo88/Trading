@@ -100,8 +100,8 @@ def build_positions(
             continue
 
         thresh = row.quantile(quantile)
-        longs  = row.index[row >= thresh].tolist()
-        longs  = longs[:max_names]            # cap by max_names
+        cand   = row[row >= thresh].sort_values(ascending=False)  # rank by conviction
+        longs  = cand.index[:max_names].tolist()  # keep the strongest max_names
         if not longs:
             target.loc[date] = 0.0
             continue
