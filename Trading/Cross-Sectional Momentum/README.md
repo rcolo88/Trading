@@ -1,10 +1,13 @@
 # Cross-Sectional Residual Momentum — Trade-Idea Engine
 
 Ranks US large/mid/small-cap stocks by **residual (idiosyncratic) momentum** —
-how much a stock outperformed its market exposure, not just its raw return —
-and produces ranked long-only trade ideas with suggested hold periods (1–3 months)
-and triple-barrier stop/target levels.  Every backtest is run through three
-overfitting tests so results are honest, not optimistic curve-fits.
+how much a stock outperformed its market exposure, not just its raw return — and
+outputs the **exact long-only portfolio book the backtest trades**: every name,
+its target weight, and (given capital) dollars + shares, plus this week's
+buy/sell/resize list.  The backtest and the live `ideas` book run the *same*
+engine — rebalance every 5 trading days, hold shares with drift between — so what
+you trade is what was validated.  Every backtest is run through three overfitting
+tests so results are honest, not optimistic curve-fits.
 
 > **Universe note — important before you run anything:**
 > - **Before `fetch`:** the backtest and ideas commands fall back to the
@@ -27,14 +30,18 @@ pip install -r requirements.txt
 # 1. Download prices and build the S&P 1500 universe (20–40 min first time, <1 min after)
 python csmom.py fetch
 
-# 2. Run the backtest and train the ML filter
-python csmom.py backtest --meta
+# 2. Run the walk-forward backtest + validation
+python csmom.py backtest
 
-# 3. Generate today's trade ideas
-python csmom.py ideas
+# 3. Generate today's target book + this week's trades
+python csmom.py ideas --capital 100000
 ```
 
-That's it. Ideas are written to `outputs/ideas_TIMESTAMP.txt` and `.json`.
+That's it. The book is written to `outputs/ideas_TIMESTAMP.txt` and `.json`.
+
+> **Run `ideas` once every 5 trading days (weekly).** That cadence *is* the
+> backtest's rebalance schedule — run it daily and you trade more than was
+> validated. `verify-book` asserts the live book equals the backtest engine.
 
 > **Tip:** `python csmom.py` with no arguments opens an interactive menu if you prefer.
 
@@ -49,25 +56,33 @@ and reconstructs *which* stocks were in the index *on each date*, so the backtes
 never looks ahead.  First run takes 20–40 minutes; after that the cache makes it
 under a minute.
 
-### Step 2 — `backtest --meta`
+### Step 2 — `backtest`
 
-Splits the date range 70% in-sample / 30% out-of-sample, validates the strategy
-on the out-of-sample period only, and trains a RandomForest ML filter (the "meta
-model") on the in-sample data.  The trained model is saved to `outputs/meta_model.pkl`
-so that `ideas` can use it.  Also runs the Deflated Sharpe Ratio test to guard
-against overfitting.
+Splits the date range 70% in-sample / 30% out-of-sample and validates on the
+out-of-sample period only.  It **simulates the real live process**: every 5
+trading days it rebalances the whole book to the fresh target (top-quintile →
+equal-dollar → vol-scaled → regime-gated), then holds those shares and lets the
+weights drift until the next rebalance, charging costs on actual turnover.  Runs
+the Deflated Sharpe Ratio test (and MCPT with `--mcpt N`) to guard against
+overfitting.
 
 Output: `outputs/backtest_TIMESTAMP.[txt|json|png]`
 
-### Step 3 — `ideas`
+### Step 3 — `ideas [--capital N]`
 
-Scores every current index member, loads the saved ML model, filters to stocks
-where the model predicts P(take) ≥ 55% (i.e. likely to hit their profit target),
-and prints the top ranked longs with entry price, stop-loss, profit target, and
-holding horizon.  If no model file exists yet, it falls back to the raw signal
-ranking with a warning.
+Builds the exact target portfolio book for today — the same engine the backtest
+trades — and prints every holding with its target weight, and (with `--capital`)
+dollar allocation and share count, plus an exposure/regime header and the
+buy/sell/resize trades vs your last book.  Hold each name until it leaves the
+weekly book; there are no intraday stops.  `--holdings file.json` diffs against
+your actual broker positions.
 
-Output: `outputs/ideas_TIMESTAMP.[txt|json]`
+Output: `outputs/ideas_TIMESTAMP.[txt|json]` (+ `outputs/portfolio_book.json` state)
+
+### `verify-book`
+
+Asserts the live `ideas` book is identical to the backtest position engine (the
+book matches exactly). Run it any time you want proof the two are in sync.
 
 ---
 
@@ -156,10 +171,9 @@ regime_filter:
   enabled: true
   spy_ma_days: 200       # go to cash when SPY < its 200-day moving average AND vol is high
 
-meta_labeling:
-  barrier_window: 42     # suggested hold period in trading days (42 ≈ 2 months)
-  pt_multiple: 1.5       # profit-take = 1.5× the stock's typical daily volatility
-  sl_multiple: 1.0       # stop-loss   = 1.0× the stock's typical daily volatility
+portfolio:
+  rebal_freq: 5          # rebalance every 5 trading days (weekly) — run `ideas` on this cadence
+  max_names: 100         # cap on number of longs held
 ```
 
 ---
@@ -183,24 +197,36 @@ meta_labeling:
 - **Permutation test p-value ≈ 0.000** (the strategy sits ~12 standard deviations above what
   a random stock-picking strategy would achieve with the same mechanics)
 
-**Walk-forward OOS only (30% holdout, no meta-labeling)**
+**Walk-forward OOS — realistic weekly-rebalance simulation (S&P 1500, 30% holdout)**
 
-| | Sharpe | CAGR | Max Drawdown | Calmar |
+These come from the unified engine: rebalance every 5 trading days, hold shares
+with drift between, costs on real turnover — the **same book `ideas` gives you**.
+
+| Strategy | Sharpe | CAGR | Max Drawdown | Ann. turnover |
 |---|---|---|---|---|
-| Primary (OOS) | +1.19 | +15.4% | -14.9% | +1.03 |
-| SPY (same period) | +0.85 | +13.9% | -24.5% | — |
+| Primary (OOS) | +1.03 | +16.6% | -16.6% | 14.5× |
+| SPY buy-and-hold | +1.46 | +23.4% | -18.8% | — |
+
+DSR = 0.97 (pass).
+
+> **Note on meta-labeling (removed):** an ML "meta filter" (RandomForest on
+> triple-barrier labels) was tested and **removed**. When re-scored every
+> rebalance — the only way you can actually trade it — it *underperformed* the
+> plain primary book and roughly tripled turnover/costs. Earlier runs where it
+> "won" were an artifact of freezing each name's size at entry, which isn't
+> tradeable. The engine now trades the primary residual-momentum book directly.
 
 ---
 
-## What the three overfitting tests mean
+## What the overfitting tests mean
 
 | Test | What it asks | Pass threshold |
 |------|-------------|----------------|
 | **Deflated Sharpe (DSR)** | "After adjusting for the number of parameter combinations you tried, is the Sharpe still impressive?" | DSR > 0.90 |
-| **Probability of Backtest Overfitting (PBO)** | "If you split the history into many pieces and checked whether the best in-sample config also won out-of-sample, how often did it?" | PBO < 0.50 |
-| **Monte Carlo Permutation Test (MCPT)** | "If we randomly shuffled which stocks were top-ranked on each date (destroying all predictive signal), what Sharpe would we still get just from market exposure? Is our real Sharpe clearly above that noise floor?" | p < 0.05 |
+| **Monte Carlo Permutation Test (MCPT)** — run with `backtest --mcpt 1000` | "If we randomly shuffled which stocks were top-ranked on each date (destroying all predictive signal), what Sharpe would we still get just from market exposure? Is our real Sharpe clearly above that noise floor?" | p < 0.05 |
 
-All three together make it very difficult to accidentally claim an edge that isn't real.
+(`sweep_signal_window.py` also reports PBO — Probability of Backtest Overfitting —
+across the candidate lookback windows.)
 
 ---
 
@@ -217,18 +243,16 @@ Cross-Sectional Momentum/
 │   ├── universe.py       ← point-in-time index membership reconstruction
 │   ├── data.py           ← price download + caching
 │   ├── signals.py        ← residual/naive momentum, regime filter, vol-scaling
-│   ├── portfolio.py      ← stock ranking → position weights
+│   ├── portfolio.py      ← ranking → position weights; target_book (live = backtest)
 │   ├── costs.py          ← transaction costs (commission + spread)
-│   ├── labeling.py       ← triple-barrier labels for the ML filter
-│   ├── model.py          ← RandomForest meta-model + calendar-time purged CV
-│   ├── backtest.py       ← walk-forward driver
+│   ├── backtest.py       ← walk-forward driver + simulate_live (weekly drift sim)
 │   ├── validation.py     ← DSR, PBO, Monte Carlo permutation test
 │   └── report.py         ← TXT + JSON + equity PNG output
 └── outputs/
     ├── cache/            ← downloaded price data (auto-populated by fetch)
-    ├── meta_model.pkl    ← trained ML filter (auto-saved by backtest --meta)
+    ├── portfolio_book.json      ← last live book (for the weekly trade diff)
     ├── backtest_*.txt/json/png   ← backtest reports
-    └── ideas_*.txt/json          ← trade idea reports
+    └── ideas_*.txt/json          ← trade book reports
 ```
 
 ---

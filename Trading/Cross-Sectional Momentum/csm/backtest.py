@@ -1,12 +1,11 @@
 """Walk-forward backtest orchestrator.
 
-Splits the full history into in-sample and out-of-sample windows, fits the
-meta-model on IS, evaluates strictly OOS, then compares primary-only vs
-meta-labeled performance.  The OOS equity curve is the headline result.
+Splits the full history into in-sample and out-of-sample windows and evaluates
+strictly on OOS via simulate_live — the SAME weekly-rebalance, hold-with-drift
+engine the live `ideas` book uses.  The OOS equity curve is the headline result.
 """
 from __future__ import annotations
 
-from pathlib import Path
 from typing import NamedTuple
 
 import numpy as np
@@ -14,13 +13,6 @@ import pandas as pd
 
 from csm import signals as sig_mod
 from csm import portfolio as port_mod
-from csm.labeling import label_universe
-from csm.model import (
-    build_feature_matrix,
-    train_meta_model,
-    apply_meta_filter,
-    save_meta_model,
-)
 
 
 class BacktestResult(NamedTuple):
@@ -103,6 +95,103 @@ def evaluate_oos_continuous(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Weekly-rebalance, hold-with-drift simulation  (identical to live trading)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _cost_rate(cfg: dict) -> float:
+    c = cfg.get("costs", {})
+    return (float(c.get("commission_bps", 5)) + float(c.get("half_spread_bps", 5))) / 1e4
+
+
+def _rebalance_dates(index: pd.DatetimeIndex, rebal_freq: int) -> pd.DatetimeIndex:
+    """Rebalance every `rebal_freq` trading days, anchored at the first bar
+    (same grid build_positions uses, so pos.loc[date] is a fresh target)."""
+    mask = np.zeros(len(index), dtype=bool)
+    mask[::rebal_freq] = True
+    return index[mask]
+
+
+def simulate_live(
+    prices:        pd.DataFrame,
+    cfg:           dict,
+    pit_df:        pd.DataFrame | None,
+    oos_start:     pd.Timestamp,
+    label:         str = "primary (OOS)",
+) -> BacktestResult:
+    """Event-driven simulation of the *actual* live process.
+
+    Every `rebal_freq` trading days, rebalance the whole book to the fresh target
+    (top-quintile → equal-$ → vol-scale → regime gate — the SAME
+    portfolio.target_book logic), then HOLD fixed shares and let the weights DRIFT
+    until the next rebalance.  Costs are charged only on real rebalance turnover; a
+    1-day execution lag is applied.
+
+    This makes the backtest identical-by-construction to `ideas`/`target_book`:
+    the same per-date book, chained weekly with realistic drift and costs.
+    """
+    stocks  = prices.drop(columns=["SPY"], errors="ignore")
+    ret     = stocks.ffill(limit=3).pct_change().fillna(0.0)
+    cols    = list(stocks.columns)
+
+    signals = sig_mod.primary_signal(prices, cfg)
+    pos     = port_mod.build_positions(signals, prices, cfg, pit_df=pit_df)  # start-anchor grid
+
+    rebal_freq = int(cfg.get("portfolio", {}).get("rebal_freq", 5))
+    all_rebal  = _rebalance_dates(prices.index, rebal_freq)
+    rebal_set  = set(all_rebal)
+
+    # Warm the book: begin at the last rebalance strictly before OOS so the
+    # portfolio is already invested when the reported OOS window starts.
+    before = all_rebal[all_rebal < oos_start]
+    internal_start = before[-1] if len(before) else prices.index[0]
+    sim_idx = prices.loc[internal_start:].index
+
+    cost_rate = _cost_rate(cfg)
+    h    = pd.Series(0.0, index=cols)   # dollar holdings per name
+    cash = 1.0                          # equity starts at 1.0, fully in cash
+    pending: pd.Series | None = None    # target weights to execute next bar (exec lag)
+    cur_target = pd.Series(0.0, index=cols)   # stepwise held target (for honest turnover)
+
+    eq_dates, eq_vals, exec_rows = [], [], []
+    for i, date in enumerate(sim_idx):
+        if i > 0:                                       # 1) drift with the market
+            h = h * (1.0 + ret.loc[date].reindex(cols).fillna(0.0))
+        E = float(h.sum() + cash)
+
+        if pending is not None:                         # 2) execute yesterday's decision
+            tgt_d = pending.reindex(cols).fillna(0.0) * E
+            cost  = float((tgt_d - h).abs().sum()) * cost_rate
+            cash  = E - float(tgt_d.sum()) - cost
+            h     = tgt_d
+            E     = float(h.sum() + cash)
+            cur_target = pending.reindex(cols).fillna(0.0)
+            pending = None
+
+        eq_dates.append(date); eq_vals.append(E)        # 3) record
+        exec_rows.append(cur_target.copy())
+
+        if date in rebal_set:                           # 4) decide tomorrow's book
+            w = pos.loc[date]
+            w = w[w > 0.0]
+            pending = w
+
+    equity_full = pd.Series(eq_vals, index=pd.DatetimeIndex(eq_dates))
+    net_full    = equity_full.pct_change().fillna(0.0)
+    exec_full   = pd.DataFrame(exec_rows, index=pd.DatetimeIndex(eq_dates))
+
+    nr    = net_full.loc[oos_start:]
+    bench = prices["SPY"].pct_change().fillna(0.0).loc[oos_start:]
+    return BacktestResult(
+        net_ret      = nr,
+        equity       = _equity(nr),
+        bench_ret    = bench,
+        bench_equity = _equity(bench),
+        exec_pos     = exec_full.loc[oos_start:],
+        label        = label,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Walk-forward backtest
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -111,110 +200,21 @@ def walk_forward(
     cfg:          dict,
     pit_df:       pd.DataFrame | None = None,
     oos_frac:     float = 0.30,
-    meta_enabled: bool  = True,
-    out_dir:      Path | None = None,
-) -> tuple[BacktestResult, BacktestResult | None]:
-    """Walk-forward split: fit meta-model on IS, evaluate on OOS.
+) -> BacktestResult:
+    """Walk-forward split: evaluate the strategy on the OOS period only.
 
-    Returns (primary_result, meta_result) for the OOS period only.
-    meta_result is None if meta_labeling is disabled in cfg or no labels.
+    Simulates the ACTUAL live process on OOS — weekly rebalance to the fresh target
+    book, hold shares with drift between, real turnover costs (see simulate_live).
+    Identical-by-construction to the live `ideas`/`target_book` engine, so what you
+    trade is exactly what is measured.
     """
     index   = prices.index
     n       = len(index)
     is_end  = index[int(n * (1 - oos_frac)) - 1]
     oos_start = is_end + pd.Timedelta(days=1)
 
-    is_prices  = prices.loc[:is_end]
-    oos_prices = prices.loc[oos_start:]
-
-    if len(oos_prices) < 63:
-        raise ValueError(f"OOS window too short ({len(oos_prices)} days).  "
+    if len(prices.loc[oos_start:]) < 63:
+        raise ValueError(f"OOS window too short ({len(prices.loc[oos_start:])} days).  "
                          "Extend the backtest date range.")
 
-    # --- Primary strategy scored on OOS using a continuous full-history signal ---
-    # (NOT run_primary_backtest(oos_prices), which would re-burn ~2×window warmup
-    #  inside OOS and badly understate long-window configs — see evaluate_oos_continuous.)
-    primary_oos = evaluate_oos_continuous(prices, cfg, oos_start, pit_df=pit_df,
-                                          label="primary (OOS)")
-
-    if not meta_enabled or not cfg.get("meta_labeling", {}).get("enabled", True):
-        return primary_oos, None
-
-    # --- Meta-labeling on the CONTINUOUS signal (mirrors the primary OOS fix) ---
-    # Compute the signal & positions ONCE on the full panel — leak-free, because every
-    # date's signal/features use only data up to that date (rolling windows look back) —
-    # then slice IS for training and OOS for application. The old path recomputed the
-    # signal on each slice ALONE, re-burning ~2×window warmup inside OOS, which both
-    # understated the meta result and made it non-comparable to the (now continuous)
-    # primary OOS curve.
-    print("  Computing continuous signal & positions on the full panel …")
-    full_signals = sig_mod.primary_signal(prices, cfg)
-    full_pos     = port_mod.build_positions(full_signals, prices, cfg, pit_df=pit_df)
-    is_pos       = full_pos.loc[:is_end]
-
-    print("  Computing triple-barrier labels on IS …")
-    # Label IS on is_prices (close TRUNCATED at is_end): a late-IS entry's vertical
-    # barrier then cannot resolve using OOS prices, so no future data leaks into a
-    # training label. Unresolved boundary labels drop out naturally (NaN bin).
-    bins, weights = label_universe(is_prices, is_pos, cfg)
-    if len(bins) < 30:
-        print("  WARNING: too few IS labels; skipping meta-labeling.")
-        return primary_oos, None
-
-    print(f"  IS labels: {len(bins)} entries, take-rate={int((bins['bin']==1).mean()*100)}%")
-
-    print("  Building feature matrix …")
-    # Features on the full (warmed) panel; leak-free because each feature at event_date
-    # uses only rolling windows ending on/before that date.
-    X = build_feature_matrix(bins, prices, cfg)
-    if X.empty or len(X) < 30:
-        print("  WARNING: feature matrix too sparse; skipping meta-labeling.")
-        return primary_oos, None
-
-    y = bins.loc[X.index, "bin"].astype(int)
-    w = weights.reindex(X.index).fillna(1.0)
-
-    print("  Training meta-model (PurgedKFoldPanel CV) …")
-    clf, oos_prob_is, cv_acc = train_meta_model(X, y, w, bins, cfg)
-    print(f"  IS PurgedCV accuracy: {cv_acc.mean():.3f} ± {cv_acc.std():.3f}  "
-          f"(base rate {max(y.mean(), 1-y.mean()):.3f})")
-
-    if out_dir is not None:
-        save_meta_model(clf, X.columns.tolist(), is_end, out_dir)
-
-    # --- Apply meta-model to OOS, using the SAME continuous positions/features ---
-    print("  Applying meta-model to OOS candidates …")
-    # Detect entries on the full continuous positions (so a holding carried across the
-    # IS/OOS boundary isn't mis-flagged as a new entry), label with full close for warmed
-    # vol/barriers, then keep OOS entries only.
-    all_bins, _ = label_universe(prices, full_pos, cfg)
-    oos_bins    = all_bins[all_bins.index.get_level_values("date") >= oos_start]
-    if len(oos_bins) < 5:
-        print("  WARNING: too few OOS entries to apply meta-model.")
-        return primary_oos, None
-
-    X_oos = build_feature_matrix(oos_bins, prices, cfg)
-    if X_oos.empty:
-        return primary_oos, None
-
-    col1 = list(clf.classes_).index(1) if 1 in clf.classes_ else -1
-    if col1 < 0:
-        return primary_oos, None
-    oos_prob_oos = clf.predict_proba(X_oos)[:, col1]
-
-    # Filter the continuous positions, score continuously, then slice to OOS so the meta
-    # curve is measured on exactly the same dates and benchmark as primary_oos.
-    meta_pos_full = apply_meta_filter(full_pos, prices, oos_bins, clf, X_oos, oos_prob_oos, cfg)
-    meta_net_ret  = port_mod.portfolio_returns(meta_pos_full, prices, cfg).loc[oos_start:]
-    meta_exec     = meta_pos_full.shift(1).fillna(0.0).loc[oos_start:]
-    bench_ret     = prices["SPY"].pct_change().fillna(0.0).loc[oos_start:]
-
-    meta_oos = BacktestResult(
-        net_ret      = meta_net_ret,
-        equity       = _equity(meta_net_ret),
-        bench_ret    = bench_ret,
-        bench_equity = _equity(bench_ret),
-        exec_pos     = meta_exec,
-        label        = "meta-labeled (OOS)",
-    )
-    return primary_oos, meta_oos
+    return simulate_live(prices, cfg, pit_df, oos_start, label="primary (OOS)")

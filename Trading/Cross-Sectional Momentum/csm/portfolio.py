@@ -20,6 +20,7 @@ def build_positions(
     prices:         pd.DataFrame,
     cfg:            dict,
     pit_df:         pd.DataFrame | None = None,
+    rebal_anchor:   str = "start",
 ) -> pd.DataFrame:
     """Cross-sectional rank → long-only position weights (before execution lag).
 
@@ -29,6 +30,11 @@ def build_positions(
     prices    : (T, N+1) price panel including SPY
     cfg       : strategy config dict
     pit_df    : point-in-time membership DataFrame; if None, no PIT filtering
+    rebal_anchor : "start" (default) anchors the rebalance grid at the FIRST bar —
+                use this for backtests so the validated dates never move.  "end"
+                anchors the grid at the LAST bar so the final row is always a fresh
+                rebalance (used by live `ideas`/`target_book`: the user's run day IS
+                the rebalance, not a ffilled hold up to 4 days stale).
 
     Returns
     -------
@@ -75,7 +81,10 @@ def build_positions(
     # First bar with a valid signal
     valid_sig_mask = signals.notna().any(axis=1)
     rebal_mask     = np.zeros(T, dtype=bool)
-    rebal_mask[::rebal_freq] = True
+    if rebal_anchor == "end":
+        rebal_mask[np.arange(T - 1, -1, -rebal_freq)] = True
+    else:
+        rebal_mask[::rebal_freq] = True
     rebal_dates = index[rebal_mask & valid_sig_mask.values]
 
     for date in rebal_dates:
@@ -132,3 +141,36 @@ def portfolio_returns(
     gross     = (exec_pos * stock_ret).sum(axis=1)
     net       = apply_costs(gross, exec_pos, cfg)
     return net
+
+
+def target_book(
+    prices:       pd.DataFrame,
+    cfg:          dict,
+    pit_df:       pd.DataFrame | None = None,
+    as_of:        pd.Timestamp | None = None,
+) -> pd.Series:
+    """The single source of truth for "what the strategy holds on `as_of`".
+
+    Returns the target weight per ticker, reconstructed with the IDENTICAL engine
+    the backtest trades — top-quintile selection → equal-dollar 1/N → vol-scaling
+    → regime gate.  Both the live `ideas` command and the `verify-book` self-check
+    call this, so trading the book it returns reproduces the validated backtest
+    curve by construction.
+
+    The rebalance grid is anchored at the END (`rebal_anchor="end"`) so the `as_of`
+    row is a fresh rebalance, not a ffilled hold.
+
+    Returns
+    -------
+    book : Series of nonzero target weights, indexed by ticker, sorted descending.
+    """
+    from csm import signals as sig_mod
+
+    signals = sig_mod.primary_signal(prices, cfg)
+    pos     = build_positions(signals, prices, cfg, pit_df=pit_df, rebal_anchor="end")
+
+    if as_of is None:
+        as_of = pos.index[-1]
+    w = pos.loc[as_of].copy()
+    w = w[w > 0.0]
+    return w.sort_values(ascending=False)

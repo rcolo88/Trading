@@ -51,17 +51,9 @@ portfolio:
   max_names: 100                # cap number of longs (avoid hairline weights)
   min_names: 10                 # need at least this many longs to trade
 
-meta_labeling:
-  enabled: true
-  barrier_window: 42            # triple-barrier vertical barrier (trading days, ≈2 months)
-  pt_multiple: 1.5              # profit-take = pt_multiple × idio_vol
-  sl_multiple: 1.0              # stop-loss    = sl_multiple × idio_vol
-  n_estimators: 300
-  max_depth: 4
-  min_samples_leaf: 20
-  min_prob_take: 0.55           # meta-model must give P(take) > this to size a position
-  n_splits: 5                   # PurgedKFoldPanel folds
-  pct_embargo: 0.02             # 2% embargo fraction
+# NOTE: meta-labeling was tested and REMOVED — when re-scored every rebalance (the
+# only tradeable way) it underperformed the plain primary book and ~3×'d turnover.
+# The strategy now trades the primary residual-momentum book directly.
 
 costs:
   commission_bps: 5             # one-way commission in basis points

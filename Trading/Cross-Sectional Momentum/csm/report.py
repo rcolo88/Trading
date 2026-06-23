@@ -153,35 +153,83 @@ def _plot_equity(results: dict[str, BacktestResult], path: Path) -> None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def write_ideas_report(
-    ideas:   list[dict],
+    book:    list[dict],
+    header:  dict,
+    trades:  dict,
     out_dir: Path,
 ) -> None:
-    """Write ranked trade ideas to JSON and TXT."""
+    """Write the target portfolio book + weekly trade list to JSON and TXT.
+
+    `book` is the exact set of holdings the backtest engine would hold today
+    (full top-quintile, equal-dollar, vol-scaled, regime-gated, meta-sized) — NOT
+    a truncated idea list and NOT decorated with un-traded stop/target brackets.
+    `header` carries regime/exposure context; `trades` carries the BUY/SELL/RESIZE
+    rebalance diff vs the previously held book.
+    """
     ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
     stem = f"ideas_{ts}"
     out_dir.mkdir(parents=True, exist_ok=True)
+    has_capital = header.get("capital") is not None
 
-    # ── TXT ──
     lines = []
-    lines.append("=" * 75)
-    lines.append("Cross-Sectional Residual Momentum — Trade Ideas")
-    lines.append(f"Generated: {datetime.now():%Y-%m-%d %H:%M}")
-    lines.append("Holding horizon: 1–3 months  |  Direction: LONG only")
-    lines.append("=" * 75)
-    lines.append(f"  {'Rank':<5}  {'Ticker':<8}  {'Score':>7}  {'P(take)':>8}  "
-                 f"{'Entry':>10}  {'Stop':>10}  {'Target':>10}  {'Horizon':>8}")
-    lines.append("  " + "-" * 70)
-    for idea in ideas:
-        lines.append(
-            f"  {idea['rank']:<5}  {idea['ticker']:<8}  "
-            f"{idea['signal_score']:>+7.3f}  "
-            f"{idea['prob_take']:>8.1%}  "
-            f"{idea['entry_price']:>10.2f}  "
-            f"{idea['stop']:>10.2f}  "
-            f"{idea['target']:>10.2f}  "
-            f"{idea['horizon_days']:>5}d"
-        )
-    lines.append("=" * 75)
+    lines.append("=" * 84)
+    lines.append("Cross-Sectional Residual Momentum — Target Portfolio Book")
+    lines.append(f"Generated: {datetime.now():%Y-%m-%d %H:%M}   |   As of close: {header.get('as_of')}")
+    lines.append("=" * 84)
+    lines.append(f"  Regime:         {'ON — taking longs' if header.get('regime_on') else 'OFF — go to CASH'}")
+    lines.append(f"  Names held:     {header.get('n_names', 0)}")
+    lines.append(f"  Gross exposure: {header.get('gross_pct', 0.0):.1f}%   "
+                 f"Cash: {header.get('cash_pct', 0.0):.1f}%")
+    if has_capital:
+        lines.append(f"  Capital:        ${header['capital']:,.0f}")
+    lines.append(f"  Exit rule:      {header.get('exit_rule', '')}")
+    if header.get("cadence_note"):
+        lines.append(f"  Cadence:        {header['cadence_note']}")
+    lines.append("=" * 84)
+
+    # ── Holdings table ──
+    if has_capital:
+        lines.append(f"  {'Rank':<5} {'Ticker':<8} {'Weight':>8} {'$ Alloc':>12} "
+                     f"{'Shares':>8} {'Close':>10} {'Score':>8}")
+        lines.append("  " + "-" * 70)
+        for r in book:
+            lines.append(
+                f"  {r['rank']:<5} {r['ticker']:<8} {r['weight_pct']:>7.2f}% "
+                f"{r.get('dollars', 0):>12,.0f} {r.get('shares', 0):>8} "
+                f"{r['last_close']:>10.2f} {r['signal_score']:>+8.3f}"
+            )
+    else:
+        lines.append(f"  {'Rank':<5} {'Ticker':<8} {'Weight':>8} {'Close':>10} "
+                     f"{'Score':>8}")
+        lines.append("  " + "-" * 48)
+        for r in book:
+            lines.append(
+                f"  {r['rank']:<5} {r['ticker']:<8} {r['weight_pct']:>7.2f}% "
+                f"{r['last_close']:>10.2f} {r['signal_score']:>+8.3f}"
+            )
+
+    # ── Rebalance trade list ──
+    buys, sells, resizes = trades.get("buys", []), trades.get("sells", []), trades.get("resizes", [])
+    lines.append("\n" + "─" * 84)
+    lines.append("REBALANCE — changes vs your previously held book")
+    lines.append("─" * 84)
+    if not (buys or sells or resizes):
+        lines.append("  (no changes — book matches your last run)")
+    for t in sells:
+        sh = f" {t['shares']} sh" if t.get("shares") is not None else ""
+        lines.append(f"  SELL    {t['ticker']:<8}{sh}   (left the book → close)")
+    for t in buys:
+        sh = f" {t['shares']} sh" if t.get("shares") is not None else ""
+        lines.append(f"  BUY     {t['ticker']:<8}{sh}")
+    for t in resizes:
+        if t.get("delta_shares") is not None:
+            verb = "ADD " if t["delta_shares"] > 0 else "TRIM"
+            lines.append(f"  {verb}    {t['ticker']:<8} {t['delta_shares']:+d} sh "
+                         f"({t['from_shares']} → {t['to_shares']})")
+        else:
+            lines.append(f"  RESIZE  {t['ticker']:<8} {t['from_pct']:.2f}% → {t['to_pct']:.2f}%")
+
+    lines.append("=" * 84)
     lines.append("\nDISCLAIMER: For research and educational purposes only.")
     lines.append("Past backtests (even OOS) do not guarantee future performance.")
     txt = "\n".join(lines)
@@ -189,5 +237,7 @@ def write_ideas_report(
     print(txt)
 
     # ── JSON ──
-    (out_dir / f"{stem}.json").write_text(json.dumps(ideas, indent=2, default=str))
-    print(f"\nIdeas written to: {out_dir}/{stem}.[txt|json]")
+    payload = {"generated": datetime.now().isoformat(),
+               "header": header, "book": book, "trades": trades}
+    (out_dir / f"{stem}.json").write_text(json.dumps(payload, indent=2, default=str))
+    print(f"\nBook written to: {out_dir}/{stem}.[txt|json]")

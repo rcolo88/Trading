@@ -4,15 +4,18 @@
 Subcommands:
   fetch      Build (or refresh) the point-in-time S&P 1500 membership table
              and download price history.
-  backtest   Run a walk-forward backtest with DSR + PBO + MCPT validation.
-  ideas      Score today's universe and output ranked long ideas with
-             triple-barrier stop/target levels.
+  backtest   Run a walk-forward backtest (weekly-rebalance simulation) + DSR/MCPT.
+  ideas      Output today's target portfolio book — the exact holdings the
+             backtest trades (full top-quintile, equal-dollar, vol-scaled,
+             regime-gated) plus the weekly rebalance trade list.
+  verify-book  Assert the live book == the backtest position engine.
 
 Usage:
   python csmom.py                     # interactive menu
   python csmom.py fetch
-  python csmom.py backtest [--meta] [--mcpt N] [--oos-frac 0.30]
-  python csmom.py ideas    [--top N]
+  python csmom.py backtest [--mcpt N] [--oos-frac 0.30]
+  python csmom.py ideas    [--capital N] [--holdings file.json]
+  python csmom.py verify-book
 
 HONEST EXPECTATIONS:
   - This strategy was validated on *survivorship-biased* current S&P 500
@@ -25,6 +28,7 @@ HONEST EXPECTATIONS:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import warnings
 from pathlib import Path
@@ -101,15 +105,11 @@ def _backtest_window(cfg: dict) -> tuple[str, str]:
     which is what makes the OOS Sharpe honest. `start_date: auto`/blank falls back
     to the cache floor (2010) for maximum regime coverage.
 
-    END is AUTO-ANCHORED so the window tracks fresh data with no hand-editing and
-    never runs past where labels can resolve:
-      * `end_date: auto`/blank → today − barrier_window (business days)
-      * a real date            → clamped to that same label-completeness ceiling
-    The lag equals meta_labeling.barrier_window (~42 trading days ≈ 2 months):
-    triple-barrier labels for the final ~42 days cannot resolve (the vertical
-    barrier extends past the data), so evaluating/scoring there would use
-    truncated labels. Clamping is harmless for primary-only runs and correct for
-    meta runs, so we apply it uniformly.
+    END is AUTO-ANCHORED so the window tracks fresh data with no hand-editing:
+      * `end_date: auto`/blank → today
+      * a real date            → clamped to today
+    The realistic weekly-rebalance simulation evaluates real forward returns at
+    every rebalance, so the backtest can run right up to the latest close.
     """
     data_cfg = cfg.get("data", {})
 
@@ -118,8 +118,7 @@ def _backtest_window(cfg: dict) -> tuple[str, str]:
         start = data_mod._CACHE_HISTORY_START
     start = pd.Timestamp(start)
 
-    bw      = int(cfg.get("meta_labeling", {}).get("barrier_window", 42))
-    ceiling = pd.Timestamp.today().normalize() - pd.tseries.offsets.BDay(bw)
+    ceiling = pd.Timestamp.today().normalize()
 
     end_cfg = data_cfg.get("end_date")
     if end_cfg in (None, "", "auto"):
@@ -187,13 +186,11 @@ def cmd_backtest(cfg: dict, args: argparse.Namespace) -> None:
         ever   = pd.read_html(StringIO(r.text))[0]["Symbol"].tolist()
         pit_df = None
 
-    bt_start, bt_end = _backtest_window(cfg)   # fixed long start, end auto-lagged to today
+    bt_start, bt_end = _backtest_window(cfg)   # fixed long start, end auto-anchored to today
     window  = int(cfg.get("signal", {}).get("window", 252))
     skip    = int(cfg.get("signal", {}).get("skip", 21))
     warmup  = 2 * window + skip                 # ~504+ days before the signal is valid
-    print(f"  Backtest window: {bt_start} → {bt_end}  "
-          f"(end auto-lagged ~{cfg.get('meta_labeling', {}).get('barrier_window', 42)} "
-          f"trading days for label completeness)")
+    print(f"  Backtest window: {bt_start} → {bt_end}")
     print(f"  Signal warmup: ~{warmup} trading days (2×window+skip) consumed before first valid row.")
     prices = data_mod.load_price_panel(
         tickers  = ever,
@@ -203,30 +200,17 @@ def cmd_backtest(cfg: dict, args: argparse.Namespace) -> None:
     )
 
     oos_frac = float(getattr(args, "oos_frac", 0.30))
-    meta_on  = bool(getattr(args, "meta", False))
     n_perm   = int(getattr(args, "mcpt",  0))   # 0 = skip MCPT (fast mode)
 
     print(f"\n─── Walk-forward backtest ({int((1-oos_frac)*100)}% IS / {int(oos_frac*100)}% OOS) ──")
-    primary_res, meta_res = bt_mod.walk_forward(
-        prices, cfg, pit_df=pit_df, oos_frac=oos_frac, meta_enabled=meta_on,
-        out_dir=out_dir if meta_on else None,
-    )
-
+    print("  Simulating the live process: rebalance every 5 trading days, hold with drift …")
+    primary_res = bt_mod.walk_forward(prices, cfg, pit_df=pit_df, oos_frac=oos_frac)
     results = {"primary (OOS)": primary_res}
-    if meta_res is not None:
-        results["meta-labeled (OOS)"] = meta_res
 
     # ── Validation suite ─────────────────────────────────────────────────────
     print("\n─── DSR (Deflated Sharpe) ───────────────────────────────────────────")
     observed_sh = val_mod.compute_metrics(primary_res.net_ret, primary_res.bench_ret)["sharpe"]
     dsr_result  = val_mod.run_dsr(primary_res.net_ret, grid_sharpes=[observed_sh])
-
-    pbo_result = None
-    if meta_res is not None:
-        print("\n─── PBO (Probability of Backtest Overfitting) ───────────────────────")
-        ret_matrix = pd.concat([primary_res.net_ret.rename("primary"),
-                                meta_res.net_ret.rename("meta")], axis=1).dropna()
-        pbo_result = val_mod.run_pbo(ret_matrix)
 
     mcpt_result = None
     if n_perm > 0:
@@ -243,7 +227,75 @@ def cmd_backtest(cfg: dict, args: argparse.Namespace) -> None:
 
     # ── Report ───────────────────────────────────────────────────────────────
     print("\n─── Report ──────────────────────────────────────────────────────────")
-    rep_mod.write_backtest_report(results, dsr_result, pbo_result, mcpt_result, out_dir)
+    rep_mod.write_backtest_report(results, dsr_result, None, mcpt_result, out_dir)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  ideas — book persistence + weekly rebalance diff
+# ─────────────────────────────────────────────────────────────────────────────
+
+BOOK_FILE = "portfolio_book.json"
+
+
+def _load_prev_book(out_dir: Path) -> dict | None:
+    """Load the last persisted target book (canonical live state), or None."""
+    path = out_dir / BOOK_FILE
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return None
+
+
+def _save_book(out_dir: Path, payload: dict) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / BOOK_FILE).write_text(json.dumps(payload, indent=2, default=str))
+
+
+def _read_holdings_file(path: Path) -> dict:
+    """Read an external holdings file ({ticker: shares}) to diff against."""
+    raw = json.loads(Path(path).read_text())
+    return {str(k).upper(): int(v) for k, v in raw.items()}
+
+
+def _compute_trades(prev_rows: list[dict], new_rows: list[dict],
+                    has_capital: bool, prev_shares: dict | None = None) -> dict:
+    """BUY/SELL/RESIZE diff of the new book vs the previously held one.
+
+    Diffs on share counts when capital is known (actionable order sizes),
+    otherwise on weight %.  `prev_shares` overrides prev_rows (used by --holdings).
+    """
+    buys, sells, resizes = [], [], []
+    if prev_shares is not None:
+        prev_sh = dict(prev_shares)
+        prev_w  = {}
+    else:
+        prev_sh = {r["ticker"]: r.get("shares", 0) for r in (prev_rows or [])}
+        prev_w  = {r["ticker"]: r.get("weight_pct", 0.0) for r in (prev_rows or [])}
+    new_sh = {r["ticker"]: r.get("shares", 0) for r in new_rows}
+    new_w  = {r["ticker"]: r.get("weight_pct", 0.0) for r in new_rows}
+
+    for t in new_rows:
+        tk = t["ticker"]
+        if tk not in prev_sh and tk not in prev_w:
+            buys.append({"ticker": tk, "shares": new_sh.get(tk) if has_capital else None})
+        elif has_capital:
+            d = new_sh.get(tk, 0) - prev_sh.get(tk, 0)
+            if abs(d) >= 1:
+                resizes.append({"ticker": tk, "delta_shares": int(d),
+                                "from_shares": int(prev_sh.get(tk, 0)),
+                                "to_shares": int(new_sh.get(tk, 0))})
+        else:
+            if abs(new_w.get(tk, 0.0) - prev_w.get(tk, 0.0)) >= 0.20:
+                resizes.append({"ticker": tk, "delta_shares": None,
+                                "from_pct": prev_w.get(tk, 0.0), "to_pct": new_w.get(tk, 0.0)})
+
+    held_now = set(new_sh)
+    for tk in (set(prev_sh) | set(prev_w)):
+        if tk not in held_now:
+            sells.append({"ticker": tk, "shares": prev_sh.get(tk) if has_capital else None})
+    return {"buys": buys, "sells": sells, "resizes": resizes}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -286,13 +338,13 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
     # ── Freshness guard #1: panel must be current vs the real calendar ───────
     # The panel's own last date is "today" for scoring, but if that date lags
     # the wall-clock by more than a few days the whole snapshot is stale and we
-    # would price entries/stops/targets off old closes. Catch that explicitly.
+    # would price the book off old closes. Catch that explicitly.
     wall_today = pd.Timestamp.today().normalize()
     panel_lag  = (wall_today - today).days
     if panel_lag > 5:
         print(f"\nERROR: price panel is stale — latest close is {today.date()}, "
               f"{panel_lag} days behind today ({wall_today.date()}).")
-        print("  Entry/stop/target prices and momentum would be computed off old data.")
+        print("  The book's prices and momentum would be computed off old data.")
         print("  Run `python csmom.py fetch` to refresh the price cache, then try again.")
         return
 
@@ -315,22 +367,20 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
               + (f" … +{len(stale_cols)-10} more" if len(stale_cols) > 10 else ""))
         stocks = stocks.drop(columns=stale_cols)
 
-    # Current PIT members
-    if pit_df is not None:
-        members = univ_mod.get_members_on(pit_df, today)
-        valid_cols = [c for c in stocks.columns if c in members]
-    else:
-        valid_cols = list(stocks.columns)
+    # Stale names are excluded from the panel entirely, so the book engine can
+    # never select one (target_book scores off `prices`, not just `stocks`).
+    if stale_cols:
+        prices = prices.drop(columns=stale_cols)
+        stocks = prices.drop(columns=["SPY"], errors="ignore")
 
-    print(f"\nScoring {len(valid_cols)} stocks as of {today.date()} …")
+    # ── Build the EXACT book the backtest holds today ────────────────────────
+    # target_book() is the single source of truth: top-quintile → equal-dollar
+    # 1/N → vol-scaling → regime gate. Identical math to the backtest engine, so
+    # trading this book reproduces the validated curve — no truncation, no
+    # un-traded stop/target brackets.
+    print(f"\nBuilding target book as of {today.date()} …")
+    book = port_mod.target_book(prices, cfg, pit_df=pit_df, as_of=today)
 
-    signals = sig_mod.primary_signal(prices, cfg)
-    today_sig = signals.loc[today].reindex(valid_cols).dropna()
-    if today_sig.empty:
-        print("ERROR: no signal values for today. Check data freshness.")
-        return
-
-    # Regime check
     reg_cfg   = cfg.get("regime_filter", {})
     regime_ok = sig_mod.spy_regime(
         prices,
@@ -338,85 +388,130 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
         vol_cap = float(reg_cfg.get("vol_cap", 0.25)),
     )
     in_regime = bool(regime_ok.get(today, True))
-    if not in_regime:
-        print("\nWARNING: Market regime filter is OFF (SPY below 200-dma + high vol).")
-        print("  Strategy would go to cash — no new longs recommended.\n")
 
-    # Rank and pick top-quintile
-    quantile  = float(cfg.get("signal", {}).get("quantile", 0.80))
-    threshold = today_sig.quantile(quantile)
-    longs     = today_sig[today_sig >= threshold].sort_values(ascending=False)
+    capital = getattr(args, "capital", None)
 
-    # ── Meta-model scoring ────────────────────────────────────────────────────
-    from csm.model import load_meta_model, score_current_candidates
-    meta_bundle = load_meta_model(out_dir)
-    ml_cfg  = cfg.get("meta_labeling", {})
-    min_prob = float(ml_cfg.get("min_prob_take", 0.55))
+    signals   = sig_mod.primary_signal(prices, cfg)
+    today_sig = signals.loc[today]
 
-    if meta_bundle is not None:
-        print(f"\n[Meta-model] Loaded  IS-end={meta_bundle['is_end']}  "
-              f"trained={meta_bundle['trained_at'][:10]}")
-        prob_take_ser = score_current_candidates(
-            tickers       = list(longs.index),
-            prices        = prices,
-            clf           = meta_bundle["clf"],
-            feature_names = meta_bundle["feature_names"],
-            cfg           = cfg,
-            as_of         = today,
-        )
-        passing = prob_take_ser[prob_take_ser >= min_prob]
-        if passing.empty:
-            print(f"  NOTE: 0/{len(longs)} candidates cleared P(take) >= {min_prob:.0%}. "
-                  "Showing all with real scores (no filter applied).")
-        else:
-            sorted_idx = prob_take_ser.reindex(passing.index).sort_values(ascending=False).index
-            longs = longs.reindex(sorted_idx).dropna()
-            print(f"  {len(longs)} candidates cleared P(take) >= {min_prob:.0%}; "
-                  "sorted by P(take) descending.")
-    else:
-        prob_take_ser = None
-        print("\n[Meta-model] Not found — run `backtest --meta` first for real P(take) scores.")
-        print("  Showing primary signal ranking with placeholder P(take) = 100%.")
-
-    # Triple-barrier stop/target levels using idio-vol
-    from csm.afml import get_daily_vol
-    pt_m    = float(ml_cfg.get("pt_multiple",   1.5))
-    sl_m    = float(ml_cfg.get("sl_multiple",   1.0))
-    bw_days = int(ml_cfg.get("barrier_window",  42))
-
-    ideas = []
-    rank  = 1
-    for ticker, score in longs.head(top_n).items():
-        close_ser = stocks[ticker].dropna()
-        if len(close_ser) < 60:
-            continue
-        entry  = float(close_ser.iloc[-1])
-        idio_v = float(get_daily_vol(close_ser).iloc[-1]) if len(close_ser) > 50 else 0.01
-        stop   = round(entry * (1.0 - sl_m * idio_v * np.sqrt(bw_days)), 2)
-        target = round(entry * (1.0 + pt_m * idio_v * np.sqrt(bw_days)), 2)
-        if prob_take_ser is not None and ticker in prob_take_ser.index:
-            prob = float(prob_take_ser[ticker])
-        else:
-            prob = 1.0
-        ideas.append({
+    rows: list[dict] = []
+    for rank, (ticker, weight) in enumerate(book.items(), start=1):
+        last_close = float(stocks[ticker].dropna().iloc[-1])
+        row = {
             "rank":         rank,
             "ticker":       ticker,
-            "signal_score": round(float(score), 4),
-            "prob_take":    round(prob, 4),
-            "entry_price":  round(entry, 2),
-            "stop":         stop,
-            "target":       target,
-            "horizon_days": bw_days,
-            "regime_ok":    in_regime,
+            "weight":       round(float(weight), 6),
+            "weight_pct":   round(float(weight) * 100, 2),
+            "last_close":   round(last_close, 2),
+            "signal_score": round(float(today_sig.get(ticker, np.nan)), 4),
             "as_of":        str(today.date()),
-        })
-        rank += 1
+        }
+        if capital is not None and last_close > 0:
+            dollars = float(weight) * capital
+            row["dollars"] = round(dollars, 2)
+            row["shares"]  = int(dollars // last_close)
+        rows.append(row)
 
-    if not ideas:
-        print("No candidates meet the signal threshold today.")
+    gross = float(book.sum()) if not book.empty else 0.0
+
+    # ── Cadence note + rebalance diff vs the previously held book ─────────────
+    prev = _load_prev_book(out_dir)
+    rebal_freq = int(cfg.get("portfolio", {}).get("rebal_freq", 5))
+    cadence_note = ""
+    if prev and prev.get("header", {}).get("as_of"):
+        prev_as_of = pd.Timestamp(prev["header"]["as_of"])
+        gap = int(prices.index.searchsorted(today) - prices.index.searchsorted(prev_as_of))
+        if gap <= 0:
+            cadence_note = "same-day rerun — book unchanged unless data refreshed."
+        elif gap < rebal_freq:
+            cadence_note = (f"{gap} trading day(s) since last book; next scheduled "
+                            f"rebalance in {rebal_freq - gap}. Trades below are optional drift.")
+        else:
+            cadence_note = f"{gap} trading days since last book — weekly rebalance due."
+
+    holdings_path = getattr(args, "holdings", None)
+    if holdings_path:
+        prev_shares = _read_holdings_file(Path(holdings_path))
+        trades = _compute_trades([], rows, capital is not None, prev_shares=prev_shares)
+    else:
+        trades = _compute_trades((prev or {}).get("book", []), rows, capital is not None)
+
+    header = {
+        "as_of":      str(today.date()),
+        "regime_on":  in_regime,
+        "gross_pct":  round(gross * 100, 1),
+        "cash_pct":   round((1.0 - gross) * 100, 1),
+        "n_names":    len(rows),
+        "capital":    capital,
+        "exit_rule":  "Exit any name that leaves next week's book; hold the rest. No intraday stops.",
+        "cadence_note": cadence_note,
+    }
+
+    if not rows:
+        if not in_regime:
+            print("\nREGIME OFF (SPY below its 200-dma / high vol) → hold 100% CASH.")
+            print("  The strategy takes no new longs; close existing per the exit rule.")
+        else:
+            print("\nNo names cleared the book today (too few candidates).")
+
+    rep_mod.write_ideas_report(rows, header, trades, out_dir)
+    # Persist the canonical live state for next run's diff (skip when diffing an
+    # external --holdings file so we don't clobber the tracked book).
+    if not holdings_path:
+        _save_book(out_dir, {"header": header, "book": rows})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  verify-book — prove `ideas` holds exactly what the backtest engine holds
+# ─────────────────────────────────────────────────────────────────────────────
+
+def cmd_verify_book(cfg: dict, args: argparse.Namespace) -> None:
+    """Assert the live book == the backtest position engine's last row.
+
+    `ideas` has no selection logic of its own — it calls portfolio.target_book,
+    which is build_positions(rebal_anchor="end").iloc[-1]. The backtest
+    (simulate_live) chains that SAME per-rebalance book weekly with drift, so
+    backtest and live are identical by construction. This check locks the book to
+    the engine so a future edit can't silently reintroduce a divergent path.
+    """
+    cache_dir = _HERE / cfg["data"]["cache_dir"]
+    out_dir   = _HERE / "outputs"
+
+    pit_df_path = cache_dir / "universe_pit.parquet"
+    pit_df = pd.read_parquet(pit_df_path) if pit_df_path.exists() else None
+    ever   = (univ_mod.get_all_ever_members(pit_df) if pit_df is not None
+              else [])
+    if not ever:
+        print("ERROR: PIT universe not built — run `fetch` first.")
         return
 
-    rep_mod.write_ideas_report(ideas, out_dir)
+    prices = data_mod.load_price_panel(
+        tickers=ever, start=_ideas_start(cfg), end=_live_end(), cache_dir=cache_dir,
+    )
+
+    # Engine path (what the backtest trades), end-anchored so the last row is fresh.
+    signals = sig_mod.primary_signal(prices, cfg)
+    pos     = port_mod.build_positions(signals, prices, cfg, pit_df=pit_df,
+                                       rebal_anchor="end")
+    engine  = pos.iloc[-1]
+    engine  = engine[engine > 0.0].sort_values(ascending=False)
+
+    # Live path (what `ideas` shows).
+    live = port_mod.target_book(prices, cfg, pit_df=pit_df)
+
+    same_names = set(engine.index) == set(live.index)
+    max_w_diff = float((engine.reindex(sorted(set(engine.index) | set(live.index)))
+                        .fillna(0.0)
+                        - live.reindex(sorted(set(engine.index) | set(live.index)))
+                        .fillna(0.0)).abs().max()) if (len(engine) or len(live)) else 0.0
+
+    print("\n─── verify-book: live ideas book vs backtest engine ───")
+    print(f"  engine names: {len(engine)}   live names: {len(live)}")
+    print(f"  identical name set: {same_names}")
+    print(f"  max per-name weight diff: {max_w_diff:.2e}")
+    ok = same_names and max_w_diff < 1e-9
+    print(f"  MATCH: {'✓ PASS' if ok else '✗ FAIL'}")
+    print("  (the backtest chains this exact book weekly with drift — simulate_live)")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -436,19 +531,20 @@ def _interactive_menu(cfg: dict) -> None:
 
     class _Args:
         oos_frac = 0.30
-        meta     = False
         mcpt     = 0
+        capital  = None
+        holdings = None
         top      = cfg.get("output", {}).get("top_n_ideas", 25)
 
     if choice in ("1", "fetch"):
         cmd_fetch(cfg)
     elif choice in ("2", "backtest"):
-        meta = input("  Enable meta-labeling? [y/N] ").strip().lower() == "y"
-        _Args.meta = meta
         n = input("  MCPT permutations? [0 = skip, 200 = fast, 1000 = rigorous] ").strip()
         _Args.mcpt = int(n) if n.isdigit() else 0
         cmd_backtest(cfg, _Args())
     elif choice in ("3", "ideas"):
+        cap = input("  Account capital for $ / share sizing? [blank = weights only] ").strip()
+        _Args.capital = float(cap) if cap.replace(".", "", 1).isdigit() else None
         cmd_ideas(cfg, _Args())
     elif choice in ("q", "quit"):
         print("  Goodbye.")
@@ -472,16 +568,20 @@ def main() -> None:
     sub.add_parser("fetch", help="Build PIT universe + download prices")
 
     bt_parser = sub.add_parser("backtest", help="Walk-forward backtest + validation")
-    bt_parser.add_argument("--meta",     action="store_true",
-                           help="Enable meta-labeling (takes longer)")
     bt_parser.add_argument("--mcpt",     type=int, default=0,
                            help="MCPT permutations (0 = skip, 200 = fast, 1000 = rigorous)")
     bt_parser.add_argument("--oos-frac", type=float, default=0.30, dest="oos_frac",
                            help="Fraction of history held out for OOS (default 0.30)")
 
-    id_parser = sub.add_parser("ideas", help="Generate today's ranked trade ideas")
-    id_parser.add_argument("--top", type=int, default=25,
-                           help="Number of ideas to output (default 25)")
+    id_parser = sub.add_parser("ideas",
+                               help="Output today's target portfolio book + rebalance trades")
+    id_parser.add_argument("--capital", type=float, default=None,
+                           help="Account capital — adds $ allocation + share counts per name")
+    id_parser.add_argument("--holdings", type=str, default=None,
+                           help="Path to a JSON {ticker: shares} of actual holdings to diff against")
+
+    sub.add_parser("verify-book",
+                   help="Assert the live book == the backtest engine (consistency self-check)")
 
     args = parser.parse_args()
 
@@ -491,6 +591,8 @@ def main() -> None:
         cmd_backtest(cfg, args)
     elif args.cmd == "ideas":
         cmd_ideas(cfg, args)
+    elif args.cmd == "verify-book":
+        cmd_verify_book(cfg, args)
     else:
         _interactive_menu(cfg)
 
