@@ -189,13 +189,13 @@ def write_ideas_report(
 
     # ── Holdings table ──
     if has_capital:
-        lines.append(f"  {'Rank':<5} {'Ticker':<8} {'Weight':>8} {'$ Alloc':>12} "
-                     f"{'Shares':>8} {'Close':>10} {'Score':>8}")
-        lines.append("  " + "-" * 70)
+        lines.append(f"  {'Rank':<5} {'Ticker':<8} {'Weight':>8} {'Buy $':>12} "
+                     f"{'~Shares':>10} {'Close':>10} {'Score':>8}")
+        lines.append("  " + "-" * 72)
         for r in book:
             lines.append(
                 f"  {r['rank']:<5} {r['ticker']:<8} {r['weight_pct']:>7.2f}% "
-                f"{r.get('dollars', 0):>12,.0f} {r.get('shares', 0):>8} "
+                f"{r.get('dollars', 0):>12,.2f} {r.get('shares', 0):>10.4f} "
                 f"{r['last_close']:>10.2f} {r['signal_score']:>+8.3f}"
             )
     else:
@@ -216,16 +216,18 @@ def write_ideas_report(
     if not (buys or sells or resizes):
         lines.append("  (no changes — book matches your last run)")
     for t in sells:
-        sh = f" {t['shares']} sh" if t.get("shares") is not None else ""
-        lines.append(f"  SELL    {t['ticker']:<8}{sh}   (left the book → close)")
+        amt = f" ${t['dollars']:,.2f}" if t.get("dollars") is not None else ""
+        lines.append(f"  SELL    {t['ticker']:<8}{amt}   (left the book → close)")
     for t in buys:
-        sh = f" {t['shares']} sh" if t.get("shares") is not None else ""
-        lines.append(f"  BUY     {t['ticker']:<8}{sh}")
+        amt = f" ${t['dollars']:,.2f}" if t.get("dollars") is not None else ""
+        lines.append(f"  BUY     {t['ticker']:<8}{amt}")
     for t in resizes:
-        if t.get("delta_shares") is not None:
-            verb = "ADD " if t["delta_shares"] > 0 else "TRIM"
-            lines.append(f"  {verb}    {t['ticker']:<8} {t['delta_shares']:+d} sh "
-                         f"({t['from_shares']} → {t['to_shares']})")
+        if t.get("delta_dollars") is not None:
+            d    = t["delta_dollars"]
+            verb = "ADD " if d > 0 else "TRIM"
+            sign = "+" if d >= 0 else "−"
+            lines.append(f"  {verb}    {t['ticker']:<8} {sign}${abs(d):,.2f}  "
+                         f"(${t['from_dollars']:,.2f} → ${t['to_dollars']:,.2f})")
         else:
             lines.append(f"  RESIZE  {t['ticker']:<8} {t['from_pct']:.2f}% → {t['to_pct']:.2f}%")
 

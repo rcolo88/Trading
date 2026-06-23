@@ -72,10 +72,11 @@ Output: `outputs/backtest_TIMESTAMP.[txt|json|png]`
 
 Builds the exact target portfolio book for today — the same engine the backtest
 trades — and prints every holding with its target weight, and (with `--capital`)
-dollar allocation and share count, plus an exposure/regime header and the
-buy/sell/resize trades vs your last book.  Hold each name until it leaves the
-weekly book; there are no intraday stops.  `--holdings file.json` diffs against
-your actual broker positions.
+the **dollar amount to buy** per name (fractional shares, e.g. Robinhood), plus an
+exposure/regime header and the **dollar** buy/sell/resize trades vs your last book.
+Hold each name until it leaves the weekly book; there are no intraday stops.
+`--holdings file.json` (a `{"TICKER": dollar_value}` map of your current positions)
+diffs against your actual broker holdings instead of the saved book.
 
 Output: `outputs/ideas_TIMESTAMP.[txt|json]` (+ `outputs/portfolio_book.json` state)
 

@@ -254,47 +254,54 @@ def _save_book(out_dir: Path, payload: dict) -> None:
 
 
 def _read_holdings_file(path: Path) -> dict:
-    """Read an external holdings file ({ticker: shares}) to diff against."""
+    """Read an external holdings file to diff against.
+
+    Values are the current dollar market value per ticker ({"AAPL": 250.00}),
+    matching how you trade on a fractional/dollar broker like Robinhood.
+    """
     raw = json.loads(Path(path).read_text())
-    return {str(k).upper(): int(v) for k, v in raw.items()}
+    return {str(k).upper(): float(v) for k, v in raw.items()}
 
 
 def _compute_trades(prev_rows: list[dict], new_rows: list[dict],
-                    has_capital: bool, prev_shares: dict | None = None) -> dict:
+                    has_capital: bool, prev_dollars: dict | None = None) -> dict:
     """BUY/SELL/RESIZE diff of the new book vs the previously held one.
 
-    Diffs on share counts when capital is known (actionable order sizes),
-    otherwise on weight %.  `prev_shares` overrides prev_rows (used by --holdings).
+    Diffs on DOLLARS when capital is known (you buy/sell dollar amounts on a
+    fractional broker), otherwise on weight %.  `prev_dollars` ({ticker: $market
+    value}) overrides prev_rows (used by --holdings).  A $1 band suppresses noise.
     """
     buys, sells, resizes = [], [], []
-    if prev_shares is not None:
-        prev_sh = dict(prev_shares)
-        prev_w  = {}
+    if prev_dollars is not None:
+        prev_d = {k: float(v) for k, v in prev_dollars.items()}
+        prev_w = {}
     else:
-        prev_sh = {r["ticker"]: r.get("shares", 0) for r in (prev_rows or [])}
-        prev_w  = {r["ticker"]: r.get("weight_pct", 0.0) for r in (prev_rows or [])}
-    new_sh = {r["ticker"]: r.get("shares", 0) for r in new_rows}
-    new_w  = {r["ticker"]: r.get("weight_pct", 0.0) for r in new_rows}
+        prev_d = {r["ticker"]: r.get("dollars", 0.0) for r in (prev_rows or [])}
+        prev_w = {r["ticker"]: r.get("weight_pct", 0.0) for r in (prev_rows or [])}
+    new_d = {r["ticker"]: r.get("dollars", 0.0) for r in new_rows}
+    new_w = {r["ticker"]: r.get("weight_pct", 0.0) for r in new_rows}
 
     for t in new_rows:
         tk = t["ticker"]
-        if tk not in prev_sh and tk not in prev_w:
-            buys.append({"ticker": tk, "shares": new_sh.get(tk) if has_capital else None})
+        if tk not in prev_d and tk not in prev_w:
+            buys.append({"ticker": tk, "dollars": round(new_d.get(tk, 0.0), 2)
+                                       if has_capital else None})
         elif has_capital:
-            d = new_sh.get(tk, 0) - prev_sh.get(tk, 0)
-            if abs(d) >= 1:
-                resizes.append({"ticker": tk, "delta_shares": int(d),
-                                "from_shares": int(prev_sh.get(tk, 0)),
-                                "to_shares": int(new_sh.get(tk, 0))})
+            delta = new_d.get(tk, 0.0) - prev_d.get(tk, 0.0)
+            if abs(delta) >= 1.0:
+                resizes.append({"ticker": tk, "delta_dollars": round(delta, 2),
+                                "from_dollars": round(prev_d.get(tk, 0.0), 2),
+                                "to_dollars":   round(new_d.get(tk, 0.0), 2)})
         else:
             if abs(new_w.get(tk, 0.0) - prev_w.get(tk, 0.0)) >= 0.20:
-                resizes.append({"ticker": tk, "delta_shares": None,
+                resizes.append({"ticker": tk, "delta_dollars": None,
                                 "from_pct": prev_w.get(tk, 0.0), "to_pct": new_w.get(tk, 0.0)})
 
-    held_now = set(new_sh)
-    for tk in (set(prev_sh) | set(prev_w)):
+    held_now = set(new_d)
+    for tk in (set(prev_d) | set(prev_w)):
         if tk not in held_now:
-            sells.append({"ticker": tk, "shares": prev_sh.get(tk) if has_capital else None})
+            sells.append({"ticker": tk, "dollars": round(prev_d.get(tk, 0.0), 2)
+                                        if has_capital else None})
     return {"buys": buys, "sells": sells, "resizes": resizes}
 
 
@@ -409,7 +416,7 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
         if capital is not None and last_close > 0:
             dollars = float(weight) * capital
             row["dollars"] = round(dollars, 2)
-            row["shares"]  = int(dollars // last_close)
+            row["shares"]  = round(dollars / last_close, 4)   # fractional (Robinhood)
         rows.append(row)
 
     gross = float(book.sum()) if not book.empty else 0.0
@@ -431,8 +438,8 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
 
     holdings_path = getattr(args, "holdings", None)
     if holdings_path:
-        prev_shares = _read_holdings_file(Path(holdings_path))
-        trades = _compute_trades([], rows, capital is not None, prev_shares=prev_shares)
+        prev_dollars = _read_holdings_file(Path(holdings_path))
+        trades = _compute_trades([], rows, capital is not None, prev_dollars=prev_dollars)
     else:
         trades = _compute_trades((prev or {}).get("book", []), rows, capital is not None)
 
@@ -576,9 +583,9 @@ def main() -> None:
     id_parser = sub.add_parser("ideas",
                                help="Output today's target portfolio book + rebalance trades")
     id_parser.add_argument("--capital", type=float, default=None,
-                           help="Account capital — adds $ allocation + share counts per name")
+                           help="Account capital — adds the $ to buy per name (fractional shares)")
     id_parser.add_argument("--holdings", type=str, default=None,
-                           help="Path to a JSON {ticker: shares} of actual holdings to diff against")
+                           help="Path to a JSON {ticker: dollar_value} of holdings to diff against")
 
     sub.add_parser("verify-book",
                    help="Assert the live book == the backtest engine (consistency self-check)")
