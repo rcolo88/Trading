@@ -11,36 +11,72 @@ underlying:
 # Change the dataset here once -- no script edits needed.
 synthetic_data:
   symbol: SPY
-  start_date: "2024-01-01"
-  end_date: "2026-06-01"
+  start_date: "2021-01-01"   # Extended for 5-year WF/OOS window (VIX complex available from 2011+)
+  end_date: "2026-06-12"
   max_dte: 90
 
 # Backtesting period (the window a backtest runs over; may be a SUBSET of the
 # synthetic_data range above -- these are distinct from the generation range).
 backtest:
-  start_date: "2025-10-01"
-  end_date: "2026-06-01"
+  # DoltHub real chains (clean iv, true term structure). Massive/Polygon free-tier was dropped:
+  # its EOD closes back-solve to iv ~1.35x VIX and invert the term structure on 34% of slices
+  # (no-arbitrage violations) — a calendar's P&L IS the near-vs-far relationship, so it's unusable.
+  # The loader's data-quality gate now HARD-FAILS such data. See CHANGELOG 2026-06-25.
+  start_date: "2021-01-04"   # Synthetic VIX-complex data, 5-year WF/OOS window
+  end_date:   "2026-06-12"
   initial_capital: 10000
+
+# Optimization controls (read by ParameterOptimizer)
+optimization:
+  min_trades: 10   # Trials with fewer trades than this have their Sharpe/Sortino/Calmar NaN'd, so a
+                   #   handful of lucky trades can't win the search and degenerate ~0-volatility
+                   #   Sharpes (|SR|~1e16) don't pollute the deflated-Sharpe benchmark. Raise as you
+                   #   add history (more days -> more trades -> a higher floor is reasonable).
 
 # Data source configuration
 data_source:
   # Which options dataset the loader (load_sample_spy_options_data) serves:
-  #   synthetic -> Black-Scholes model data (flat IV, no skew/term structure) — FAST, for
-  #                plumbing/CI only; results are NOT tradeable (calendar Sharpe is an artifact).
+  #   synthetic -> Black-Scholes model data (calibrated skew + term structure, dense chains) —
+  #                use for parameter exploration when real data is too sparse for stable ranking.
   #   real      -> DoltHub/logged chains with true skew + term structure — use for any real
   #                conclusion. Build with: python -m src.data_fetchers.real_chain_loader ...
-  mode: "real"        # synthetic | real
+  #   hybrid    -> REAL data wherever DoltHub sampled it, plus CALIBRATED SYNTHETIC fill for
+  #                missing (date, expiration) pairs so every expiration is quotable every day.
+  #                Best of both: real prices/historical skew where they exist, dense enough for
+  #                entry/exit to fire reliably.  Recommended default.
+  mode: "synthetic"  # synthetic | real | hybrid
+                     # VIX-complex-driven synthetic: term structure from real ^VIX9D/^VIX/^VIX3M/^VIX6M
   primary: "quantconnect"  # Options: quantconnect, yahoo, polygon, schwab
   backup: "yahoo"  # For underlying price data
   cache_enabled: true
   cache_dir: "data/processed"
 
+  # Reprice bid/ask from the (clean) IV surface on real data. On the DoltHub free dataset the iv
+  # column tracks VIX (ATM ~30d iv/VIX ~= 0.95) but the raw bid/ask is inflated/noisy (mid implies
+  # ~1.47x VIX), so marking held positions against bid/ask is inconsistent with entry and breaks
+  # profit/stop/dte exits. Repricing every contract off its own clean iv (Black-Scholes, real skew +
+  # term structure preserved) puts entry, exit, and daily re-marks on one fair basis. Set false to
+  # backtest the raw quotes instead.
+  # OptionsDX EOD bid/ask are genuine exchange quotes (clean), so backtest them DIRECTLY rather
+  # than repricing off the IV column. Set true ONLY for the DoltHub dataset (whose raw bid/ask is
+  # inflated ~1.47x VIX). Build the OptionsDX file with: python -m src.data_fetchers.optionsdx_loader
+  price_from_iv: true   # DoltHub: clean iv, dirty bid/ask -> reprice off iv (true). The loader's
+                        #   data-quality gate refuses any dataset that isn't arbitrage-coherent.
+  # allow_low_quality: false  # set true ONLY to deliberately override the gate (NOT recommended)
+  reprice:
+    risk_free_rate: 0.04
+    spread_frac: 0.008     # ~0.8% matches real SPY ATM liquidity (was 0.03 — 3-6x too wide)
+    min_spread: 0.01       # 1¢ floor (was 0.05)
+
 # Real options dataset spec (used when data_source.mode == real). The real_chain_loader writes
 # data/processed/SPY_real_options_<start>_<end>.csv from these values, and the loader reads it.
 real_data:
   symbol: SPY
-  start_date: "2025-10-01"
-  end_date: "2026-06-08"
+  # Selects data/processed/SPY_real_options_<start>_<end>.csv. DoltHub chains: clean iv + true term
+  # structure (ATM iv/VIX ~0.93, 0% term-structure inversions), ~3 expirations/day (sparse, handled
+  # by synthetic_remark + strike_snap). The Massive 2024-06..2026-06 pull is corrupt — do NOT use it.
+  start_date: "2021-01-01"
+  end_date:   "2026-06-08"
 
 # Transaction costs / fill model (see src/utils/execution.py)
 costs:
@@ -116,6 +152,17 @@ strategies:
       # far_dte_max: 65       # Maximum DTE for far-term leg
       # Note: If min/max specified, they override near_dte/far_dte/dte_tolerance
 
+      require_contango: false # Only enter when front-month IV < back-month IV (normal, upward-sloping
+                             #   term structure). Refuses backwardation (vol-spike) entries, where a
+                             #   long calendar structurally loses — externally-sourced data: contango
+                             #   ~+18% avg vs backwardation ~-15%. Fixed gate (no optimizer dimension,
+                             #   so it doesn't deflate the Deflated Sharpe).
+                             # DEFAULT OFF: the Massive/Polygon free-tier dataset's option prices are
+                             #   thin last-trade prints (1-6 contracts/day) that back-solve to IVs 2-4x
+                             #   VIX, inflated WORSE at short DTE — which fabricates backwardation on
+                             #   ~99% of days and makes this gate reject nearly every entry. Turn it ON
+                             #   only on a dataset with trustworthy term structure (genuine exchange
+                             #   bid/ask, e.g. OptionsDX), where near/far IV is real. See CHANGELOG.
       strike_selection: "delta"  # Options: atm, delta, moneyness
       target_delta: 0.4     # Used if strike_selection = "delta"
       moneyness: 0.0         # Used if strike_selection = "moneyness" (0.0 = ATM)
@@ -123,6 +170,14 @@ strategies:
       max_debit: 10.0        # Maximum debit to enter (increased for SPY ~$530)
       vix_min: 5            # Calendars prefer low VIX environment
       vix_max: 25            # Don't enter if VIX > 20 (defeats calendar purpose)
+      vix_rank_max: 30       # VIX IV-Rank gate: only enter when VIX's percentile over its trailing
+                             #   252 days is <= this (a long calendar is long vega -> open when vol is
+                             #   cheap vs its own year). Unlike vix_min/vix_max (same-day scalars the
+                             #   engine passes the strategy), the rank needs a 252d window + warmup, so
+                             #   the optimizer script builds it ONCE from ^VIX (cached) as an entry gate
+                             #   rather than recomputing it every trial. Uses CLEAN VIX, so it is
+                             #   unaffected by the Massive option-price issue that disabled contango.
+                             #   Set to null to disable; CLI --vix-rank=N overrides, --no-vix-rank off.
     exit:
       profit_target: 0.3    # Close at 30% profit
       stop_loss: -0.1        # Stop at 10% loss
@@ -131,6 +186,13 @@ strategies:
       strike_snap_pct: 0.01  # Re-mark a held leg at the nearest quoted strike within this % of spot
                              #   when its exact strike isn't quoted (real chains are sparse). 0.01
                              #   (~$7 on SPY) bridges the median gap with minimal distortion; 0 = off.
+      # When a held leg's exact contract isn't quoted at all on a later day, synthesize its mark via
+      # Black-Scholes off the day's IV surface (so profit/stop/dte exits can fire every day instead of
+      # the trade drifting to near-expiration). Needs consistent pricing — keep data_source.price_from_iv
+      # on. Set false to revert to hold-until-quoted behavior.
+      synthetic_remark: true
+      synthetic_iv_fallback: 0.18   # IV used only when a day has no usable quotes at all
+      synthetic_spread_frac: 0.02   # modeled half-spread on synthesized marks
 
   iron_condor:              # Market-neutral credit spread (bull put + bear call)
     enabled: true

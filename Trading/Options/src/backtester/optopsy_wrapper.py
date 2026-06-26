@@ -280,9 +280,20 @@ class OptopsyBacktester:
             if daily_options.empty:
                 continue
 
-            underlying_price = underlying_data.loc[
-                underlying_data.index == current_date, 'close'
-            ].values[0] if current_date in underlying_data.index else None
+            # Spot from the option chain ITSELF (its underlying_price column) so strike
+            # selection, daily marks, and the "underlying moved" exit all share ONE price
+            # basis. underlying_data (yfinance) is dividend-ADJUSTED, so on real datasets that
+            # carry their own unadjusted spot (e.g. OptionsDX UNDERLYING_LAST) mixing the two
+            # put strikes ~13% from the adjusted close and fired phantom "moved too far" exits
+            # on day one. Fall back to underlying_data only when the chain lacks a spot.
+            if 'underlying_price' in daily_options.columns and daily_options['underlying_price'].notna().any():
+                underlying_price = float(daily_options['underlying_price'].iloc[0])
+            elif current_date in underlying_data.index:
+                underlying_price = underlying_data.loc[
+                    underlying_data.index == current_date, 'close'
+                ].values[0]
+            else:
+                underlying_price = None
 
             if underlying_price is None:
                 continue
@@ -390,16 +401,19 @@ class OptopsyBacktester:
                         )
                         current_portfolio_value = self.account_value + total_unrealized
 
+                        # Price the spread FIRST so sizing uses the ACTUAL debit/credit per contract,
+                        # not a worst-case max_debit estimate (which made a $10k account that dipped
+                        # after one loss size 0 contracts and stop trading for the rest of the run).
+                        entry_price = self._get_entry_price(daily_options, entry_signal, self.limit_frac, self.extra_slip)
+
                         # Calculate position size with available risk constraint
                         contracts = strategy.calculate_position_size(
                             signal=entry_signal,
                             account_value=current_portfolio_value,
                             available_risk_budget=available_risk_budget,
-                            full_config=self.config  # Pass full config for Kelly parameters
-                        )
-
-                        # Get entry price
-                        entry_price = self._get_entry_price(daily_options, entry_signal, self.limit_frac, self.extra_slip)
+                            full_config=self.config,  # Pass full config for Kelly parameters
+                            entry_price=entry_price,  # actual per-contract debit/credit for risk sizing
+                        ) if entry_price else 0
 
                         if entry_price and contracts > 0:
                             # Iron condor = 4 legs at one expiration; everything else = 2 legs.

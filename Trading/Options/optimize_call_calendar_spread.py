@@ -5,12 +5,26 @@ Call Calendar Spread Parameter Optimization
 Optimizes parameters for Call Calendar Spread strategy and saves results.
 Designed to run unattended in Mac terminal, even with screen closed.
 
-Usage:
-    # Best practice - prevents Mac sleep during optimization
-    caffeinate -i python optimize_call_calendar_spread.py
+Two modes:
+    DEFAULT (walk-forward validation) — optimize on an in-sample window, then score the chosen
+        params on a held-out out-of-sample window the search never saw. Reports IS vs OOS Sharpe.
+        This is the honest "does the edge survive?" test; use it to DECIDE whether to trade.
+    --final — fit on the ENTIRE window with NO out-of-sample holdout. The production fit you run
+        ONLY AFTER a default run confirms the edge survives OOS, to get live params from all data.
 
-    # Or simply (but Mac may sleep on battery)
-    python optimize_call_calendar_spread.py
+Usage:
+    # DEFAULT: walk-forward validation (honest IS-vs-OOS). caffeinate prevents Mac sleep.
+    caffeinate -i python optimize_call_calendar_spread.py
+    #   optional: change the holdout fraction (default 0.30 = last 30% held out)
+    caffeinate -i python optimize_call_calendar_spread.py --oos-frac=0.25
+
+    # FINAL fit on all data, no holdout (only after walk-forward passes):
+    caffeinate -i python optimize_call_calendar_spread.py --final
+
+    # --TR overlays the SPY Trend Reversal entry gate (bullish-day entries only); combinable.
+    # VIX IV-Rank gate is ON by default from config (call_calendar.entry.vix_rank_max, default 30):
+    #   a long calendar is long vega, so enter only when vol is cheap vs its trailing year. Override
+    #   per-run with --vix-rank=N, or turn it off with --no-vix-rank. Combinable with --TR.
 
 Results saved to: optimization_results/CallCalendarSpread_YYYYMMDD_HHMMSS.csv
 """
@@ -101,16 +115,38 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
     #     trials silently find no contract. We derive that cap from the loaded data (which is
     #     governed by config/config.yaml -> synthetic_data.max_dte at generation time) and
     #     round it down to the step grid -- no more hand-coding it against the generator.
-    #   * near_dte < far_dte and vix_min < vix_max by construction, so no trial is wasted on an
-    #     invalid ordering.
-    FAR_DTE_STEP = 7
-    FAR_DTE_FLOOR = 42
-    data_max_dte = int(options_data['dte'].max())
-    far_dte_cap = max(FAR_DTE_FLOOR, (data_max_dte // FAR_DTE_STEP) * FAR_DTE_STEP)
+    #   * near_dte < far_dte and vix_min < vix_max by construction (DISJOINT ranges: near {7..28}
+    #     vs far {30..45}; vix_min {5..20} vs vix_max {25..60}), so no trial is wasted on those
+    #     invalid orderings. The near_dte {7..28} and dte_exit {2..14} ranges OVERLAP, though, so
+    #     dte_exit < near_dte CANNOT be guaranteed by the ranges — it is enforced as a runtime guard
+    #     in ParameterOptimizer._run_single_backtest (dte_exit >= near_dte raises and is dropped),
+    #     since dte_exit >= near_dte would force the calendar to exit on entry day.
+    #   * STEP is deliberately fine (3): real chains list only a few expirations/day at irregular
+    #     DTEs (e.g. DoltHub clusters near ~{13, 28, 60}). A coarse step-7 grid {42,49,56,63} can
+    #     straddle the actual far expiration and find NO contract (far_dte=42 lands in a gap -> 1
+    #     trade), so we sample densely and let the floor (min_trades) discard the gap-landing trials.
+    FAR_DTE_STEP = 3
+    FAR_DTE_FLOOR = 30
+    # Research ceiling: externally-sourced consensus is a 30-45 DTE far leg (3:1-4:1 over a 7-14 DTE
+    # near leg); 60+ DTE pairings show overfitting risk and drift off the real expiration grid. Cap
+    # the search at 45 regardless of how far the data extends, so the optimizer can't wander into a
+    # longer-dated region that isn't supported by the strategy literature.
+    FAR_DTE_CEIL = 45
+    # Cap far_dte at the longest REAL DTE, not the combined max. In hybrid mode the data
+    # carries surface-fit fill out to synthetic_data.max_dte (~90); those rows beyond the
+    # real grid (~66) are quadratic IV-surface EXTRAPOLATION, not quotes. Letting far_dte
+    # reach them lets the optimizer game a fabricated far leg (far_dte=87 → $10k→$356M,
+    # one trade +$92M). The 'is_fill' tag (hybrid loader) marks fill rows; when present,
+    # cap on real-only DTE so the search stays inside data the market actually priced.
+    if 'is_fill' in options_data.columns and (~options_data['is_fill']).any():
+        data_max_dte = int(options_data.loc[~options_data['is_fill'], 'dte'].max())
+    else:
+        data_max_dte = int(options_data['dte'].max())
+    far_dte_cap = min(FAR_DTE_CEIL, max(FAR_DTE_FLOOR, (data_max_dte // FAR_DTE_STEP) * FAR_DTE_STEP))
 
-    optimizer.set_parameter_range('near_dte', min=7, max=35, step=7)        # sell the near leg
-    optimizer.set_parameter_range('far_dte', min=FAR_DTE_FLOOR, max=far_dte_cap, step=FAR_DTE_STEP)  # buy the far leg
-    optimizer.set_parameter_range('target_delta', min=0.40, max=0.55, step=0.05)  # ATM-ish
+    optimizer.set_parameter_range('near_dte', min=7, max=28, step=7)        # sell the near leg (7-28)
+    optimizer.set_parameter_range('far_dte', min=FAR_DTE_FLOOR, max=far_dte_cap, step=FAR_DTE_STEP)  # buy the far leg (30-45)
+    optimizer.set_parameter_range('target_delta', min=0.45, max=0.55, step=0.05)  # ATM / slightly OTM
     optimizer.set_parameter_range('profit_target', min=0.10, max=0.60, step=0.10)
     optimizer.set_parameter_range('stop_loss', min=-0.50, max=-0.10, step=0.10)
     optimizer.set_parameter_range('vix_min', min=5, max=20, step=5)
@@ -145,6 +181,14 @@ def run_optimization(optimizer: ParameterOptimizer) -> pd.DataFrame:
         # Use grid search for small search spaces
         MODE = 'grid'
         N_TRIALS = None  # Not used in grid mode
+
+    # Quick override: --trials=N forces Optuna with N trials (e.g. a fast first pass on a big
+    # dataset). On a 5-year history each backtest is several seconds, so 1000 trials runs hours;
+    # --trials=150 gives a representative walk-forward in a fraction of the time.
+    for _a in sys.argv:
+        if _a.startswith('--trials='):
+            MODE = 'optuna'
+            N_TRIALS = int(_a.split('=', 1)[1])
 
     # OVERRIDE: Uncomment to force a specific mode
     # MODE = 'optuna'
@@ -277,10 +321,13 @@ def run_walk_forward(config, options_data, underlying_data, entry_gate) -> int:
         return int(f) if f.is_integer() else f
     best_params = {p: _cast(row[p]) for p in optimizer.parameter_ranges.keys() if p in row}
 
-    # Score those exact params on the held-out OOS window.
-    oos = walk_forward.evaluate_params(
+    # Score those exact params on the held-out OOS window — from the OOS slice of ONE continuous
+    # IS+OOS run (standard walk-forward), NOT an isolated OOS-only backtest. An isolated short window
+    # under-trades badly (an early degenerate exit + low-capital sizing starve it: ~1 trade vs ~70
+    # continuous), which produced false "overfit" NaN verdicts.
+    oos = walk_forward.evaluate_oos_continuous(
         config, 'calendar', CallCalendarSpread, options_data, underlying_data,
-        oos_win, best_params, entry_gate,
+        (is_win[0], oos_win[1]), oos_win[0], best_params, entry_gate,
     )
     is_sharpe = float(row['sharpe_ratio'])
     oos_sharpe = float(oos.get('sharpe_ratio', float('nan')))
@@ -294,8 +341,12 @@ def run_walk_forward(config, options_data, underlying_data, entry_gate) -> int:
           f"  | OOS trades: {oos.get('total_trades', '?')}")
     if 'error' in oos:
         print(f"  OOS note: {oos['error']}")
-    verdict = 'healthy — edge survives OOS' if (oos_sharpe > 1.0 and oos_sharpe > 0.5 * is_sharpe) \
-        else 'LARGE degradation — treat the IS optimum as overfit'
+    if oos_sharpe > 1.0 and oos_sharpe > 0.5 * is_sharpe:
+        verdict = 'healthy — edge survives OOS'
+    elif oos_sharpe > 0.5:
+        verdict = 'edge persists but weaker — degraded, not collapsed'
+    else:
+        verdict = 'collapse — treat the IS optimum as overfit'
     print(f"  IS→OOS Sharpe drop: {is_sharpe - oos_sharpe:7.3f}  ({verdict})")
     print("=" * 70 + "\n")
 
@@ -317,18 +368,57 @@ def main() -> int:
         config = load_configuration()
         options_data, underlying_data = load_data(config)
 
+        # Entry gates (each a causal callable(date)->bool); multiple compose by logical AND.
+        start = options_data['quote_date'].min().strftime('%Y-%m-%d')
+        end = options_data['quote_date'].max().strftime('%Y-%m-%d')
+        gates = []
+
         # --TR overlays the SPY Trend Reversal signal: only open trades on 'green' (bullish) days.
-        entry_gate = None
         if '--TR' in sys.argv:
             from src.utils.trend_gate import spy_trend_gate
-            end = options_data['quote_date'].max().strftime('%Y-%m-%d')
-            entry_gate = spy_trend_gate(end, 'bull')
-            print("  --TR ON: gating entries to SPY Trend Reversal 'green' (bullish) days only.\n")
+            gates.append(spy_trend_gate(end, 'bull'))
+            print("  --TR ON: gating entries to SPY Trend Reversal 'green' (bullish) days only.")
 
-        # --wf: optimize in-sample, then score the winner out-of-sample (overfit check).
-        if '--wf' in sys.argv:
+        # VIX IV-Rank gate: enter only when VIX IV-Rank <= threshold (a long calendar is long vega ->
+        # cheap-vol entries; the SPY-correct way to apply "IV Rank < 30"). The threshold lives in
+        # config (call_calendar.entry.vix_rank_max) like every other entry filter; it's built HERE,
+        # not read inside the strategy, only because the 252d rank needs warmup history absent from the
+        # per-day chain -> build once as a gate vs recompute per trial. CLI overrides for one-off runs:
+        #   --vix-rank=N  use threshold N    --vix-rank  use config (or 30)    --no-vix-rank  disable
+        cal_entry = config['strategies']['call_calendar']['entry']
+        vix_rank_max = cal_entry.get('vix_rank_max')  # config default; None/null -> off
+        cli = next((a for a in sys.argv if a == '--vix-rank' or a.startswith('--vix-rank=')), None)
+        if '--no-vix-rank' in sys.argv:
+            vix_rank_max = None
+        elif cli is not None and '=' in cli:
+            vix_rank_max = float(cli.split('=', 1)[1])
+        elif cli is not None:
+            vix_rank_max = vix_rank_max if vix_rank_max is not None else 30.0
+        if vix_rank_max is not None:
+            from src.utils.vix_gate import vix_rank_gate
+            gates.append(vix_rank_gate(start, end, max_rank=float(vix_rank_max)))
+            print(f"  VIX IV-Rank gate ON: entries only when VIX IV-Rank <= {float(vix_rank_max):.0f} "
+                  f"(config vix_rank_max; --no-vix-rank to disable).")
+
+        if gates:
+            entry_gate = gates[0] if len(gates) == 1 else (lambda d, _g=tuple(gates): all(g(d) for g in _g))
+            print()
+        else:
+            entry_gate = None
+
+        # Walk-forward validation is the DEFAULT: optimize on an in-sample window, then score the
+        # chosen params on a held-out out-of-sample window the search never saw (the honest overfit
+        # check). The bare in-sample number is optimistic by construction — you searched 1000 trials
+        # and kept the max — so it must not be the default deliverable.
+        #   --final  : skip the holdout and fit on the ENTIRE window (production fit; do this ONLY
+        #              after a walk-forward run shows the edge survives OOS).
+        #   --wf     : still accepted as an explicit alias for the (now default) walk-forward mode.
+        if '--final' not in sys.argv:
             return run_walk_forward(config, options_data, underlying_data, entry_gate)
 
+        print("MODE: FINAL FIT — optimizing over the ENTIRE window with NO out-of-sample holdout.")
+        print("      The reported Sharpe is in-sample only; trust it only after a default/--wf run")
+        print("      has shown the edge survives OOS. Use these params for live trading.\n")
         optimizer = setup_optimizer(config, options_data, underlying_data, entry_gate)
         results = run_optimization(optimizer)
         save_results(results, optimizer, config)

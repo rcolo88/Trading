@@ -55,28 +55,72 @@ class SyntheticOptionsGenerator:
         self.volatility_window = volatility_window
         self.use_vix_for_iv = use_vix_for_iv
 
-        # IV-surface shape (so synthetic chains have real skew + term structure, not one flat IV).
-        # Without these every strike/expiration shares one IV, which makes calendars a free lunch and
-        # produces the degenerate ties + inflated Sharpe. Values are deliberately modest and SPY-like.
-        self.skew_slope = 0.60   # IV rises as strike falls (equity put skew); per unit log-moneyness
-        self.skew_curv = 1.50    # smile convexity (both deep wings richer)
-        self.term_slope = 0.10   # mild contango: longer-dated slightly higher IV (per year past 30d)
-        self.min_half_spread = 0.025  # floor on half bid/ask ($) so cheap options aren't priced tight
+        # IV-surface shape — calibrated against DoltHub real data (compare_synthetic_real.py).
+        # Skew term: 1.0 - slope * log_moneyness + curv * log_moneyness^2
+        # Term:      1.0 + term_slope * (dte - 30) / 365
+        #             + short_premium * max(0, 30-dte) / 365  (short-dated vol premium)
+        self.skew_slope = 1.00          # equity put skew steepness (was 0.60 — too flat)
+        self.skew_curv = 2.50           # smile convexity (was 1.50 — wings too cheap)
+        self.term_slope = 0.0           # residual contango (was +0.10; short_premium does the work)
+        self.short_premium = 3.0        # extra annualized vol for days below 30 DTE
+        self.min_half_spread = 0.01     # floor on half bid/ask ($); SPY ATM spreads are ~1¢
+        # VIX → base-vol calibration.  VIX itself is ~30d ATM, so raw vix/100 is a decent starting
+        # point.  Real SPY atmf vol ≈ 0.95 * VIX + 1.5 vol-pts (low-VIX regimes have a higher
+        # premium over VIX; high-VIX regimes trade near VIX).
+        self.vix_scale = 0.95           # scale factor on vix/100 (was implicit 1.0)
+        self.vix_offset = 0.015         # additive offset so low-vix doesn't floor out
 
         self.underlying_data = None
         self.volatility = None
+        # Set per-day from _build_term_curve() before generating each day's chains.
+        # None → fallback to hardcoded short_premium formula (used if VIX complex unavailable).
+        self._day_term_curve = None
 
     def _iv_surface(self, spot: float, strike: float, dte: int, base_vol: float) -> float:
-        """IV for one (strike, dte) from a base level: equity skew × mild term structure.
+        """IV for one (strike, dte) from a base level: equity skew × term structure.
 
-        This is what makes the synthetic data non-degenerate — a calendar's near/far legs and a
-        vertical's two strikes now carry *different* IVs, so skew/term-structure risk is modelled
-        rather than assumed away. Still a model: use real data (data_source.mode=real) for conclusions.
+        When self._day_term_curve is set (VIX complex available), the term-structure
+        ratio at each DTE is interpolated from real observed VIX tenors (^VIX9D/^VIX/
+        ^VIX3M/^VIX6M), so contango/backwardation regimes are real, not hardcoded.
+        Falls back to the parametric formula when the VIX complex is unavailable.
         """
-        m = np.log(strike / spot) if spot > 0 and strike > 0 else 0.0  # log-moneyness (<0 = low strike)
+        m = np.log(strike / spot) if spot > 0 and strike > 0 else 0.0
         skew = 1.0 - self.skew_slope * m + self.skew_curv * m * m
-        term = 1.0 + self.term_slope * (dte - 30.0) / 365.0
+        if self._day_term_curve is not None:
+            term = self._day_term_curve(dte)
+        else:
+            short_extra = max(0, 30 - dte) * self.short_premium / 365.0 if self.short_premium else 0.0
+            term = 1.0 + self.term_slope * (dte - 30.0) / 365.0 + short_extra
         return float(np.clip(base_vol * skew * term, 0.03, 3.0))
+
+    def _build_term_curve(self, date):
+        """Build a per-day term-ratio callable from the real VIX tenor complex.
+
+        Interpolates across available VIX tenors (^VIX9D=9d, ^VIX=30d, ^VIX3M=93d,
+        ^VIX6M=180d) and returns a function term_ratio(dte) that gives IV(dte)/IV(30d).
+        The 30d anchor (^VIX level) is already baked into base_vol; this only shapes the
+        curve — so contango/backwardation comes from real observed data, not a constant.
+
+        Returns None when fewer than 2 tenors are available (caller uses fallback).
+        """
+        tenor_cols = [("vix9d", 9), ("vix", 30), ("vix3m", 93), ("vix6m", 180)]
+        points = []
+        for col, dte_pt in tenor_cols:
+            if col in self.underlying_data.columns:
+                val = self.underlying_data.loc[date, col]
+                if pd.notna(val) and val > 0:
+                    points.append((dte_pt, float(val)))
+        if len(points) < 2 or not any(d == 30 for d, _ in points):
+            return None
+        dtes = np.array([p[0] for p in points], dtype=float)
+        vols = np.array([p[1] for p in points], dtype=float)
+        vix30 = float(dict(points)[30])
+
+        def term_ratio(dte: int) -> float:
+            interp_vol = float(np.interp(float(dte), dtes, vols))
+            return float(np.clip(interp_vol / vix30, 0.5, 3.0))
+
+        return term_ratio
 
     def fetch_underlying_data(
         self,
@@ -144,6 +188,28 @@ class SyntheticOptionsGenerator:
         else:
             print(f"⚠️  Warning: Could not fetch VIX data")
             data['vix'] = np.nan
+
+        # Fetch VIX term-structure complex for per-day term-ratio calibration.
+        # ^VIX9D / ^VIX3M / ^VIX6M combined with ^VIX (30d, already fetched) give 4 tenor
+        # points; _build_term_curve() interpolates these into a daily term-ratio curve so the
+        # calendar sees real contango/backwardation regimes rather than a hardcoded constant.
+        for vix_sym, col_name in [("^VIX9D", "vix9d"), ("^VIX3M", "vix3m"), ("^VIX6M", "vix6m")]:
+            try:
+                vt = yf.Ticker(vix_sym)
+                vd = vt.history(start=start_date, end=end_date)
+                if not vd.empty:
+                    vd.index = vd.index.tz_localize(None)
+                    vd.index = vd.index.map(
+                        lambda x: x.replace(hour=12, minute=0, second=0, microsecond=0))
+                    data = data.join(vd['Close'].rename(col_name), how='left')
+                    data[col_name] = data[col_name].ffill()
+                    print(f"  ✓ {vix_sym} → '{col_name}' ({data[col_name].notna().sum()} days)")
+                else:
+                    data[col_name] = np.nan
+                    print(f"  ⚠️  {vix_sym}: no data returned — term-structure will use fallback")
+            except Exception as e:
+                data[col_name] = np.nan
+                print(f"  ⚠️  {vix_sym}: fetch failed ({e}) — term-structure will use fallback")
 
         # Calculate SPY's Implied Volatility from ATM options
         # For synthetic data, we use VIX as a proxy for SPY IV since:
@@ -270,7 +336,7 @@ class SyntheticOptionsGenerator:
         num_strikes: int = 40,
         strike_interval: float = 5.0,
         add_spread: bool = True,
-        spread_pct: float = 0.02
+        spread_pct: float = 0.008
     ) -> pd.DataFrame:
         """
         Generate complete options chain for a single date and expiration.
@@ -453,10 +519,15 @@ class SyntheticOptionsGenerator:
             # Get VIX if available
             vix = self.underlying_data.loc[quote_date, 'vix'] if 'vix' in self.underlying_data.columns else None
 
+            # Build per-day term-structure curve from the VIX complex (real contango/backwardation).
+            # _iv_surface() reads self._day_term_curve; None = fallback to hardcoded formula.
+            self._day_term_curve = self._build_term_curve(quote_date)
+
             # Determine which volatility to use for pricing
             if self.use_vix_for_iv and vix is not None and not np.isnan(vix):
-                # Use VIX as implied volatility (convert from percentage to decimal)
-                pricing_vol = vix / 100.0
+                # Calibrated VIX → SPY IV: scale + offset so low-VIX regimes don't floor out
+                # and high-VIX regimes don't over-shoot (see compare_synthetic_real.py).
+                pricing_vol = max(vix / 100.0 * self.vix_scale + self.vix_offset, 0.05)
             else:
                 # Fall back to historical volatility
                 pricing_vol = vol
@@ -587,6 +658,146 @@ def _read_options_csv(csv_file) -> pd.DataFrame:
     return data
 
 
+def reprice_from_iv(df: pd.DataFrame, r: float = 0.04, spread_frac: float = 0.03,
+                    min_spread: float = 0.05, iv_lo: float = 0.03, iv_hi: float = 2.0) -> pd.DataFrame:
+    """Re-derive bid/ask from the (clean) ``iv`` column via Black-Scholes — vectorized.
+
+    On the DoltHub free dataset the ``iv`` column tracks VIX (for ATM ~30d, iv/VIX ≈ 0.95, ~2 vol-pts
+    error) but the raw bid/ask is systematically inflated (mid-implied vol ≈ 1.47× VIX, ~8 vol-pts
+    high) and noisy. Marking a held position against that bid/ask is inconsistent with entry, so
+    profit/stop/dte exits misfire (a remark on fair BS vs an entry on inflated mid books phantom
+    P&L). Pricing every contract off its own clean iv puts entry, exit, and daily re-marks on ONE
+    fair, internally-consistent basis (true skew + term structure preserved — this is NOT flat-IV
+    synthetic). The raw spread is unreliable, so a modeled spread (max(spread_frac*mid, min_spread))
+    stands in; tune it with the cost model. Originals are kept as iv_raw_bid / iv_raw_ask.
+    """
+    from scipy.stats import norm
+    d = df.copy()
+    S = d['underlying_price'].to_numpy(float)
+    K = d['strike'].to_numpy(float)
+    T = np.clip(d['dte'].to_numpy(float), 0.0, None) / 365.0
+    iv = np.clip(pd.to_numeric(d['iv'], errors='coerce').to_numpy(float), iv_lo, iv_hi)
+    is_call = d['option_type'].astype(str).str.lower().isin(['call', 'c']).to_numpy()
+    with np.errstate(divide='ignore', invalid='ignore'):
+        sqrtT = np.sqrt(T)
+        d1 = (np.log(S / K) + (r + 0.5 * iv ** 2) * T) / (iv * sqrtT)
+        d2 = d1 - iv * sqrtT
+        call = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+        put = K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+    mid = np.where(is_call, call, put)
+    expired = T <= 0
+    mid = np.where(expired, np.where(is_call, np.maximum(S - K, 0.0), np.maximum(K - S, 0.0)), mid)
+    mid = np.nan_to_num(np.maximum(mid, 0.0), nan=0.0, posinf=0.0, neginf=0.0)
+    half = np.maximum(spread_frac * mid, min_spread) / 2.0
+    d['iv_raw_bid'], d['iv_raw_ask'] = d['bid'], d['ask']
+    d['bid'] = np.maximum(mid - half, 0.01)
+    d['ask'] = mid + half
+    return d
+
+
+def assess_real_data_quality(df: pd.DataFrame, *, atm_band: float = 0.01,
+                             dte_lo: int = 5, dte_hi: int = 50,
+                             sample_days: int = 300) -> dict:
+    """Diagnose whether a real options dataset is arbitrage-coherent enough to backtest.
+
+    Two cheap, model-light checks on the dataset's OWN columns:
+      * **ATM IV vs VIX** — for ATM (~near-30d) options ``iv / (VIX/100)`` should be ~1.0. The
+        Massive/Polygon free-tier EOD *closes* back-solve to iv ≈ 1.3–1.6× VIX (worse at short DTE,
+        i.e. exactly the calendar's near leg), so a median far above 1.0 flags inflated prices.
+      * **Term-structure (calendar) coherence** — for a fixed (day, strike) the ATM call mid MUST be
+        weakly increasing in DTE (a longer-dated option is worth at least as much). A high fraction
+        of slices where the mid DECREASES with DTE is a no-arbitrage violation: the near-vs-far
+        relationship a calendar spread trades is broken, so any calendar P&L on it is fiction.
+
+    Returns a dict of metrics plus ``verdict`` in {clean, suspect, corrupt}. Whether to raise on
+    'corrupt' is the caller's choice (load_sample_spy_options_data does, unless the config sets
+    data_source.allow_low_quality). Calibrated on measured data: DoltHub = 0.93 / 0% inversions
+    (clean); Massive = 1.35 / 34% inversions (corrupt).
+    """
+    out: dict = {"verdict": "clean", "reasons": []}
+    if "option_type" not in df.columns or "underlying_price" not in df.columns:
+        return out
+    c = df[df["option_type"].astype(str).str.lower().isin(["call", "c"])].copy()
+    if c.empty:
+        return out
+    c["_m"] = (c["strike"] - c["underlying_price"]).abs() / c["underlying_price"]
+
+    # --- ATM IV vs VIX -------------------------------------------------------------------------
+    ratio_med = float("nan")
+    if "iv" in c.columns and "vix" in c.columns:
+        atm = c[(c["_m"] <= atm_band) & (c["dte"].between(dte_lo, dte_hi))]
+        iv = pd.to_numeric(atm["iv"], errors="coerce")
+        vix = pd.to_numeric(atm["vix"], errors="coerce") / 100.0
+        r = (iv / vix).replace([np.inf, -np.inf], np.nan).dropna()
+        if len(r) >= 50:
+            ratio_med = float(r.median())
+            out["atm_iv_vix_median"] = ratio_med
+            out["atm_iv_gt_2x_vix_frac"] = float((r > 2).mean())
+
+    # --- Term-structure (calendar) coherence ---------------------------------------------------
+    inv_rate = float("nan")
+    if {"bid", "ask"}.issubset(c.columns):
+        atmc = c[c["_m"] <= atm_band / 2.0].copy()
+        days = atmc["quote_date"].drop_duplicates()
+        if len(days) > sample_days:                       # cap cost on large files
+            days = days.sample(sample_days, random_state=0)
+            atmc = atmc[atmc["quote_date"].isin(days)]
+        atmc["_mid"] = (pd.to_numeric(atmc["bid"], errors="coerce")
+                        + pd.to_numeric(atmc["ask"], errors="coerce")) / 2.0
+        bad = tot = 0
+        for _, g in atmc.groupby(["quote_date", "strike"]):
+            if len(g) < 3:
+                continue
+            m = g.sort_values("dte")["_mid"].to_numpy()
+            tot += 1
+            if np.any(np.diff(m) < -0.05 * m[:-1]):       # >5% drop as DTE rises = inverted
+                bad += 1
+        if tot >= 30:
+            inv_rate = bad / tot
+            out["term_inversion_rate"] = inv_rate
+            out["term_slices_checked"] = tot
+
+    # --- Verdict -------------------------------------------------------------------------------
+    if ratio_med == ratio_med and (ratio_med > 1.20 or ratio_med < 0.5):
+        out["verdict"] = "corrupt"
+        out["reasons"].append(f"ATM iv/VIX median {ratio_med:.2f} (expect ~1.0)")
+    if inv_rate == inv_rate and inv_rate > 0.10:
+        out["verdict"] = "corrupt"
+        out["reasons"].append(
+            f"{inv_rate:.0%} of ATM term-structure slices invert (no-arbitrage violation)")
+    if out["verdict"] == "clean" and (
+        (ratio_med == ratio_med and ratio_med > 1.10) or (inv_rate == inv_rate and inv_rate > 0.03)
+    ):
+        out["verdict"] = "suspect"
+    return out
+
+
+def _enforce_data_quality(df: pd.DataFrame, ds: dict, name: str) -> dict:
+    """Run assess_real_data_quality, print a report, and HARD-FAIL on a corrupt dataset.
+
+    Override with data_source.allow_low_quality: true (strongly discouraged — it lets a backtest
+    run on prices that are not arbitrage-coherent).
+    """
+    rep = assess_real_data_quality(df)
+    rv, inv = rep.get("atm_iv_vix_median"), rep.get("term_inversion_rate")
+    print(f"  Data-quality check on {name}:")
+    print(f"    ATM iv/VIX median:            {rv:.2f}  (clean ~1.0)" if rv is not None
+          else "    ATM iv/VIX median:            n/a")
+    print(f"    term-structure inversion:     {inv:.0%}  (clean ~0%)" if inv is not None
+          else "    term-structure inversion:     n/a")
+    print(f"    verdict: {rep['verdict'].upper()}")
+    if rep["verdict"] == "corrupt" and not ds.get("allow_low_quality", False):
+        raise ValueError(
+            f"Real options dataset '{name}' FAILED the data-quality gate: "
+            f"{'; '.join(rep['reasons'])}. These prices are not arbitrage-coherent, so any backtest "
+            f"on them (especially a calendar, whose P&L IS the near-vs-far relationship) is fiction. "
+            f"Point real_data at a clean dataset (e.g. the DoltHub file "
+            f"SPY_real_options_2021-01-01_2026-06-08.csv) or, to override anyway (NOT recommended), "
+            f"set data_source.allow_low_quality: true."
+        )
+    return rep
+
+
 def load_sample_spy_options_data(specific_file: str = None, config: dict = None) -> pd.DataFrame:
     """
     Load SPY options data from pre-generated synthetic data CSV.
@@ -625,11 +836,102 @@ def load_sample_spy_options_data(specific_file: str = None, config: dict = None)
         return _read_options_csv(csv_file)
 
     cfg = config or _load_options_config()
+    ds = cfg.get("data_source", {})
+
+    # Hybrid mode: real DoltHub data wherever it exists, plus per-date-IV-surface synthetic
+    # fill for any (date, expiration) pair that DoltHub does not sample.  The fill uses the
+    # day's OWN real DoltHub quotes to fit a bivariate polynomial IV surface (see
+    # `iv_surface_fitter.py`), so missing expirations inherit that day's actual skew + term
+    # structure rather than a global parametric guess.
+    if ds.get("mode") == "hybrid":
+        real_name = real_data_filename(cfg)
+        synth_name = synthetic_data_filename(cfg)
+        real_path = data_dir / real_name
+        synth_path = data_dir / synth_name
+        if not real_path.exists():
+            rd = cfg["real_data"]
+            raise FileNotFoundError(
+                f"data_source.mode=hybrid but real dataset '{real_name}' missing.\n"
+                f"   Build it first:\n"
+                f"   opt_venv/bin/python -m src.data_fetchers.real_chain_loader "
+                f"--start {rd['start_date']} --end {rd['end_date']}"
+            )
+        if not synth_path.exists():
+            sd = cfg["synthetic_data"]
+            raise FileNotFoundError(
+                f"data_source.mode=hybrid but synthetic dataset '{synth_name}' missing.\n"
+                f"   Run: python generate_synthetic_data.py"
+            )
+
+        print(f"Loading REAL dataset:     {real_name}")
+        real_data = _read_options_csv(real_path)
+        _enforce_data_quality(real_data, ds, real_name)  # refuse arbitrage-incoherent real source
+        print(f"Loading SYNTHETIC dataset: {synth_name}")
+        synth_data = _read_options_csv(synth_path)
+
+        # Normalize dates for merge key (real = midnight, synth = noon — strip time)
+        real_data['_date'] = real_data['quote_date'].dt.normalize()
+        real_data['_exp'] = real_data['expiration'].dt.normalize()
+        synth_data['_date'] = synth_data['quote_date'].dt.normalize()
+        synth_data['_exp'] = synth_data['expiration'].dt.normalize()
+
+        # Build set of (date, expiration) pairs present in real data
+        real_pairs = set(zip(real_data['_date'], real_data['_exp']))
+
+        # Keep synthetic rows whose (date, expiration) pair DoltHub did NOT sample
+        mask = ~synth_data.apply(
+            lambda r: (r['_date'], r['_exp']) in real_pairs, axis=1
+        )
+        fill_rows = synth_data[mask].copy()
+
+        # Reprice fill rows using per-date IV surfaces fitted from REAL data.
+        # For each date where real data exists, fit a bivariate polynomial IV surface
+        # from that day's real quotes, then use it to set iv/bid/ask/greeks for the
+        # synthetic-fill rows on that date.  Rows for dates without real data (e.g.
+        # outside the DoltHub range) keep their original synthetic pricing.
+        from src.data_fetchers.iv_surface_fitter import apply_surface_fill
+        ds_cfg = ds.get("reprice", {}) or {}
+        fill_rows = apply_surface_fill(
+            fill_rows, real_data,
+            r=float(ds_cfg.get("risk_free_rate", 0.04)),
+            spread_frac=float(ds_cfg.get("spread_frac", 0.03)),
+            min_spread=float(ds_cfg.get("min_spread", 0.05)),
+        )
+
+        # Drop temporary columns
+        real_data.drop(columns=['_date', '_exp'], inplace=True)
+        fill_rows.drop(columns=['_date', '_exp'], inplace=True)
+
+        # Tag provenance so downstream consumers can distinguish genuine quotes from
+        # surface-fit fill. The optimizer uses this to cap far_dte at the REAL data's
+        # max DTE — without it the combined max (incl. fill out to synthetic max_dte)
+        # lets the search pick far legs in the pure-extrapolation zone (see far_dte=87
+        # → $356M artifact). is_fill=False = real DoltHub quote, True = synthetic fill.
+        real_data['is_fill'] = False
+        fill_rows['is_fill'] = True
+
+        # Combine — real rows first, then surface-fit synthetic fill
+        result = pd.concat([real_data, fill_rows], ignore_index=True)
+        print(f"  Hybrid: {len(real_data):,} real + {len(fill_rows):,} surface-fit fill"
+              f" = {len(result):,} total contracts")
+
+        # Reprice everything from iv column so hybrid entry/exit/remarks share one fair basis
+        if ds.get("price_from_iv", True) and "iv" in result.columns:
+            rp = ds.get("reprice", {}) or {}
+            result = reprice_from_iv(
+                result,
+                r=float(rp.get("risk_free_rate", 0.04)),
+                spread_frac=float(rp.get("spread_frac", 0.03)),
+                min_spread=float(rp.get("min_spread", 0.05)),
+            )
+            print(f"  ✓ Repriced bid/ask from clean IV surface (spread_frac="
+                  f"{rp.get('spread_frac', 0.03)}); raw kept as iv_raw_bid/iv_raw_ask")
+        return result
 
     # Real-data mode: load the DoltHub/logged dataset named by the real_data config block.
     # This is the honest dataset (true skew + term structure); synthetic stays the default
     # only for fast plumbing/CI runs.
-    if cfg.get("data_source", {}).get("mode") == "real":
+    if ds.get("mode") == "real":
         real_name = real_data_filename(cfg)
         real_path = data_dir / real_name
         if not real_path.exists():
@@ -641,7 +943,24 @@ def load_sample_spy_options_data(specific_file: str = None, config: dict = None)
                 f"--start {rd['start_date']} --end {rd['end_date']}"
             )
         print(f"Loading REAL dataset: {real_name}")
-        return _read_options_csv(real_path)
+        data = _read_options_csv(real_path)
+        # Gate: refuse arbitrage-incoherent data (e.g. Massive/Polygon free-tier closes, which
+        # back-solve to inflated IVs and invert the term structure on ~34% of slices). A calendar's
+        # P&L IS the near-vs-far relationship, so corrupt prices fabricate the edge.
+        _enforce_data_quality(data, ds, real_name)
+        # The raw DoltHub bid/ask is the dirty field (mid implies ~1.47x VIX); the iv column is
+        # clean. Reprice off iv so entry/exit/remarks share one fair basis and the exits work.
+        if ds.get("price_from_iv", True) and "iv" in data.columns:
+            rp = ds.get("reprice", {}) or {}
+            data = reprice_from_iv(
+                data,
+                r=float(rp.get("risk_free_rate", 0.04)),
+                spread_frac=float(rp.get("spread_frac", 0.03)),
+                min_spread=float(rp.get("min_spread", 0.05)),
+            )
+            print(f"  ✓ Repriced bid/ask from clean IV surface (spread_frac="
+                  f"{rp.get('spread_frac', 0.03)}); raw kept as iv_raw_bid/iv_raw_ask")
+        return data
 
     # Default: derive the canonical filename from the synthetic_data config block,
     # so the file the generator wrote is exactly the file we load here.

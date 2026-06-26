@@ -36,6 +36,13 @@ from ..analysis.metrics import calculate_performance_metrics
 # Higher is better for all of these (max_drawdown_pct is negative, so higher = shallower drawdown).
 _TIE_BREAK_KEYS = ["total_return_pct", "max_drawdown_pct", "win_rate_pct"]
 
+# Trials with fewer than this many trades are statistical noise: a Sharpe from ~1-2 trades is
+# meaningless, and a near-zero-trade backtest yields |Sharpe| ~ 1e16 (tiny return / ~0 volatility)
+# that both wins the search spuriously AND blows up the deflated-Sharpe selection benchmark. Below
+# this floor we NaN the ratio metrics so such trials cannot rank and are dropped from the DSR stats
+# (returns and trade counts are kept for audit). Override per-run via config: optimization.min_trades.
+MIN_TRADES_FOR_RANKING = 10
+
 
 def sort_results_stable(df: pd.DataFrame, metric: str) -> pd.DataFrame:
     """Sort results by `metric` (desc) with deterministic tie-breakers; stable + reindexed.
@@ -878,7 +885,7 @@ class ParameterOptimizer:
 
         return self.results
 
-    def _run_single_backtest(self, params: Dict, verbose: bool = False) -> Dict:
+    def _run_single_backtest(self, params: Dict, verbose: bool = False, return_raw: bool = False) -> Dict:
         """
         Run a single backtest with given parameters.
 
@@ -966,6 +973,22 @@ class ParameterOptimizer:
             if 'vix_max' in entry and 'vix_min' not in entry:
                 strategy_config['entry']['vix_min'] = 0
 
+            # Validate dte_exit < near_dte. dte_exit closes the trade when the NEAR leg has
+            # <= dte_exit days left, so it must be strictly less than the DTE the near leg is
+            # sold at — otherwise the exit condition is already true on entry day and the
+            # "calendar" is held ~0 days. Unlike near_dte<far_dte and vix_min<vix_max (guaranteed
+            # by DISJOINT search ranges), near_dte {7..28} and dte_exit {2..14} OVERLAP, so the
+            # optimizer can otherwise pick e.g. near_dte=7, dte_exit=11 — a logically impossible
+            # exit that produced degenerate ~1-day trades and an absurd inflated Sharpe.
+            exit_cfg = strategy_config.get('exit', {})
+            if 'dte_exit' in exit_cfg and 'near_dte' in entry:
+                if exit_cfg['dte_exit'] >= entry['near_dte']:
+                    raise ValueError(
+                        f"dte_exit ({exit_cfg['dte_exit']}) must be < near_dte "
+                        f"({entry['near_dte']}): cannot exit at more DTE than the near leg is "
+                        f"sold with (the exit would fire on entry day)."
+                    )
+
         elif self.strategy_type == 'vertical':
             # Validate stop_loss is between 0.0 and 1.0 (percentage of max loss)
             if 'stop_loss' in strategy_config.get('exit', {}):
@@ -989,8 +1012,23 @@ class ParameterOptimizer:
             verbose=False  # Suppress per-backtest prints; progress bar shows overall progress
         )
 
+        # Raw escape hatch: callers that need the equity curve + trade ledger (e.g. walk-forward OOS
+        # slicing of a continuous run) take the backtest result directly, not the floored summary.
+        if return_raw:
+            return backtest_results
+
         # Calculate performance metrics
         metrics = calculate_performance_metrics(backtest_results)
+
+        # Minimum-trades floor (see MIN_TRADES_FOR_RANKING): disqualify thin trials so a handful of
+        # trades can't masquerade as an edge and degenerate ~0-volatility Sharpes don't poison
+        # selection. NaN the ratio metrics; keep returns/trade counts for audit.
+        min_trades = int(self.base_config.get('optimization', {}).get('min_trades', MIN_TRADES_FOR_RANKING))
+        if int(metrics.get('total_trades', 0) or 0) < min_trades:
+            for _k in ('sharpe_ratio', 'sortino_ratio', 'calmar_ratio'):
+                if _k in metrics:
+                    metrics[_k] = float('nan')
+            metrics['below_min_trades'] = True
 
         return metrics
 

@@ -19,6 +19,7 @@ import numpy as np
 
 from .base_strategy import BaseStrategy, Signal, Position
 from ..utils.execution import net_open, net_close
+from ..utils.black_scholes import black_scholes_price
 
 
 class CalendarSpread(BaseStrategy):
@@ -37,6 +38,16 @@ class CalendarSpread(BaseStrategy):
         self.spread_type = spread_type
         self.entry_config = config.get('entry', {})
         self.exit_config = config.get('exit', {})
+
+        # Daily re-mark of held legs the day's chain doesn't list (sparse real chains). Prices the
+        # missing leg via Black-Scholes off the day's OWN IV surface, so profit_target / stop_loss /
+        # dte_exit can actually fire each day instead of the position drifting to near-expiration
+        # (the reason those exits were inert on real DoltHub data). See _bs_quote / _estimate_iv.
+        self._remark = bool(self.exit_config.get('synthetic_remark', True))
+        self._remark_r = float(self.exit_config.get('risk_free_rate', 0.04))
+        self._remark_spread_frac = float(self.exit_config.get('synthetic_spread_frac', 0.02))
+        self._remark_min_spread = float(self.exit_config.get('synthetic_min_spread', 0.05))
+        self._iv_fallback = float(self.exit_config.get('synthetic_iv_fallback', 0.18))
 
     def _find_strike_by_moneyness(
         self,
@@ -257,16 +268,38 @@ class CalendarSpread(BaseStrategy):
                 print(f"  ❌ Strike ${strike} not found in far-term options")
             return None
 
-        # Get actual DTEs
-        near_dte_actual = near_options[
+        # The two selected legs (same strike, near vs far expiration).
+        near_row = near_options[
             (near_options['strike'] == strike) &
             (near_options['option_type'] == option_type)
-        ].iloc[0]['dte']
-
-        far_dte_actual = far_options[
+        ].iloc[0]
+        far_row = far_options[
             (far_options['strike'] == strike) &
             (far_options['option_type'] == option_type)
-        ].iloc[0]['dte']
+        ].iloc[0]
+
+        # --- Term-structure (contango) gate -------------------------------------------------
+        # A long calendar SELLS the front month and BUYS the back, so it profits from the normal
+        # upward-sloping vol term structure (front IV < back IV = "contango"). When the structure
+        # inverts (front IV >= back IV = backwardation, the signature of a vol spike) the calendar
+        # works against you. Externally-sourced data backs this strongly (contango ~+18% avg vs
+        # backwardation ~-15%), so by default we refuse backwardation entries. Enforced only when
+        # both legs carry a plausible IV (sparse/deep rows can hold garbage back-solved IVs, e.g.
+        # a 1-DTE deep-ITM call). A FIXED gate -> costs the optimizer no degrees of freedom.
+        if self.entry_config.get('require_contango', True):
+            near_iv = pd.to_numeric(near_row.get('iv'), errors='coerce')
+            far_iv = pd.to_numeric(far_row.get('iv'), errors='coerce')
+            if (pd.notna(near_iv) and pd.notna(far_iv)
+                    and 0.03 <= near_iv <= 2.0 and 0.03 <= far_iv <= 2.0
+                    and near_iv >= far_iv):
+                if debug:
+                    print(f"  ❌ Backwardation: near IV {near_iv:.1%} >= far IV {far_iv:.1%} "
+                          f"(require_contango)")
+                return None
+
+        # Get actual DTEs
+        near_dte_actual = near_row['dte']
+        far_dte_actual = far_row['dte']
 
         # Get spread price
         spread_price = self._get_spread_price(
@@ -288,15 +321,8 @@ class CalendarSpread(BaseStrategy):
             return None
 
         # Get expiration dates for tracking
-        near_expiration = near_options[
-            (near_options['strike'] == strike) &
-            (near_options['option_type'] == option_type)
-        ].iloc[0]['expiration']
-
-        far_expiration = far_options[
-            (far_options['strike'] == strike) &
-            (far_options['option_type'] == option_type)
-        ].iloc[0]['expiration']
+        near_expiration = near_row['expiration']
+        far_expiration = far_row['expiration']
 
         signal = Signal(
             date=date,
@@ -315,27 +341,81 @@ class CalendarSpread(BaseStrategy):
 
         return signal
 
-    def _leg_quote(self, options_data, strike, option_type, expiration, tol):
-        """Quote row for a held leg: exact strike if present, else the NEAREST strike within `tol`.
+    def _leg_quote(self, options_data, strike, option_type, expiration, tol,
+                   underlying_price=None, today=None):
+        """Quote row for a held leg: exact strike if present, else NEAREST real strike within `tol`,
+        else a Black-Scholes synthetic mark off the day's own IV surface.
 
-        Real chains (e.g. DoltHub) sample only a handful of strikes per day at irregular spacing, so
-        a calendar's exact strike is often not quoted on a later day. Re-marking at the closest
-        available strike for that expiration — a bounded approximation of the leg's value — lets the
-        position live its full intended duration instead of being force-closed as "expired" after a
-        few days (which is why stop_loss/profit/dte exits never fired on real data). Returns None only
-        when that expiration has no quote within `tol` (a genuine gap or true expiry).
+        Real chains (e.g. DoltHub) sample only a handful of strikes/expirations per day, so a
+        calendar's exact contract is often unquoted on a later day. We first try a real quote at (or
+        within `tol` of) the strike; failing that, for a still-live expiration we SYNTHESIZE the mark
+        with Black-Scholes (IV interpolated from the day's real quotes — see `_estimate_iv`). That
+        gives every day a value so profit_target / stop_loss / dte_exit can fire as intended, instead
+        of the trade drifting to near-expiration (which made those exits inert on real data). Returns
+        None only when the expiration has already passed (caller settles at intrinsic) or re-marking
+        is disabled and no real quote exists.
         """
         cand = options_data[
             (options_data['option_type'] == option_type) &
             (options_data['expiration'] == expiration)
         ]
-        if cand.empty:
-            return None
-        idx = (cand['strike'] - strike).abs().idxmin()
-        row = cand.loc[idx]
-        if abs(float(row['strike']) - float(strike)) > tol:
-            return None
-        return row
+        if not cand.empty:
+            idx = (cand['strike'] - strike).abs().idxmin()
+            row = cand.loc[idx]
+            if abs(float(row['strike']) - float(strike)) <= tol:
+                return row  # real quote at/near the strike — no model risk, prefer it
+
+        # No usable real quote. Synthesize a BS mark for a still-LIVE expiration; an expired leg
+        # returns None so the caller settles it at intrinsic via its expiry paths.
+        if self._remark and underlying_price is not None and today is not None:
+            dte = (pd.Timestamp(expiration).normalize() - pd.Timestamp(today).normalize()).days
+            if dte > 0:
+                return self._bs_quote(options_data, float(underlying_price), float(strike),
+                                      option_type, expiration, dte)
+        return None
+
+    def _estimate_iv(self, day_chain, spot, strike, option_type, dte):
+        """Estimate IV at (strike, dte) by interpolating the day's OWN real IV surface.
+
+        Inverse-distance weighting over the nearest plausible quotes in (log-moneyness, sqrt-years)
+        space, so the synthetic mark inherits the real skew + term structure rather than a flat IV
+        (the synthetic-data flaw). Plausibility-gated (0.03–2.0) to ignore the garbage IVs that show
+        up in some live rows; falls back to a config IV only when the day has no usable quote.
+        """
+        if 'iv' not in day_chain.columns:
+            return self._iv_fallback
+        df = day_chain[day_chain['option_type'] == option_type]
+        iv = pd.to_numeric(df['iv'], errors='coerce')
+        mask = iv.between(0.03, 2.0)
+        if not mask.any():  # try the other option type before giving up
+            df = day_chain
+            iv = pd.to_numeric(df['iv'], errors='coerce')
+            mask = iv.between(0.03, 2.0)
+            if not mask.any():
+                return self._iv_fallback
+        df, iv = df[mask], iv[mask].to_numpy()
+        lm_t, sy_t = np.log(strike / spot), np.sqrt(max(dte, 1) / 365.0)
+        lm = np.log(df['strike'].to_numpy() / spot)
+        sy = np.sqrt(np.clip(df['dte'].to_numpy(), 1, None) / 365.0)
+        # Term-structure distance weighted higher than smile distance (IV varies faster across DTE).
+        dist = np.sqrt((lm - lm_t) ** 2 + 4.0 * (sy - sy_t) ** 2)
+        k = min(5, len(dist))
+        order = np.argsort(dist)[:k]
+        w = 1.0 / (dist[order] + 1e-6)
+        est = float((iv[order] * w).sum() / w.sum())
+        return float(np.clip(est, 0.03, 2.0))
+
+    def _bs_quote(self, day_chain, spot, strike, option_type, expiration, dte):
+        """Synthesize a quote row (with bid/ask) for an unquoted held leg via Black-Scholes off the
+        interpolated IV surface — a drop-in for a real quote row in net_close()."""
+        iv = self._estimate_iv(day_chain, spot, strike, option_type, dte)
+        mid = black_scholes_price(spot, strike, max(dte, 0) / 365.0, self._remark_r, iv, option_type)
+        half = max(self._remark_spread_frac * mid, self._remark_min_spread)
+        return pd.Series({
+            'strike': float(strike), 'expiration': expiration, 'option_type': option_type,
+            'dte': int(dte), 'bid': max(mid - half, 0.0), 'ask': mid + half,
+            'iv': iv, 'synthetic': True,
+        })
 
     def generate_exit_signal(
         self,
@@ -368,14 +448,16 @@ class CalendarSpread(BaseStrategy):
 
         # --- Near leg: re-mark at exact-or-nearest strike for the stored near expiration ---
         if near_expiration is not None and far_expiration is not None:
-            current_near = self._leg_quote(options_data, strike, option_type, near_expiration, tol)
+            current_near = self._leg_quote(options_data, strike, option_type, near_expiration, tol,
+                                           underlying_price, today)
             if current_near is None:
                 # No near-leg quote near this strike. If the near expiration has actually passed, the
                 # near leg is settled -> close by selling the remaining far long leg. Otherwise it's
                 # just a data gap for this strike today -> hold and re-check on a later day.
                 if pd.Timestamp(near_expiration).normalize() > today:
                     return None
-                far_leg = self._leg_quote(options_data, strike, option_type, far_expiration, tol)
+                far_leg = self._leg_quote(options_data, strike, option_type, far_expiration, tol,
+                                          underlying_price, today)
                 position.current_price = (
                     net_close([(far_leg['bid'], far_leg['ask'], True)], lf, extra)
                     if far_leg is not None else position.entry_price
@@ -402,7 +484,8 @@ class CalendarSpread(BaseStrategy):
 
         # --- Far leg: same exact-or-nearest re-marking ---
         if far_expiration is not None:
-            current_far = self._leg_quote(options_data, strike, option_type, far_expiration, tol)
+            current_far = self._leg_quote(options_data, strike, option_type, far_expiration, tol,
+                                          underlying_price, today)
         else:
             far_option = options_data[
                 (options_data['strike'] == strike) &
@@ -514,11 +597,17 @@ class CalendarSpread(BaseStrategy):
         if available_risk_budget <= 0:
             return 0
 
-        # For calendar spreads, max risk is the debit paid
-        # Use a conservative estimate based on typical calendar pricing
-        # In practice, this will be refined when actual entry_price is known
-        estimated_max_debit = self.entry_config.get('max_debit', 5.0)
-        max_risk_per_contract = estimated_max_debit * 100  # $100 per point
+        # Per-contract risk for a calendar IS the debit paid. Prefer the ACTUAL debit the backtester
+        # just priced (entry_price); fall back to the worst-case max_debit only when it's unknown.
+        # Using max_debit ($10) as the risk when the real debit is ~$6-7 made an account that dipped
+        # even slightly below the starting capital size int(budget/1000)=0 contracts and stop trading
+        # forever after a single loss — the death-spiral behind the "1 trade" backtests.
+        entry_price = kwargs.get('entry_price')
+        if entry_price and float(entry_price) > 0:
+            max_risk_per_contract = float(entry_price) * 100
+        else:
+            estimated_max_debit = self.entry_config.get('max_debit', 5.0)
+            max_risk_per_contract = estimated_max_debit * 100  # $100 per point
 
         # Check if full_config provided
         full_config = kwargs.get('full_config')

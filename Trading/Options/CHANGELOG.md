@@ -4,6 +4,267 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed — VIX-complex–driven synthetic chains; cost-model fix; repo cleanup (2026-06-26)
+
+**Root cause of prior "no edge" result:** Two read-only audits confirmed DoltHub's `iv` column has
+no usable term structure (near-vs-far ATM IV is a coin flip — median diff 0.0003; 49/51% contango/
+backwardation vs ~80% real contango). A calendar's entire P&L is the term structure, so repricing
+off it produced a flat-term-structure backtest: no edge by construction. The pipeline's `reprice_from_iv`
+is innocent (it preserves per-contract IV faithfully); the data source is the limit.
+
+**Fix — VIX-complex–driven synthetic term structure:**
+- `SyntheticOptionsGenerator` now fetches `^VIX9D` (9d), `^VIX` (30d), `^VIX3M` (93d), `^VIX6M`
+  (180d) daily closes from Yahoo in `fetch_underlying_data`. Four tenor points per day.
+- New `_build_term_curve(date)` method interpolates those tenors into a `term_ratio(dte)` callable
+  (IV at DTE t divided by IV at 30d). Real contango/backwardation regimes — including the 2020 and
+  2022 inversions — now flow through to generated options prices.
+- `_iv_surface()` uses `self._day_term_curve` when available; falls back to the old parametric
+  formula when the VIX complex is unavailable. Not circular: the term-structure carry and the
+  implied-vs-realized variance premium both come from exogenous real data the strategy can't control.
+- `config/config.yaml`: `mode: synthetic`, `synthetic_data.start_date: 2021-01-01` (5-year window),
+  spread_frac 0.03→0.008 + min_spread 0.05→0.01 (real SPY ATM liquidity).
+
+**Cleanup:** Removed 287M of corrupt/stale data: `data/raw/massive/`, `SPY_real_options_2024-06-16_
+2026-06-16.csv` (Massive/Polygon corrupt), intermediate real-data subsets, old synthetic CSVs (all
+built on flat term structure), and stale optimization_results/ (all run on bad data).
+
+**Next step:** Run `python generate_synthetic_data.py -y` to build the new
+`SPY_synthetic_options_2021-01-01_2026-06-12.csv`, validate the term-structure acceptance test
+(≥70% contango), then `caffeinate -i python optimize_call_calendar_spread.py`.
+
+### Fixed — Massive/Polygon free-tier data is corrupt; reverted to clean DoltHub + added a data-quality gate (2026-06-25)
+
+Investigating the calendar backtest's implausible results traced to the **data**, not just params. The
+Massive/Polygon free-tier pull (`SPY_real_options_2024-06-16_2026-06-16.csv`) takes each expired
+contract's daily-bar **close** as the option mid (`massive_loader.py:364`); for illiquid SPY contracts
+those closes are incoherent, and bid/ask + the back-solved `iv`/greeks all inherit it.
+
+- **Evidence (dataset-wide)** — ATM **iv/VIX median 1.35** (1.58 at 5–10 DTE, where the near leg lives;
+  14.8% of ATM rows >2× VIX), and **34% of ATM (day, strike) term-structure slices INVERT** (a
+  longer-dated ATM call priced below a shorter-dated one — a no-arbitrage violation). A calendar's P&L
+  *is* the near-vs-far relationship, so this fabricates the edge. Neither `price_from_iv:false` (raw
+  bid/ask) nor `true` (reprice off `iv`) is clean, because both trace back to the corrupt close.
+- **Fix — reverted to the clean DoltHub dataset.** `config.yaml` now points `real_data` /`backtest` at
+  `SPY_real_options_2021-01-01_2026-06-08.csv` (955 days, 2021–2026; **iv/VIX 0.93, 0% inversions**)
+  with `price_from_iv: true` (DoltHub's `iv` is clean, its bid/ask dirty). Repriced ATM prices verify
+  0% term-structure inversions; a sample backtest trades 117 times (coherent, no fabricated Sharpe).
+- **New — data-quality gate** (`synthetic_generator.assess_real_data_quality` + `_enforce_data_quality`,
+  wired into the real & hybrid load branches). Computes ATM iv/VIX median + term-structure inversion
+  rate and **HARD-FAILS** a `corrupt` dataset (iv/VIX > 1.20 or inversions > 10%) with a clear message,
+  unless `data_source.allow_low_quality: true`. Verified it rejects Massive and passes DoltHub — so a
+  corrupt dataset can no longer silently produce a 5-Sharpe artifact.
+
+### Fixed — Calendar optimizer could pick `dte_exit >= near_dte` (impossible exit) (2026-06-25)
+
+A walk-forward run returned a "best" combo of `near_dte=7, dte_exit=11` — logically impossible:
+`dte_exit` closes the trade when the **near leg** has `<= dte_exit` days left
+(`calendar_spreads.py:524`), so it must be strictly less than the DTE the near leg is sold at.
+With `dte_exit >= near_dte` the exit condition is already true on entry day, so the "calendar"
+is force-closed after ~1 day; these degenerate trades compounded into an absurd 445,187% IS
+return and a spurious Sharpe.
+
+- **Root cause** — the optimizer relies on **disjoint** search ranges to keep orderings valid
+  (`near_dte` {7..28} < `far_dte` {30..45}; `vix_min` {5..20} < `vix_max` {25..60}). But
+  `near_dte` {7..28} and `dte_exit` {2..14} **overlap**, so nothing prevented `dte_exit >= near_dte`.
+- **Fix** (`src/optimization/parameter_optimizer.py`) — added a validation guard in the calendar
+  branch of `_run_single_backtest` (alongside the existing `stop_loss`/`vix` checks): `dte_exit >=
+  near_dte` raises `ValueError`. It runs **before** the backtest, so invalid Optuna trials
+  short-circuit cheaply and are dropped from the leaderboard; grid trials record a NaN metric and
+  can't rank. Comment in `optimize_call_calendar_spread.py` updated to note this ordering is
+  guarded at runtime (overlapping ranges), not "by construction."
+
+### Added — Calendar entry gates (contango + VIX IV-Rank) and a Massive data-quality finding (2026-06-21)
+
+Implemented two externally-sourced, theory-grounded entry filters for the call calendar, as **fixed
+gates** (literature thresholds, not optimized parameters) so they add no degrees of freedom and don't
+deflate the Deflated Sharpe. Tightened the DTE search to the research consensus. Testing the contango
+gate surfaced that the Massive/Polygon free-tier option prices are not trustworthy for IV-based logic.
+
+- **Contango gate** (`src/strategies/calendar_spreads.py`, `entry.require_contango`) — refuses entries
+  in backwardation (front-month IV >= back-month IV), where a long calendar structurally loses
+  (externally-sourced: contango ~+18% avg vs backwardation ~-15%). Compares the two selected legs' IV
+  at the chosen strike; enforced only when both carry a plausible (0.03–2.0) back-solved IV.
+- **VIX IV-Rank gate** (`src/utils/vix_gate.py`, `--vix-rank[=N]`) — a long calendar is long vega, so
+  enter only when vol is cheap relative to its own trailing year. Computes IV Rank off **VIX itself**
+  (a clean, liquid 30-day ATM-IV index — far better than an ATM IV reconstructed from a sparse chain):
+  `IV Rank = (VIX - 252d min)/(252d max - min)*100`, gate passes when `<= N` (default 30). Fetches
+  `^VIX` via yfinance with a ~420-day warmup (disk-cached to `data/processed/vix_history.csv`) so the
+  rank is valid on the first backtest day. Drops into the existing `entry_gate` slot and composes
+  (AND) with `--TR`. Verified live: IV-Rank<=30 passes 81% of 2024-06→2026-06 days (median rank 16).
+- **DTE grid tightened** (`optimize_call_calendar_spread.py`) — far leg capped at **30-45 DTE** (was
+  42-to-data-max ~90; 60+ pairings overfit and drift off the real expiration grid), near leg 7-28,
+  target delta 0.45-0.55 (ATM / slightly OTM). Aligns the search with the strategy literature.
+- **Finding — Massive/Polygon free-tier option prices are unreliable for IV/term-structure.** The
+  per-contract daily *last-trade* prints come from 1-6 contracts/day of volume and back-solve to IVs
+  **2-4x VIX**, inflated worse at short DTE (e.g. 2024-06-17, VIX 12.75: a 7-DTE ATM SPY call marks
+  `last`=14.53 vs a correct ~$3.80 → IV 48.7% vs ~13%). That asymmetry fabricates backwardation on
+  ~99% of days, so the contango gate (correctly) rejects nearly every entry. **`require_contango`
+  defaults OFF** until run on a dataset with genuine exchange quotes (e.g. OptionsDX), where the term
+  structure is real. The VIX-rank gate is unaffected — it uses clean VIX, not the option prices.
+
+### Added — OptionsDX EOD real data + a spot-consistency fix it exposed (2026-06-15)
+
+Integrated paid-grade OptionsDX historical SPY EOD chains, which finally gives the backtester
+dense enough real quotes to stop relying on a model. The DoltHub free sample lists ~3
+expirations/day, so a calendar's exact legs were almost never both quoted and ~96% of daily marks
+were synthesized off a fitted IV surface (which the optimizer then gamed). OptionsDX EOD carries
+**~30 expirations/day and ~240 strikes/day** out past a year, so the exact contracts are quoted
+every trading day.
+
+- **`src/data_fetchers/optionsdx_loader.py`** — converts OptionsDX monthly `spy_eod_YYYYMM.txt`
+  files (WIDE: one row per date/expiry/strike with `C_*`/`P_*`) into the project's LONG schema
+  (one row per contract, matching `real_chain_loader`'s DoltHub output). Globs all files under
+  `data/raw/optionsdx/`, melts call+put, recomputes integer DTE, trims to a near-ATM / `dte<=120`
+  band (flags to widen), merges `^VIX`, and writes `SPY_real_options_<start>_<end>.csv` so the
+  existing `mode: real` path loads it with no further plumbing. 2018 → 636,194 contracts, 252 days.
+- **`config.yaml`**: `mode: real`, `price_from_iv: false` (OptionsDX bid/ask are genuine exchange
+  quotes — backtest them directly, don't reprice; repricing is only for DoltHub's inflated mids),
+  and the `real_data` / `backtest` ranges set to the OptionsDX coverage (2018 so far).
+- **Result:** on a textbook 30/60 ATM calendar, daily leg marks went from **96% synthetic → 100%
+  real quotes**. The model is out of the loop.
+- **Fixed — spot-consistency bug the dense data exposed.** `OptopsyBacktester` sourced the spot
+  for strike selection / marks / the "underlying moved too far" exit from `underlying_data`
+  (yfinance, dividend-**adjusted** ≈ $241 in Jan 2018), while strikes are quoted against the
+  chain's **unadjusted** `UNDERLYING_LAST` ≈ $274. The ~13% gap fired a phantom `max_underlying_move`
+  exit on day ONE of nearly every trade (89 one-day churns instead of real holds). Fix: take spot
+  from the option chain's own `underlying_price` column, falling back to `underlying_data` only when
+  absent — one price basis for selection, marking, and exits. (No DoltHub/synthetic regression:
+  their chain spot already equals the yfinance close.) After the fix the same calendar makes 17
+  proper holds (13 to `dte_exit`, 4 stops), spot reads 258–291 (correct), no phantom exits.
+
+Honest read: that 30/60 calendar still LOST ~22% in 2018 — but 2018 had Feb "Volmageddon" and the
+Q4 crash, and it's one hostile year. Download more OptionsDX years (2019–2024) for a multi-regime
+read before concluding. The pipeline is now trustworthy; the data window is the remaining gap.
+
+### Fixed — hybrid-mode IV-surface extrapolation artifact: far_dte=87 → $356M (2026-06-15)
+
+The latest calendar optimization picked `near_dte=7 / far_dte=87 / dte_exit=5` (hold ~2 days) and
+reported **$10k → $356,851,728**, a single trade **+$92,402,114**, 90% win. That is not an edge — it
+is the optimizer gaming a pricing hole created by **hybrid mode + a quadratic IV surface extrapolated
+past the real data**. Two compounding bugs, both fixed:
+
+- **The IV surface was extrapolating quadratically beyond its support.** `iv_surface_fitter` fits
+  `IV = c0 + c1·m + c2·t + c3·m² + c4·m·t + c5·t²` to the day's REAL quotes (10–66 DTE on DoltHub SPY),
+  then priced hybrid-fill contracts at ANY DTE off it. A `far_dte=87` leg sits 21 days past the fit, so
+  the `t²` term diverges and the long leg gets a fabricated IV/price with no market anchor — held 2 days
+  vs a 7-DTE short, it "won" ~90% on phantom P&L, then compounded (10% risk of a growing account).
+  **Fix:** `fit_day_surface` now records the `(m, t)` support; `_reprice_group` clamps evaluation `(m, t)`
+  to that range before the polynomial (flat IV-extrapolation at the boundary), while Black-Scholes still
+  uses the leg's *real* maturity `T`. Same `near=7/far=87` config now: **$19,766 final / $1,198 largest
+  win / Sharpe 1.85** (was $356M / $92M / 26.0).
+- **The far_dte cap was defeated by hybrid mode.** `optimize_call_calendar_spread` caps `far_dte` at the
+  data's max DTE so trials can't request unquoted expirations — but in hybrid mode it read the *combined*
+  max (synthetic fill runs to `synthetic_data.max_dte`≈90), so the cap was 90 and the search wandered
+  into the 67–90 DTE pure-extrapolation zone. **Fix:** the hybrid loader now tags rows `is_fill`
+  (False=real DoltHub quote, True=surface fill); the optimizer caps on **real-only** DTE when the tag is
+  present → far_dte cap 90 → **66**, so 87 is unreachable.
+
+Net: the optimizer can no longer manufacture an edge from data the market never priced. Re-run
+`optimize_call_calendar_spread.py --wf` for trustworthy parameters now that the hole is closed.
+
+### Fixed — calendar exits made real: IV repricing, daily re-marks, position-sizing death-spiral (2026-06-11)
+
+Investigating why `profit_target` / `stop_loss` / `dte_exit` were inert on real data uncovered three
+compounding issues. Fixing them makes the exits actually fire — and reveals the calendar's *honest*
+edge is far smaller than the previously reported numbers, which rode on dirty pricing.
+
+- **DoltHub bid/ask is the corrupt field; the `iv` column is clean.** For ATM ~30d calls the `iv`
+  column tracks VIX (iv/VIX median **0.95**, ~2 vol-pts), but the raw bid/ask **mid implies ~1.47x
+  VIX** (~8 vol-pts high) — only 0.5% are hard no-arb violations, so it's systematic level/spread
+  inflation, not random garbage. Spot-checked a 28d ATM call marked **$27.48** when BS says ~$12.81.
+- **Reprice from the clean IV surface** (`synthetic_generator.reprice_from_iv`, on by default for real
+  data via `data_source.price_from_iv`). Every contract's bid/ask is re-derived from its own `iv` via
+  Black-Scholes with a modeled spread, so entry, exit, and daily re-marks share ONE fair, internally
+  consistent basis (real skew + term structure preserved — NOT flat-IV synthetic). Raw quotes kept as
+  `iv_raw_bid/ask`.
+- **Daily Black-Scholes re-mark of held legs** (`calendar_spreads._leg_quote` -> `_bs_quote` /
+  `_estimate_iv`). When a held leg's exact contract isn't quoted on a later day (sparse chains), its
+  mark is synthesized from the day's interpolated IV surface instead of the position drifting to
+  near-expiration — which is *why* the exits never fired (157/159 trades used to close as "Near-term
+  option expired"; now 76 dte / 50 stop / 50 profit / 1 expired).
+- **Position-sizing death-spiral FIXED — the true root cause of the "1 trade" backtests.** The calendar
+  sizer used worst-case `max_debit` ($10 -> $1,000 risk/contract) and, with `max_risk_percent=10%` of
+  $10k = $1,000, sized exactly `int(1000/1000)=1` contract at the starting capital but `int(<1000/1000)
+  =0` after **any** loss — so one losing trade dropped the account below the knife-edge and it never
+  traded again. (The continuous run only survived because its first trade *won*; an isolated/early
+  losing first trade is exactly the earlier walk-forward "1 trade vs 70" OOS artifact.) Fix: price the
+  spread first and size off the **actual debit** (`optopsy_wrapper` reorder + `entry_price` passed to
+  `calculate_position_size`); ~$6-7 real debit -> ~$650 risk -> `int(980/650)=1` survives the dip.
+- **Honest consequence — the calendar shows NO demonstrable edge on cleanly-priced data.** With
+  consistent pricing + working exits + correct sizing, the corrected walk-forward gives IS Sharpe 1.81
+  / OOS Sharpe 0.75 (18 OOS trades) but **DSR = 0.20 (WEAK — likely overfit):** the best Sharpe (1.81)
+  is BELOW the no-skill selection benchmark (2.24 expected best of 65 trials), haircut Sharpe ≈ −0.43.
+  Typical (non-cherry-picked) configs sit at Sharpe ~0.4–0.5. The previously reported 2.69 IS / 1.10
+  OOS rode on the inflated bid/ask — not a real edge. Parameter sensitivities are now economically
+  coherent (hold longer for theta = better; tight stops get whipsawed), and the framework is now
+  correctly reporting "no edge" instead of a false positive. New config knobs:
+  `data_source.price_from_iv`/`reprice`, calendar `exit.synthetic_remark`. Recommendation: do NOT trade
+  this calendar on current evidence; apply the same actual-debit sizing fix to the vertical/IC sizers
+  and re-test those, and/or validate on cleaner data (forward-logged chains or a paid source).
+
+### Changed — trustworthy-optimization hardening: min-trades floor, storage-smart logger (2026-06-10)
+
+- **Minimum-trades floor in the optimizer** (`parameter_optimizer.py`, `MIN_TRADES_FOR_RANKING=10`,
+  override via `config.yaml` -> `optimization.min_trades`). Trials with fewer trades than the floor
+  have their Sharpe/Sortino/Calmar NaN'd, so a lucky handful of trades can't win the search and
+  degenerate near-zero-volatility Sharpes (|SR| ~ 1e16) no longer poison the deflated-Sharpe
+  selection benchmark. Diagnosed from a real run where 268/1000 trials had |Sharpe|>50 and the DSR
+  benchmark blew up to 4.1e16. Returns/trade counts are kept for audit (`below_min_trades` flag).
+- **Storage-smart chain logger** (`chain_logger.py`): a full SPY chain is ~4,500 contracts/day
+  (~15 expirations x dense $1 strikes), but every strategy here trades a narrow band. The logger now
+  keeps a `--moneyness` band (default +/-12%, ~30% smaller files) as the robust default, with an
+  opt-in `--delta-min/--delta-max` band that cuts ~2x harder. The delta path **self-protects**: it
+  only applies if it retains a plausible fraction of the chain, because yfinance IV is frequently
+  ~1e-5 pre-/post-market, collapsing greeks to a degenerate 0/1 step function (a naive delta filter
+  kept just 17/4,267 contracts on such a day). **No logger restart needed** — launchd reads the
+  script fresh each run; only a schedule change (the plist) requires a reload.
+- **More real history + expiration-grid fix** (the trustworthy-data payoff). Pulled 2021-2026 from
+  DoltHub — **955 trading days** with data (2023 patchy), 5.7x the prior 167. The longer history
+  exposed that DoltHub lists only ~3 expirations/day at irregular DTEs (clustered near ~{13, 28,
+  60}), so the calendar's default `far_dte=42` fell in a **gap** and found no far leg (**1 trade**
+  over 5 years — initially mistaken for a backtester bug). Fix: densified the optimizer's `far_dte`
+  grid (step 7 -> 3) so it samples *on* the data's actual expirations, while the min-trades floor
+  discards the gap-landing trials. Result: **1 -> 158 trades, a believable Sharpe ~2.3** (vs the
+  synthetic 8.2 artifact). Added a `--trials=N` override for fast first-pass walk-forwards on big
+  datasets; `config.yaml` backtest window now spans the full 2021-2026 history.
+- **Investigated, then reverted, a far-leg expiration "snap"** for the calendar: letting the calendar
+  enter when no expiration sits in the exact far-DTE window made it enter at the dataset boundary,
+  where the snapped far leg can't be priced as the near leg expires (exit falls back to the entry
+  price -> 0 P&L) and entries then halt -- collapsing a 16-trade backtest to 1. Root cause is a
+  pre-existing exit-pricing/position fragility, not safely fixable in the strategy layer; the real
+  trade-count fix is more history (above). Left as a documented follow-up.
+- **FIXED — trustworthy walk-forward OOS (was the #1 follow-up).** The OOS score had been a
+  measurement artifact: an *isolated* OOS-only backtest under-trades vs. the *same dates in a
+  continuous run* — on the 2021-2026 calendar the OOS window scored **1 trade** isolated but **70
+  trades (+$19,729)** continuous — producing false "OOS NaN / LARGE degradation — overfit" verdicts
+  (and almost certainly the earlier −68 OOS). Root cause is a backtester state/boundary issue (early
+  degenerate 0-P&L exits + low-capital sizing starving a fresh short window), since
+  `generate_entry_signal` is a pure function of the day. **Fix:** score the **OOS slice of one
+  continuous IS+OOS run** (standard walk-forward methodology) via new
+  `walk_forward.evaluate_oos_continuous` + `_run_single_backtest(..., return_raw=True)`; Sharpe is
+  scale-invariant (`total_value` pct-change) so the slice is comparable to IS. Wired into the calendar
+  and both vertical optimizers (iron_condor uses its own grid path — noted as a follow-up). Verdict is
+  now 3-tier (healthy / weaker-but-persists / collapse). **Result on the calendar: OOS Sharpe ~1.10,
+  70 trades, +24.5%, −4.5% DD** — the IS edge (Sharpe 2.69, DSR 0.999 PASS, stability 2.59 on
+  far_dte=60) **degrades but persists OOS**, not overfit.
+
+### Changed — walk-forward validation is now the DEFAULT for all optimizers (2026-06-10)
+
+- **All four `optimize_*` scripts default to walk-forward (out-of-sample) validation**; the old
+  full-window in-sample fit is now opt-in via `--final`. A default run splits the window into
+  in-sample (~70%) and a held-out out-of-sample (~30%) tail, optimizes on IS only, then scores the
+  single winning parameter set on the untouched OOS window and prints **IS vs OOS Sharpe** + a
+  healthy/overfit verdict. The in-sample max is optimistic by construction (best of N trials), so it
+  should never be the default deliverable — OOS is the honest number. No runtime penalty (IS is ~70%
+  of the days + one OOS backtest, so it's marginally faster than `--final`).
+  - `optimize_call_calendar_spread.py`: the existing `--wf` behavior is now the default; `--wf` kept as an alias.
+  - `optimize_bull_call_spread.py` / `optimize_bull_put_spread.py`: gained the calendar's full
+    trustworthy bundle — walk-forward, the `stability_score` column, and the deflated-Sharpe selection check.
+  - `optimize_iron_condor.py`: gained the same default-WF / `--final` contract and IS-vs-OOS verdict,
+    reusing its own grid backtest so IS and OOS score identically (still a fixed grid; no DSR column).
+  - `--oos-frac=` tunes the split (default `0.30`). Docs: new **Validation Modes** section in
+    `guides/OPTIMIZATION_SCRIPTS_GUIDE.md`, plus `REAL_DATA_WORKFLOW.md`.
+
 ### Fixed — calendar optimizer crash on near-expiry (2026-06-06)
 
 - **`unsupported operand type(s) for -: 'NoneType' and 'float'`** during calendar optimization. The

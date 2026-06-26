@@ -7,7 +7,10 @@ Evaluates performance metrics (Sharpe ratio, win rate, profit factor) to find op
 Results are exported to CSV for comparison with other strategies.
 
 Usage:
+    # DEFAULT: walk-forward validation (optimize in-sample, score out-of-sample)
     python optimize_iron_condor.py
+    # FINAL fit on the full window with no holdout (only after walk-forward passes):
+    python optimize_iron_condor.py --final
 
 Output:
     - optimization_results/iron_condor_optimization_results_YYYYMMDD_HHMMSS.csv
@@ -20,12 +23,15 @@ import numpy as np
 from datetime import datetime
 from itertools import product
 import os
+import sys
+import copy
 
 from src.strategies.iron_condor import IronCondor
 from src.backtester.optopsy_wrapper import OptopsyBacktester
 from src.data_fetchers.synthetic_generator import load_sample_spy_options_data
 from src.data_fetchers.yahoo_options import fetch_spy_data
 from src.analysis.metrics import PerformanceAnalyzer
+from src.optimization import walk_forward
 
 
 def create_param_combinations():
@@ -107,7 +113,7 @@ def run_single_backtest(base_config, param_dict, options_data, underlying_data):
         return None
 
 
-def optimize_parameters(options_data, underlying_data, max_combinations=100):
+def optimize_parameters(options_data, underlying_data, max_combinations=100, base_config=None):
     """
     Run parameter optimization using grid search.
 
@@ -115,13 +121,16 @@ def optimize_parameters(options_data, underlying_data, max_combinations=100):
         options_data: Options contract data
         underlying_data: Underlying price data
         max_combinations: Maximum number of parameter combinations to test
+        base_config: Optional pre-loaded config (e.g. window-pinned for walk-forward). If None,
+            it is read from config/config.yaml.
 
     Returns:
         DataFrame with optimization results
     """
-    # Load base configuration
-    with open('config/config.yaml', 'r') as f:
-        base_config = yaml.safe_load(f)
+    # Load base configuration (or use the caller-supplied, window-pinned one for walk-forward).
+    if base_config is None:
+        with open('config/config.yaml', 'r') as f:
+            base_config = yaml.safe_load(f)
 
     param_grid = create_param_combinations()
 
@@ -165,36 +174,13 @@ def optimize_parameters(options_data, underlying_data, max_combinations=100):
     return results_df
 
 
-def main():
-    print("="*70)
-    print("Iron Condor Parameter Optimization")
-    print("="*70)
-
-    # Load data
-    print("\n1. Loading data...")
-    print("   Loading sample options data...")
-    options_data = load_sample_spy_options_data()
-    print(f"   ✓ Loaded {len(options_data)} option contracts")
-
-    print("   Fetching SPY price data...")
-    start_date = options_data['quote_date'].min().strftime('%Y-%m-%d')
-    end_date = options_data['quote_date'].max().strftime('%Y-%m-%d')
-    underlying_data = fetch_spy_data(start_date, end_date)
-    print(f"   ✓ Loaded {len(underlying_data)} days of price data")
-
-    # Run optimization
-    print("\n2. Running optimization...")
-    results_df = optimize_parameters(options_data, underlying_data, max_combinations=50)
-
-    if results_df is None or len(results_df) == 0:
-        print("\n✗ Optimization failed. No results to export.")
-        return
-
+def export_results(results_df):
+    """Sort, display, and export an iron-condor results DataFrame (shared by both modes)."""
     # Sort by Sharpe ratio (primary metric)
-    results_df = results_df.sort_values('sharpe_ratio', ascending=False)
+    results_df = results_df.sort_values('sharpe_ratio', ascending=False).reset_index(drop=True)
 
     # Display top results
-    print("\n3. Top 10 Parameter Combinations (by Sharpe Ratio):")
+    print("\nTop 10 Parameter Combinations (by Sharpe Ratio):")
     print("-" * 70)
     top_results = results_df.head(10)
     display_cols = [
@@ -205,9 +191,8 @@ def main():
     print(top_results[display_cols].to_string())
 
     # Save results
-    print("\n4. Exporting results...")
+    print("\nExporting results...")
     os.makedirs('optimization_results', exist_ok=True)
-
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     # Export full results
@@ -218,7 +203,6 @@ def main():
     # Export best parameters
     best_params = results_df.iloc[0]
     best_params_file = f"optimization_results/iron_condor_best_params_{timestamp}.yaml"
-
     best_config = {
         'iron_condor': {
             'entry': {
@@ -241,20 +225,19 @@ def main():
             }
         }
     }
-
     with open(best_params_file, 'w') as f:
         yaml.dump(best_config, f, default_flow_style=False)
     print(f"   ✓ Best parameters: {best_params_file}")
 
     # Summary statistics
-    print("\n5. Optimization Summary:")
+    print("\nOptimization Summary:")
     print("-" * 70)
     print(f"Total combinations tested: {len(results_df)}")
     print(f"Combinations with trades: {len(results_df[results_df['total_trades'] > 0])}")
     print(f"\nBest parameters (Sharpe Ratio: {best_params['sharpe_ratio']:.2f}):")
     print(f"  DTE range: {int(best_params['dte_min'])}-{int(best_params['dte_max'])}")
-    print(f"  Put deltas: {best_params['put_short_delta']:.2f}%/{best_params['put_long_delta']:.2f}%")
-    print(f"  Call deltas: {best_params['call_short_delta']:.2f}%/{best_params['call_long_delta']:.2f}%")
+    print(f"  Put deltas: {best_params['put_short_delta']:.2f}/{best_params['put_long_delta']:.2f}")
+    print(f"  Call deltas: {best_params['call_short_delta']:.2f}/{best_params['call_long_delta']:.2f}")
     print(f"  Profit target: {best_params['profit_target']:.0%}")
     print(f"  Stop loss: {best_params['stop_loss']:.0%}")
     print(f"\nMetrics:")
@@ -263,14 +246,115 @@ def main():
     print(f"  Profit factor: {best_params['profit_factor']:.2f}")
     print(f"  Trades: {int(best_params['total_trades'])}")
 
+
+def run_walk_forward(options_data, underlying_data, max_combinations):
+    """Optimize on an in-sample window, then score the chosen params on an untouched OOS window.
+
+    A real edge keeps most of its Sharpe out-of-sample; an overfit grid optimum collapses. This is
+    the DEFAULT mode; pass --final to optimize over the entire window with no holdout instead. The
+    OOS score reuses this script's own run_single_backtest, so IS and OOS scoring are identical.
+    """
+    with open('config/config.yaml', 'r') as f:
+        base_config = yaml.safe_load(f)
+
+    oos_frac = 0.30
+    for a in sys.argv:
+        if a.startswith('--oos-frac='):
+            oos_frac = float(a.split('=', 1)[1])
+
+    bt = base_config['backtest']
+    is_win, oos_win = walk_forward.split_window(bt['start_date'], bt['end_date'], oos_frac)
+    print("\n" + "=" * 70)
+    print(f"WALK-FORWARD  in-sample {is_win[0]}..{is_win[1]}  |  out-of-sample {oos_win[0]}..{oos_win[1]}")
+    print("=" * 70)
+
+    # Optimize on IS only.
+    is_config = copy.deepcopy(base_config)
+    is_config['backtest']['start_date'], is_config['backtest']['end_date'] = is_win
+    results_df = optimize_parameters(options_data, underlying_data, max_combinations, base_config=is_config)
+    if results_df is None or len(results_df) == 0:
+        print("\n✗ In-sample optimization produced no results; aborting walk-forward.")
+        return
+
+    results_df = results_df.sort_values('sharpe_ratio', ascending=False).reset_index(drop=True)
+    best_row = results_df.iloc[0]
+
+    # Pull the chosen (best IS) parameters, casting integral grid values back to int.
+    param_keys = list(create_param_combinations().keys())
+    def _cast(v):
+        f = float(v)
+        return int(f) if f.is_integer() else f
+    best_params = {k: _cast(best_row[k]) for k in param_keys if k in best_row}
+
+    # Score those exact params on the held-out OOS window (same backtest path as IS).
+    # NOTE: this is an ISOLATED OOS-only backtest. The calendar/vertical scripts moved to scoring the
+    # OOS *slice of one continuous IS+OOS run* (walk_forward.evaluate_oos_continuous) because an
+    # isolated short window can under-trade (early degenerate exit + low-capital sizing). Iron Condor
+    # uses its own hand-rolled grid path, so adopting the continuous slice here is a follow-up — if
+    # OOS trades look implausibly low vs a continuous run, that's the cause.
+    oos_config = copy.deepcopy(base_config)
+    oos_config['backtest']['start_date'], oos_config['backtest']['end_date'] = oos_win
+    oos = run_single_backtest(oos_config, best_params, options_data, underlying_data) or {}
+
+    is_sharpe = float(best_row['sharpe_ratio'])
+    oos_sharpe = float(oos.get('sharpe_ratio', float('nan')))
+
+    print("\n" + "=" * 70)
+    print("WALK-FORWARD RESULT (best in-sample params scored on the untouched OOS window)")
+    print("=" * 70)
+    print(f"  params: {best_params}")
+    print(f"  IS  Sharpe: {is_sharpe:7.3f}  | IS  return: {float(best_row.get('total_return_pct', float('nan'))):7.2f}%")
+    print(f"  OOS Sharpe: {oos_sharpe:7.3f}  | OOS return: {float(oos.get('total_return_pct', float('nan'))):7.2f}%"
+          f"  | OOS trades: {oos.get('total_trades', '?')}")
+    verdict = 'healthy — edge survives OOS' if (oos_sharpe > 1.0 and oos_sharpe > 0.5 * is_sharpe) \
+        else 'LARGE degradation — treat the IS optimum as overfit'
+    print(f"  IS→OOS Sharpe drop: {is_sharpe - oos_sharpe:7.3f}  ({verdict})")
+    print("=" * 70)
+
+    export_results(results_df)
+
+
+def main():
+    print("="*70)
+    print("Iron Condor Parameter Optimization")
+    print("="*70)
+
+    # Load data
+    print("\n1. Loading data...")
+    print("   Loading sample options data...")
+    options_data = load_sample_spy_options_data()
+    print(f"   ✓ Loaded {len(options_data)} option contracts")
+
+    print("   Fetching SPY price data...")
+    start_date = options_data['quote_date'].min().strftime('%Y-%m-%d')
+    end_date = options_data['quote_date'].max().strftime('%Y-%m-%d')
+    underlying_data = fetch_spy_data(start_date, end_date)
+    print(f"   ✓ Loaded {len(underlying_data)} days of price data")
+
+    max_combinations = 50
+
+    # DEFAULT: walk-forward validation (optimize in-sample, score out-of-sample). The bare in-sample
+    # Sharpe is optimistic by construction, so --final (full-window fit, no holdout) is opt-in and
+    # should only be used after a default run shows the edge survives OOS.
+    if '--final' not in sys.argv:
+        print("\n2. Running walk-forward validation (default)...")
+        run_walk_forward(options_data, underlying_data, max_combinations)
+        print("\n" + "="*70)
+        print("Walk-forward complete!")
+        print("="*70)
+        return
+
+    print("\nMODE: FINAL FIT — full window, NO out-of-sample holdout.")
+    print("2. Running optimization...")
+    results_df = optimize_parameters(options_data, underlying_data, max_combinations=max_combinations)
+    if results_df is None or len(results_df) == 0:
+        print("\n✗ Optimization failed. No results to export.")
+        return
+
+    export_results(results_df)
     print("\n" + "="*70)
     print("Optimization complete!")
     print("="*70)
-    print("\nNext steps:")
-    print("1. Review results in optimization_results/ directory")
-    print("2. Update config/config.yaml with best parameters")
-    print("3. Calculate Kelly % from backtest results")
-    print("4. Run backtest comparison with Bull Put Spread")
 
 
 if __name__ == '__main__':

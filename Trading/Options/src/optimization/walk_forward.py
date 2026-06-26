@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 from typing import Dict, Optional, Tuple
 
+import numpy as np
 import pandas as pd
 
 from ..backtester.optopsy_wrapper import OptopsyBacktester
@@ -79,3 +80,62 @@ def evaluate_params(
         return opt._run_single_backtest(params, verbose=False)
     except Exception as exc:  # e.g. no trades in the OOS window — report rather than crash
         return {"error": str(exc), "sharpe_ratio": float("nan"), "total_return_pct": float("nan")}
+
+
+def evaluate_oos_continuous(
+    base_config: Dict,
+    strategy_type: str,
+    strategy_class,
+    options_data: pd.DataFrame,
+    underlying_data: pd.DataFrame,
+    full_window: Window,
+    oos_start: str,
+    params: Dict,
+    entry_gate=None,
+) -> Dict:
+    """Score `params` out-of-sample the *honest* way: run ONE continuous backtest over the full
+    IS+OOS window, then compute metrics from the OOS-date slice of its equity curve.
+
+    This is standard walk-forward methodology (a single equity curve, evaluate its OOS segment) and
+    it sidesteps a backtester quirk where an *isolated* OOS-only backtest drastically under-trades
+    versus the same dates inside a continuous run (an early degenerate exit + low-capital position
+    sizing starve the fresh short window — e.g. 1 trade isolated vs ~70 continuous). Sharpe is built
+    on `total_value` pct-change, so it is scale-invariant: evaluating the OOS slice of the compounded
+    curve is directly comparable to the IS Sharpe.
+    """
+    opt = _optimizer_for_window(
+        base_config, strategy_type, strategy_class, options_data, underlying_data, full_window, entry_gate
+    )
+    try:
+        res = opt._run_single_backtest(params, verbose=False, return_raw=True)
+    except Exception as exc:  # report rather than crash
+        return {"error": str(exc), "sharpe_ratio": float("nan"),
+                "total_return_pct": float("nan"), "total_trades": 0}
+
+    cut = pd.to_datetime(oos_start)
+    eq = res["equity_curve"].copy()
+    eq["date"] = pd.to_datetime(eq["date"])
+    oos = eq[eq["date"] >= cut].reset_index(drop=True)
+
+    trades = res.get("trades")
+    if trades is not None and len(trades) and "entry_date" in trades.columns:
+        td = trades.copy()
+        td["entry_date"] = pd.to_datetime(td["entry_date"])
+        n_oos_trades = int((td["entry_date"] >= cut).sum())
+    else:
+        n_oos_trades = 0
+
+    if len(oos) < 3:
+        return {"sharpe_ratio": float("nan"), "total_return_pct": float("nan"),
+                "total_trades": n_oos_trades, "error": "insufficient OOS equity points"}
+
+    # Same annualized excess-return Sharpe convention as the engine (rf = 2%).
+    rets = oos["total_value"].pct_change().dropna()
+    excess = rets - 0.02 / 252.0
+    sharpe = float(np.sqrt(252) * excess.mean() / excess.std()) if excess.std() > 0 else float("nan")
+    start_val, end_val = float(oos["total_value"].iloc[0]), float(oos["total_value"].iloc[-1])
+    total_ret = (end_val - start_val) / start_val * 100.0 if start_val else float("nan")
+    cummax = oos["total_value"].cummax()
+    max_dd = float(((oos["total_value"] - cummax) / cummax).min() * 100.0)
+    return {"sharpe_ratio": sharpe, "total_return_pct": total_ret,
+            "total_trades": n_oos_trades, "max_drawdown_pct": max_dd}
