@@ -8,6 +8,39 @@ Standalone Python scripts for optimizing strategy parameters. Designed to run un
 - `optimize_bull_put_spread.py` - Bull Put Spread optimization
 - `optimize_bull_call_spread.py` - Bull Call Spread optimization
 - `optimize_call_calendar_spread.py` - Call Calendar Spread optimization
+- `optimize_iron_condor.py` - Iron Condor optimization
+
+> **All four scripts default to walk-forward validation** (optimize in-sample, score out-of-sample).
+> Read [Validation Modes](#validation-modes-walk-forward) before treating any result as tradeable.
+
+---
+
+## Validation Modes (Walk-Forward)
+
+Every optimizer runs in one of two modes:
+
+| Mode | Command | What it does | When to use |
+|---|---|---|---|
+| **Walk-forward** (DEFAULT) | `python optimize_<strategy>.py` | Optimizes on an in-sample (IS) window = first ~70%, then scores the single winning parameter set on a held-out out-of-sample (OOS) window = last ~30% the search never saw. Prints **IS vs OOS Sharpe** + a verdict. | **Always run this first.** The honest "does the edge survive?" test — decide whether to trade from the OOS number. |
+| **Final fit** | `python optimize_<strategy>.py --final` | Skips the holdout and fits on the **entire** window. Reports in-sample metrics only. | **Only after** a default run shows the edge survives OOS. Produces the params you actually trade (uses the most recent data too). |
+
+**Why walk-forward is the default.** The bare in-sample Sharpe is optimistic *by construction* — the
+search tries hundreds-to-thousands of parameter sets and reports the maximum, so it almost always
+looks good. The OOS score is the honest one, so it's what you get without asking. There is no runtime
+penalty: walk-forward optimizes over ~70% of the days plus one extra backtest, so it's marginally
+*faster* than a full-window `--final` fit.
+
+**Reading the output** (printed at the end of a default run, also saved to `optimization_results/`):
+- **IS vs OOS Sharpe** — healthy ≈ `OOS > 1.0` *and* `OOS > 0.5 × IS`. A large drop = the IS optimum is fit to noise.
+- **`stability_score`** column — each row's Sharpe averaged over its grid neighbors; the top row's should be close to its own Sharpe (a robust *plateau*, not a lone spike).
+- **Deflated Sharpe Ratio (DSR)** — probability the best Sharpe beats pure selection luck. Want **DSR > 0.95**.
+
+**Options:**
+- `--oos-frac=0.25` — change the holdout fraction (default `0.30`).
+- `--wf` — explicit alias for the default walk-forward mode (the calendar script; harmless elsewhere since it's already the default).
+
+> **iron_condor note.** It runs a fixed grid (no Optuna, and no `stability_score`/DSR columns), but it
+> follows the same default-walk-forward / `--final` contract and prints the same IS-vs-OOS verdict.
 
 ---
 

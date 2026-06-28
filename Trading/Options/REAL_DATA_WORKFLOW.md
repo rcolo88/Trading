@@ -26,8 +26,9 @@ opt_venv/bin/python -m src.data_fetchers.validate_chain SPY_real_options_2025-10
 # 3. Daily collection runs itself (launchd job, already installed) -> data/raw/chains/
 # 4. Roll the collected snapshots into a dataset when you want to backtest them:
 opt_venv/bin/python data_collection/compile_chains.py
-# 5. Trustworthy optimization (long; see section 6):
-caffeinate -i opt_venv/bin/python optimize_call_calendar_spread.py --wf
+# 5. Trustworthy optimization (long; see section 6) — walk-forward IS/OOS is the DEFAULT now:
+caffeinate -i opt_venv/bin/python optimize_call_calendar_spread.py
+#    (add --final ONLY after this passes, to fit live params on all data with no holdout)
 ```
 
 ---
@@ -79,9 +80,21 @@ After pulling, point the config at the new file by editing `real_data.start_date
 
 ## 3. Collect real data automatically (the scheduler)
 
-`data_collection/chain_logger.py` writes the **full** current SPY chain (~4,500 contracts incl.
-VIX) to `data/raw/chains/SPY_chain_YYYY-MM-DD_HHMM.csv`. A macOS **launchd** job runs it **twice
-every weekday — 10:00 and 15:00 local** — so you accumulate a real, point-in-time history.
+`data_collection/chain_logger.py` writes a **storage-smart** slice of the current SPY chain + VIX to
+`data/raw/chains/SPY_chain_YYYY-MM-DD_HHMM.csv`. A macOS **launchd** job runs it **twice every weekday
+— 10:00 and 15:00 local** — so you accumulate a real, point-in-time history.
+
+> **Storage-smart filter.** A full SPY chain is ~4,500 contracts/day (~15 expirations × dense $1
+> strikes), but every strategy here trades a narrow band. The logger keeps strikes within
+> `--moneyness` of spot (default ±12% → ~30% smaller files, ~160 MB/yr at 2 snaps/day vs ~480
+> unfiltered) — robust because it needs no greeks. An opt-in `--delta-min/--delta-max` band cuts ~2×
+> harder but only applies when IV is healthy (yfinance IV is often ~1e-5 pre-/post-market, which
+> makes a delta filter collapse). To keep the whole chain: `--moneyness 0`.
+
+> **Do I need to restart the logger after editing it?** **No.** launchd runs `python chain_logger.py`
+> fresh at each scheduled time, so it picks up script edits automatically on the next run. A restart
+> (`bootout` + `bootstrap`) is only needed when you change the **plist** itself — e.g. the schedule
+> (dropping to one EOD snapshot) or env vars — because that lives in the plist, not the script.
 
 **It is already installed and loaded.** Lifecycle:
 
@@ -94,6 +107,14 @@ every weekday — 10:00 and 15:00 local** — so you accumulate a real, point-in
 | **Pause / stop** | `launchctl bootout gui/$(id -u)/com.robert.spychainlogger` |
 | **Resume** | `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.robert.spychainlogger.plist` |
 | **Remove for good** | bootout (above), then `rm ~/Library/LaunchAgents/com.robert.spychainlogger.plist` |
+
+**Check first — don't re-install if already loaded:**
+```bash
+launchctl list | grep spychainlogger
+# If it prints a line (e.g. "-  0  com.robert.spychainlogger"), it's already registered.
+# Running bootstrap again will fail with "Bootstrap failed: 5: Input/output error" — that's normal.
+# Just use kickstart to test it (see above). No re-install needed.
+```
 
 **Install from scratch** (only needed on a new machine — it's already done here):
 ```bash
@@ -193,26 +214,39 @@ better dataset for multi-day calendars as it accumulates.
 
 These are the deliberately-not-automated, time-consuming steps. Run them yourself when ready.
 
-### 6a. Trustworthy optimization with an out-of-sample check
+### 6a. Trustworthy optimization with an out-of-sample check (the DEFAULT)
 
 ```bash
-caffeinate -i opt_venv/bin/python optimize_call_calendar_spread.py --wf
+caffeinate -i opt_venv/bin/python optimize_call_calendar_spread.py
 ```
 
-- **What it does.** `--wf` (walk-forward) splits the backtest window into an **in-sample (IS)** part
-  (the first ~70%) and a **held-out out-of-sample (OOS)** part (the last ~30%). It optimizes the
-  parameters on IS only, then scores that *single* winning parameter set on the OOS window the
-  search never saw. A real edge keeps most of its Sharpe out-of-sample; an overfit one collapses.
-  Add `--oos-frac=0.25` to change the split.
+- **What it does.** Walk-forward validation runs by **default** (no flag needed). It splits the
+  backtest window into an **in-sample (IS)** part (the first ~70%) and a **held-out out-of-sample
+  (OOS)** part (the last ~30%). It optimizes the parameters on IS only, then scores that *single*
+  winning parameter set on the OOS window the search never saw. A real edge keeps most of its Sharpe
+  out-of-sample; an overfit one collapses. Add `--oos-frac=0.25` to change the split.
+- **Why it's the default.** The bare in-sample number is optimistic *by construction* — the search
+  tries ~1,000 trials and reports the maximum, so it almost always looks good. The OOS score is the
+  honest one, so it's what you get without asking. `--wf` is still accepted as an explicit alias.
+- **`--final` (the opposite mode).** Once a default run confirms the edge survives OOS, run
+  `... optimize_call_calendar_spread.py --final` to refit on the **entire** window with no holdout.
+  That uses the most recent 30% of data too, giving you the params to actually trade. Don't read a
+  `--final` Sharpe as validation — it has no holdout; it's a production fit, not an honesty check.
 - **Runtime.** This is the slow one — up to ~1,000 Optuna trials. Budget **a few hours** on the full
   window. `caffeinate -i` keeps the Mac awake for the duration. To do a fast first pass, lower
   `N_TRIALS` in `optimize_call_calendar_spread.py` (`run_optimization`) from `1000` to ~`150`.
 - **How to read the output** (printed at the end, and saved to `optimization_results/`):
   - **IS vs OOS Sharpe** — the headline honesty check. Healthy ≈ OOS > 1.0 *and* OOS > 0.5 × IS. A
     large drop means the IS optimum is fit to noise.
+  - **Trade count is the gate.** A Sharpe from a handful of trades is noise. The optimizer now NaN's
+    any trial with fewer than `optimization.min_trades` (default 10) trades so it can't win the
+    search, and OOS Sharpe prints `nan` when the chosen params trade too little out-of-sample — that
+    `nan` means "too few OOS trades to judge," not "catastrophic loss." If most trials are below the
+    floor, you need **more history** (section 6b), not different parameters.
   - **Deflated Sharpe Ratio (DSR)** — the probability the best Sharpe beats what pure selection over
     N trials would produce by luck. **Want DSR > 0.95.** Below that, the number is likely a search
-    artifact (this is exactly what flagged the synthetic 8.2).
+    artifact (this is exactly what flagged the synthetic 8.2). The min-trades floor also keeps
+    degenerate ~0-volatility Sharpes from inflating the DSR benchmark.
   - **`stability_score`** column — each row's metric averaged over its grid neighbors. The top row's
     stability should be close to its own Sharpe (a robust *plateau*, not a lone spike).
   - **"Best parameters" == top row of "TOP 5"** — guaranteed now by a stable tie-break (the old

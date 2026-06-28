@@ -3,7 +3,19 @@
     "allow": [
       "WebSearch",
       "Bash(grep -nE \"^#{1,4} \" README.md)",
-      "Bash(grep -nE \"^#{1,4} \" guides/WORKFLOWS.md)"
+      "Bash(grep -nE \"^#{1,4} \" guides/WORKFLOWS.md)",
+      "Bash(launchctl list *)",
+      "Bash(opt_venv/bin/python *)",
+      "WebFetch(domain:polygon.io)",
+      "WebFetch(domain:massive.com)",
+      "Bash(grep -n \"SPY_APPROX\" /Users/robertcologero/GitHub/Trading/Options/src/data_fetchers/massive_loader.py)",
+      "Read(//tmp/**)",
+      "Bash(ps aux *)",
+      "Bash(rm -f /tmp/ps2.txt /tmp/grepout.txt)",
+      "Bash(grep -n \"np.isna\" /Users/robertcologero/GitHub/Trading/Options/src/data_fetchers/massive_loader.py)",
+      "Bash(rm -f /tmp/g.txt)",
+      "Bash(python -c ' *)",
+      "Bash(python csmom.py ideas --top 8)"
     ],
     "deny": [],
     "ask": [],

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IRA Portfolio Plan — $1M / ~$120k Annual Income</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #f4f6f9;
+    color: #1a1a2e;
+    line-height: 1.6;
+    padding: 32px 24px;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 {
+    font-size: 28px; font-weight: 700; margin-bottom: 4px;
+    color: #1a1a2e;
+  }
+  .subtitle {
+    font-size: 16px; color: #555; margin-bottom: 28px;
+    border-bottom: 2px solid #e0e0e0; padding-bottom: 16px;
+  }
+  .summary-box {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #fff; border-radius: 12px; padding: 28px 32px;
+    margin-bottom: 32px; display: flex; flex-wrap: wrap;
+    justify-content: space-between; align-items: center;
+  }
+  .summary-item { text-align: center; flex: 1; min-width: 120px; padding: 6px; }
+  .summary-item .label { font-size: 13px; opacity: 0.75; margin-bottom: 4px; }
+  .summary-item .value { font-size: 26px; font-weight: 700; }
+  .summary-item .value.green { color: #4ade80; }
+  .summary-item .value.gold { color: #fbbf24; }
+  .summary-item .value.blue { color: #60a5fa; }
+  h2 {
+    font-size: 20px; font-weight: 600; margin: 28px 0 14px 0;
+    padding-bottom: 6px; border-bottom: 2px solid #ddd;
+  }
+  h2 .tier-badge {
+    display: inline-block; font-size: 12px; font-weight: 600;
+    padding: 2px 12px; border-radius: 20px; margin-left: 10px;
+    vertical-align: middle; letter-spacing: 0.3px;
+  }
+  .badge-high { background: #fecaca; color: #991b1b; }
+  .badge-moderate { background: #fde68a; color: #92400e; }
+  .badge-defensive { background: #bbf7d0; color: #166534; }
+  table {
+    width: 100%; border-collapse: collapse; font-size: 14px;
+    margin-bottom: 4px; border-radius: 8px; overflow: hidden;
+  }
+  thead th {
+    background: #1e293b; color: #fff; padding: 10px 8px;
+    text-align: right; font-weight: 600; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  thead th:first-child { text-align: left; padding-left: 14px; }
+  tbody td {
+    padding: 9px 8px; text-align: right; border-bottom: 1px solid #eee;
+    white-space: nowrap;
+  }
+  tbody td:first-child {
+    text-align: left; font-weight: 600; padding-left: 14px;
+  }
+  tbody tr:hover { background: #f1f5f9; }
+  tbody tr:last-child td { border-bottom: none; }
+  .tier-high tbody tr:nth-child(even) { background: #fef2f2; }
+  .tier-high tbody tr:nth-child(even):hover { background: #fee2e2; }
+  .tier-moderate tbody tr:nth-child(even) { background: #fffbeb; }
+  .tier-moderate tbody tr:nth-child(even):hover { background: #fef3c7; }
+  .tier-defensive tbody tr:nth-child(even) { background: #f0fdf4; }
+  .tier-defensive tbody tr:nth-child(even):hover { background: #dcfce7; }
+  .tier-total td {
+    font-weight: 700; background: #1e293b !important; color: #fff;
+    border-top: 2px solid #0f172a; padding: 10px 8px;
+  }
+  .tier-total td:first-child { padding-left: 14px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .sector-label { font-size: 11px; color: #777; font-weight: 400; }
+  .cards {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px; margin: 16px 0 24px 0;
+  }
+  .card {
+    background: #fff; border-radius: 8px; padding: 14px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07); border-left: 4px solid #ccc;
+  }
+  .card.high { border-left-color: #ef4444; }
+  .card.moderate { border-left-color: #f59e0b; }
+  .card.defensive { border-left-color: #22c55e; }
+  .card .ticker { font-weight: 700; font-size: 15px; }
+  .card .strike-info { font-size: 13px; color: #444; margin-top: 2px; }
+  .card .strike-info span { display: inline-block; margin-right: 14px; }
+  .notes { background: #fff; border-radius: 8px; padding: 20px 24px; margin-top: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }
+  .notes h3 { font-size: 16px; margin-bottom: 10px; color: #1e293b; }
+  .notes ul { list-style: none; padding: 0; }
+  .notes ul li { padding: 5px 0; font-size: 14px; color: #333; position: relative; padding-left: 18px; }
+  .notes ul li::before { content: "›"; position: absolute; left: 2px; color: #64748b; font-weight: 700; font-size: 18px; line-height: 1.4; }
+  .footer { text-align: center; font-size: 13px; color: #888; margin-top: 32px; padding-top: 16px; border-top: 1px solid #ddd; }
+  @media (max-width: 700px) {
+    body { padding: 16px 10px; }
+    table { font-size: 12px; }
+    thead th, tbody td { padding: 6px 4px; }
+    .summary-box { flex-direction: column; gap: 10px; }
+    .summary-item { min-width: auto; }
+    .cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>IRA Portfolio Plan</h1>
+<div class="subtitle">$1,000,000 &middot; 16 Names &middot; Covered Call Strategy &middot; Targeting ~$120,000 Annual Income</div>
+
+<div class="summary-box">
+  <div class="summary-item">
+    <div class="label">Total Deployed</div>
+    <div class="value blue">$999,700</div>
+  </div>
+  <div class="summary-item">
+    <div class="label">Monthly Income Est.</div>
+    <div class="value green">$10,478</div>
+  </div>
+  <div class="summary-item">
+    <div class="label">Annual Income Est.</div>
+    <div class="value gold">$125,736</div>
+  </div>
+  <div class="summary-item">
+    <div class="label">Blended Yield</div>
+    <div class="value green">12.6%</div>
+  </div>
+  <div class="summary-item">
+    <div class="label">Open Positions</div>
+    <div class="value blue">32 Contracts</div>
+  </div>
+</div>
+
+<!-- TIER 1 -->
+<h2>Tier 1 &mdash; High Premium <span class="tier-badge badge-high">Target ~14-20% Yield</span></h2>
+<table class="tier-high">
+<thead>
+  <tr>
+    <th>Ticker</th><th>Sector</th><th>Lots</th><th>Shares</th><th>Price</th><th>Cost</th>
+    <th>Mo. CC</th><th>Mo. Div</th><th>Mo. Total</th><th>Ann. Income</th>
+  </tr>
+</thead>
+<tbody>
+  <tr><td>AVGO</td><td class="sector-label">AI / Semis</td><td>2</td><td>200</td><td>$397</td><td>$79,400</td><td>$1,100</td><td>$42</td><td>$1,142</td><td>$13,704</td></tr>
+  <tr><td>CAT</td><td class="sector-label">Industrial / Infra</td><td>1</td><td>100</td><td>$1,022</td><td>$102,200</td><td>$1,400</td><td>$54</td><td>$1,454</td><td>$17,448</td></tr>
+  <tr><td>AAPL</td><td class="sector-label">Tech / Consumer</td><td>3</td><td>300</td><td>$297</td><td>$89,100</td><td>$900</td><td>$27</td><td>$927</td><td>$11,124</td></tr>
+  <tr><td>XOM</td><td class="sector-label">Energy</td><td>4</td><td>400</td><td>$138</td><td>$55,200</td><td>$600</td><td>$125</td><td>$725</td><td>$8,700</td></tr>
+  <tr><td>JPM</td><td class="sector-label">Banking</td><td>3</td><td>300</td><td>$325</td><td>$97,500</td><td>$750</td><td>$125</td><td>$875</td><td>$10,500</td></tr>
+  <tr><td>HD</td><td class="sector-label">Home Improvement</td><td>2</td><td>200</td><td>$327</td><td>$65,400</td><td>$600</td><td>$154</td><td>$754</td><td>$9,048</td></tr>
+  <tr class="tier-total"><td colspan="5"></td><td>$488,800</td><td>$5,350</td><td>$527</td><td>$5,877</td><td>$70,524</td></tr>
+</tbody>
+</table>
+
+<!-- TIER 2 -->
+<h2>Tier 2 &mdash; Moderate-High Premium <span class="tier-badge badge-moderate">Target ~10-14% Yield</span></h2>
+<table class="tier-moderate">
+<thead>
+  <tr>
+    <th>Ticker</th><th>Sector</th><th>Lots</th><th>Shares</th><th>Price</th><th>Cost</th>
+    <th>Mo. CC</th><th>Mo. Div</th><th>Mo. Total</th><th>Ann. Income</th>
+  </tr>
+</thead>
+<tbody>
+  <tr><td>MSFT</td><td class="sector-label">Tech / Software</td><td>2</td><td>200</td><td>$367</td><td>$73,400</td><td>$600</td><td>$55</td><td>$655</td><td>$7,860</td></tr>
+  <tr><td>LMT</td><td class="sector-label">Defense</td><td>1</td><td>100</td><td>$494</td><td>$49,400</td><td>$450</td><td>$54</td><td>$504</td><td>$6,048</td></tr>
+  <tr><td>WMT</td><td class="sector-label">Retail</td><td>3</td><td>300</td><td>$117</td><td>$35,100</td><td>$240</td><td>$25</td><td>$265</td><td>$3,180</td></tr>
+  <tr><td>COST</td><td class="sector-label">Retail / Wholesale</td><td>1</td><td>100</td><td>$951</td><td>$95,100</td><td>$700</td><td>$43</td><td>$743</td><td>$8,916</td></tr>
+  <tr><td>UNH</td><td class="sector-label">Healthcare</td><td>1</td><td>100</td><td>$407</td><td>$40,700</td><td>$350</td><td>$65</td><td>$415</td><td>$4,980</td></tr>
+  <tr class="tier-total"><td colspan="5"></td><td>$293,700</td><td>$2,340</td><td>$242</td><td>$2,582</td><td>$30,984</td></tr>
+</tbody>
+</table>
+
+<!-- TIER 3 -->
+<h2>Tier 3 &mdash; Defensive Dividend <span class="tier-badge badge-defensive">Target ~7-10% Yield</span></h2>
+<table class="tier-defensive">
+<thead>
+  <tr>
+    <th>Ticker</th><th>Sector</th><th>Lots</th><th>Shares</th><th>Price</th><th>Cost</th>
+    <th>Mo. CC</th><th>Mo. Div</th><th>Mo. Total</th><th>Ann. Income</th>
+  </tr>
+</thead>
+<tbody>
+  <tr><td>DUK</td><td class="sector-label">Utility</td><td>4</td><td>400</td><td>$124</td><td>$49,600</td><td>$280</td><td>$142</td><td>$422</td><td>$5,064</td></tr>
+  <tr><td>ABBV</td><td class="sector-label">Pharma</td><td>2</td><td>200</td><td>$220</td><td>$44,000</td><td>$360</td><td>$115</td><td>$475</td><td>$5,700</td></tr>
+  <tr><td>PEP</td><td class="sector-label">Consumer Staples</td><td>3</td><td>300</td><td>$148</td><td>$44,400</td><td>$300</td><td>$148</td><td>$448</td><td>$5,376</td></tr>
+  <tr><td>MRK</td><td class="sector-label">Pharma</td><td>3</td><td>300</td><td>$114</td><td>$34,200</td><td>$240</td><td>$85</td><td>$325</td><td>$3,900</td></tr>
+  <tr><td>PG</td><td class="sector-label">Consumer Staples</td><td>3</td><td>300</td><td>$150</td><td>$45,000</td><td>$240</td><td>$109</td><td>$349</td><td>$4,188</td></tr>
+  <tr class="tier-total"><td colspan="5"></td><td>$217,200</td><td>$1,420</td><td>$599</td><td>$2,019</td><td>$24,228</td></tr>
+</tbody>
+</table>
+
+<!-- GRAND TOTAL -->
+<table style="margin-top: 8px; font-size: 15px;">
+<thead><tr><th colspan="5">Portfolio Total</th><th>$999,700</th><th>$9,110</th><th>$1,368</th><th>$10,478</th><th>$125,736</th></tr></thead>
+</table>
+
+<!-- AVGO NOTE -->
+<div style="background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:12px 16px; margin:16px 0; font-size:14px;">
+<strong>Note on AVGO:</strong> Current implied volatility rank is 72% (elevated). At current IV, the $450 strike (13% OTM) yields ~$8.80/share/month. <strong>If AVGO IV stays elevated</strong>, annual income rises to <strong>~$133,656 (13.4% yield)</strong>. The conservative estimate above uses normalized IV ($5.50/share).
+</div>
+
+<!-- STRIKE GUIDE -->
+<h2>Strike Guide</h2>
+<div class="cards">
+  <div class="card high">
+    <div class="ticker">AVGO &mdash; $430-450</div>
+    <div class="strike-info">8-13% OTM &middot; 18-25Δ &middot; Sell rich IV</div>
+  </div>
+  <div class="card high">
+    <div class="ticker">CAT &mdash; $1,055</div>
+    <div class="strike-info">3.5% OTM &middot; 25Δ &middot; Beta 1.58 needs cushion</div>
+  </div>
+  <div class="card high">
+    <div class="ticker">AAPL &mdash; $310</div>
+    <div class="strike-info">4% OTM &middot; 25Δ &middot; Tight spreads, liquid</div>
+  </div>
+  <div class="card high">
+    <div class="ticker">XOM &mdash; $143</div>
+    <div class="strike-info">3.5% OTM &middot; 25Δ &middot; Energy moves in bursts</div>
+  </div>
+  <div class="card high">
+    <div class="ticker">JPM &mdash; $336</div>
+    <div class="strike-info">3.5% OTM &middot; 25Δ &middot; Close before ex-div</div>
+  </div>
+  <div class="card high">
+    <div class="ticker">HD &mdash; $340</div>
+    <div class="strike-info">4% OTM &middot; 20Δ &middot; Moderate IV, good liquidity</div>
+  </div>
+  <div class="card moderate">
+    <div class="ticker">MSFT &mdash; $382</div>
+    <div class="strike-info">4% OTM &middot; 20Δ &middot; Use 20Δ to balance premium/upside</div>
+  </div>
+  <div class="card moderate">
+    <div class="ticker">LMT &mdash; $512</div>
+    <div class="strike-info">3.5% OTM &middot; 25Δ &middot; Defense, stable premium</div>
+  </div>
+  <div class="card moderate">
+    <div class="ticker">WMT &mdash; $121</div>
+    <div class="strike-info">3.5% OTM &middot; 20Δ &middot; Beta 0.6, tight strike for premium</div>
+  </div>
+  <div class="card moderate">
+    <div class="ticker">COST &mdash; $985</div>
+    <div class="strike-info">3.5% OTM &middot; 20Δ &middot; Low beta, wider strike to preserve upside</div>
+  </div>
+  <div class="card moderate">
+    <div class="ticker">UNH &mdash; $422</div>
+    <div class="strike-info">3.5% OTM &middot; 25Δ &middot; Healthcare, decent IV</div>
+  </div>
+  <div class="card defensive">
+    <div class="ticker">DUK &mdash; $130</div>
+    <div class="strike-info">5% OTM &middot; 25Δ &middot; Beta 0.06, very safe strike</div>
+  </div>
+  <div class="card defensive">
+    <div class="ticker">ABBV &mdash; $228</div>
+    <div class="strike-info">3.5% OTM &middot; 20Δ &middot; Low beta, div adds to total</div>
+  </div>
+  <div class="card defensive">
+    <div class="ticker">PEP &mdash; $153</div>
+    <div class="strike-info">3.5% OTM &middot; 20Δ &middot; Consumer staple, steady</div>
+  </div>
+  <div class="card defensive">
+    <div class="ticker">MRK &mdash; $118</div>
+    <div class="strike-info">3.5% OTM &middot; 25Δ &middot; Pharma, manageable premium</div>
+  </div>
+  <div class="card defensive">
+    <div class="ticker">PG &mdash; $155</div>
+    <div class="strike-info">3.5% OTM &middot; 20Δ &middot; Low beta, dividend focus</div>
+  </div>
+</div>
+
+<!-- EXECUTION NOTES -->
+<div class="notes">
+  <h3>Execution Notes</h3>
+  <ul>
+    <li><strong>Roll all calls at 50% max profit</strong> (typically day 12-18 of a 30-45 DTE cycle). This extracts theta decay approximately 2x faster than holding to expiration. Exception: WMT, PG, DUK, PEP &mdash; use 14-21 DTE cycles for these lower-IV names to reduce roll frequency.</li>
+    <li><strong>Earnings management:</strong> Close calls 2 trading days before earnings for AAPL, AVGO, MSFT, CAT, XOM, JPM, WMT, PG. Reopen the day after the report to capture IV crush as the premium seller. DUK, PEP, MRK, ABBV can ride through earnings.</li>
+    <li><strong>Dividend capture risk:</strong> ABBV, JPM, XOM, HD, LMT have the highest payout ratios. If a call is deep ITM before the ex-dividend date, close or roll the position to avoid early assignment.</li>
+    <li><strong>Downside management:</strong> In a market drawdown, you still own all 16 quality names &mdash; no margin, no forced liquidation. Premiums typically increase in down markets (VIX spikes). Dividends are safe (payout ratios all below 70%). Continue selling calls at the same delta targets; strikes simply reset lower.</li>
+    <li><strong>Cash buffer:</strong> Keep ~$300 residual cash for flexibility on rolling assignments.</li>
+  </ul>
+</div>
+
+<div class="notes">
+  <h3>Sector Diversification</h3>
+  <ul>
+    <li><strong>Technology:</strong> AVGO, AAPL, MSFT &mdash; 26.4%</li>
+    <li><strong>Industrials / Defense:</strong> CAT, LMT &mdash; 15.2%</li>
+    <li><strong>Energy:</strong> XOM &mdash; 5.5%</li>
+    <li><strong>Financials:</strong> JPM &mdash; 9.8%</li>
+    <li><strong>Consumer Discretionary:</strong> HD, WMT &mdash; 10.1%</li>
+    <li><strong>Consumer Staples:</strong> COST, PEP, PG &mdash; 17.6%</li>
+    <li><strong>Healthcare:</strong> UNH, ABBV, MRK &mdash; 11.9%</li>
+    <li><strong>Utilities:</strong> DUK &mdash; 5.0%</li>
+  </ul>
+</div>
+
+<div class="footer">
+  Plan prepared June 22, 2026 &middot; Data as of June 18-22, 2026 &middot; Income estimates use conservative normalized IV assumptions except where noted.
+</div>
+
+</div>
+</body>
+</html>

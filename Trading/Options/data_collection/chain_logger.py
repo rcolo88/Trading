@@ -108,6 +108,17 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", choices=["auto", "schwab", "yfinance"], default="auto")
     ap.add_argument("--max-dte", type=int, default=70)
+    # Storage-smart: a full SPY chain is ~4,500 contracts/day. A +/-moneyness band around spot keeps
+    # every strategy leg (calendar ATM + vertical/IC legs out to ~0.08 delta ~= +/-10%) while dropping
+    # the far wings. Moneyness is the ROBUST default: yfinance IV (and thus delta) is frequently
+    # garbage (~1e-5) pre-/post-market, which collapses a delta filter to almost nothing. A delta
+    # band is opt-in for reliable-greek sources (Schwab) and only fires when IV looks healthy.
+    ap.add_argument("--moneyness", type=float, default=0.12,
+                    help="keep strikes within +/- this fraction of spot (default 0.12; 0 = keep all)")
+    ap.add_argument("--delta-min", type=float, default=0.05,
+                    help="opt-in delta-band lower |delta| (used only with --delta-max and healthy IV)")
+    ap.add_argument("--delta-max", type=float, default=0.0,
+                    help="opt-in: also require |delta| <= this (e.g. 0.72); 0 = disabled (use moneyness)")
     args = ap.parse_args()
 
     use_schwab = args.source == "schwab" or (args.source == "auto" and os.environ.get("SCHWAB_APP_KEY"))
@@ -133,6 +144,32 @@ def main() -> int:
     # Capture the current VIX so logged chains satisfy the strategies' VIX gates without a post-hoc
     # merge (and so compile_chains.py doesn't have to backfill it).
     df["vix"] = _current_vix()
+
+    # Storage-smart filter: a full SPY chain is ~4,500 contracts/day (~15 expirations x dense $1
+    # strikes). A +/-12% moneyness band keeps every strategy leg (calendar ATM; vertical/IC legs to
+    # ~0.08 delta ~= +/-10%) and drops the far wings -- ~700 KB -> ~640 KB/snap, ~160 MB/yr at 2
+    # snaps/day vs ~480 unfiltered. The optional delta band cuts harder (~1/3 kept) but only fires
+    # when IV is healthy, because yfinance IV is often ~1e-5 (degenerate 0/1 deltas) pre-/post-market.
+    if not df.empty and (args.delta_max or args.moneyness):
+        before = len(df)
+        how = None
+        ad = df["delta"].abs() if "delta" in df.columns else None
+        # Try the opt-in delta band first, but accept it only if it retains a plausible fraction of
+        # the chain (a real chain has ~1/3 in this band). yfinance IV is often ~1e-5 pre-/post-market,
+        # which makes deltas a degenerate 0/1 step function; then the band keeps almost nothing, so we
+        # reject it and fall back to the robust, greek-independent moneyness band.
+        if args.delta_max and ad is not None and ad.notna().mean() >= 0.5:
+            cand = df[(ad >= args.delta_min) & (ad <= args.delta_max)]
+            if len(cand) >= 0.15 * before:
+                df, how = cand.copy(), f"|delta| in [{args.delta_min:.2f}, {args.delta_max:.2f}]"
+        if how is None and args.moneyness and "underlying_price" in df.columns:
+            spot = float(df["underlying_price"].iloc[0])
+            lo, hi = spot * (1 - args.moneyness), spot * (1 + args.moneyness)
+            df = df[(df["strike"] >= lo) & (df["strike"] <= hi)].copy()
+            how = f"strike within +/-{args.moneyness:.0%} of ${spot:.0f}"
+        if how:
+            print(f"  storage-smart: kept {len(df):,}/{before:,} contracts ({how})")
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     # Stamp date + HHMM so multiple intraday snapshots (e.g. 10:00 and 15:00) coexist instead of
     # overwriting each other.
