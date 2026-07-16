@@ -32,14 +32,26 @@ data:
   cache_dir:  "outputs/cache"
 
 signal:
+  type: composite               # residual | naive | composite (resid-mom + FIP
+                                #   continuity + 52wk-high proximity, equal-weight z).
+                                #   2026-07-16 sweep: composite OOS Sharpe 1.33 vs
+                                #   residual 1.17, same MaxDD — the only variant of 7
+                                #   that cleared the +0.1 bar (see validation.trial_sharpes).
   window: 252                   # momentum lookback (trading days, ≈12 months)
   skip:   21                    # skip recent bars (trading days, ≈1 month reversal filter)
   quantile: 0.80                # top-quantile threshold for long selection (0.80 = top quintile)
 
 regime_filter:
   enabled: true
+  mode: binary                  # binary = legacy 0/1 gate (off only when SPY < MA AND
+                                #   vol high). graded = 0/½/1 exposure from three
+                                #   conditions: SPY>MA, vol<cap, VIX<VIX3M (term
+                                #   structure catches acute vol shocks the MA lags).
   spy_ma_days: 200              # SPY must be above its N-day MA to take new longs
   vol_cap: 0.25                 # annualised SPY vol above which exposure is reduced
+  defensive: none               # none = uninvested capital sits in cash.
+                                #   IEF = park it in 7-10y Treasuries instead (the
+                                #   sleeve is engine-held but never signal-selected).
 
 vol_scaling:
   enabled: true
@@ -54,6 +66,10 @@ portfolio:
                                 #   tail of the quintile dilutes the strongest signals
                                 #   and worsens drawdowns); ~20-30 is the sweet spot.
   min_names: 10                 # need at least this many longs to trade
+  hold_band: null               # hysteresis sell band (rank percentile): buy only from
+                                #   the top `quantile`, but HOLD an incumbent until its
+                                #   rank falls below this (e.g. 0.60). null = off
+                                #   (sell the week a name slips out of the buy set).
 
 # NOTE: meta-labeling was tested and REMOVED — when re-scored every rebalance (the
 # only tradeable way) it underperformed the plain primary book and ~3×'d turnover.
@@ -65,6 +81,11 @@ costs:
 
 validation:
   n_perm_mcpt: 1000             # MCPT permutations (≥1000 for publication-grade p-value)
+  # OOS Sharpe of EVERY configuration tried (keeps the DSR honest about selection
+  # bias — de Prado). Append here whenever a new variant is backtested.
+  # 2026-07-16 sweep: baseline residual, graded regime, hold_band .50/.60/.70,
+  # composite signal, defensive IEF.
+  trial_sharpes: [1.172, 0.903, 1.101, 1.011, 1.026, 1.326, 1.187]
   n_partitions_pbo: 16          # CSCV partitions for PBO estimate
   walk_forward_oos_frac: 0.30   # 30% OOS for walk-forward split
 

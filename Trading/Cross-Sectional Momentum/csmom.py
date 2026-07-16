@@ -148,10 +148,11 @@ def cmd_fetch(cfg: dict) -> None:
     live_end = _live_end()   # always refresh through the latest available close
     print(f"  Refreshing prices through {live_end} (today) — config end_date is backtest-only.")
     prices = data_mod.load_price_panel(
-        tickers  = ever,
-        start    = cfg["data"]["start_date"],
-        end      = live_end,
-        cache_dir= cache_dir,
+        tickers   = ever,
+        start     = cfg["data"]["start_date"],
+        end       = live_end,
+        cache_dir = cache_dir,
+        refresh   = "full",
     )
     spy = prices.get("SPY", None)
     if spy is not None:
@@ -210,7 +211,13 @@ def cmd_backtest(cfg: dict, args: argparse.Namespace) -> None:
     # ── Validation suite ─────────────────────────────────────────────────────
     print("\n─── DSR (Deflated Sharpe) ───────────────────────────────────────────")
     observed_sh = val_mod.compute_metrics(primary_res.net_ret, primary_res.bench_ret)["sharpe"]
-    dsr_result  = val_mod.run_dsr(primary_res.net_ret, grid_sharpes=[observed_sh])
+    # Deflate against EVERY configuration ever tried (config validation.trial_sharpes),
+    # not just this run — otherwise the DSR forgets the selection bias of the sweep
+    # that picked the current config.
+    trial_grid  = [float(s) for s in
+                   cfg.get("validation", {}).get("trial_sharpes", [])]
+    dsr_result  = val_mod.run_dsr(primary_res.net_ret,
+                                  grid_sharpes=trial_grid + [observed_sh])
 
     mcpt_result = None
     if n_perm > 0:
@@ -227,7 +234,8 @@ def cmd_backtest(cfg: dict, args: argparse.Namespace) -> None:
 
     # ── Report ───────────────────────────────────────────────────────────────
     print("\n─── Report ──────────────────────────────────────────────────────────")
-    rep_mod.write_backtest_report(results, dsr_result, None, mcpt_result, out_dir)
+    rep_mod.write_backtest_report(results, dsr_result, None, mcpt_result, out_dir,
+                                  has_pit=pit_df is not None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -339,18 +347,47 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
         cache_dir= cache_dir,
     )
 
-    today  = prices.index[-1]
-    stocks = prices.drop(columns=["SPY"], errors="ignore")
+    # Use the last date where ≥50% of the panel has valid data — guards against
+    # partial download failures where the newest row is mostly NaN (would otherwise
+    # score signals off a near-empty universe).
+    _cov_thresh  = max(50, prices.shape[1] // 2)
+    today        = prices.dropna(thresh=_cov_thresh).index[-1]
+    wall_today   = pd.Timestamp.today().normalize()
+    panel_lag_bd = int(np.busday_count(today.date(), wall_today.date()))
+    if wall_today.dayofweek < 5 and not data_mod.market_close_passed():
+        panel_lag_bd -= 1   # today's session is still open — its close can't exist yet
+
+    # ── Auto-refresh: cache is behind by ≥1 trading day → incremental update ──
+    # Without this, `ideas` would silently score momentum off Friday's closes on
+    # Tuesday/Wednesday/Thursday (the BDay(5) cache gate is too wide for daily
+    # trading). refresh="tail" pulls only the last ~10 trading days and splices
+    # them onto the cache — tiny payload, so Yahoo rate limiting is a non-issue.
+    if panel_lag_bd >= 1:
+        print(f"Cache is {panel_lag_bd} trading day(s) behind — refreshing prices …")
+        prices = data_mod.load_price_panel(
+            tickers   = ever,
+            start     = ideas_start,
+            end       = _live_end(),
+            cache_dir = cache_dir,
+            refresh   = "tail",
+        )
+        _cov_thresh  = max(50, prices.shape[1] // 2)
+        today        = prices.dropna(thresh=_cov_thresh).index[-1]
+        panel_lag_bd = int(np.busday_count(today.date(), wall_today.date()))
+        if wall_today.dayofweek < 5 and not data_mod.market_close_passed():
+            panel_lag_bd -= 1
+        if panel_lag_bd >= 1:
+            print(f"NOTE: yfinance latest close is {today.date()} — "
+                  f"scoring off most recent available data.")
+
+    stocks = prices.drop(columns=data_mod.NON_STOCK_COLS, errors="ignore")
 
     # ── Freshness guard #1: panel must be current vs the real calendar ───────
-    # The panel's own last date is "today" for scoring, but if that date lags
-    # the wall-clock by more than a few days the whole snapshot is stale and we
-    # would price the book off old closes. Catch that explicitly.
-    wall_today = pd.Timestamp.today().normalize()
-    panel_lag  = (wall_today - today).days
-    if panel_lag > 5:
+    # Auto-refresh above handles the 1-3 day case; this catches a genuine outage
+    # where yfinance itself returned data that is still multi-days stale.
+    if panel_lag_bd > 3:
         print(f"\nERROR: price panel is stale — latest close is {today.date()}, "
-              f"{panel_lag} days behind today ({wall_today.date()}).")
+              f"{panel_lag_bd} trading days behind today ({wall_today.date()}).")
         print("  The book's prices and momentum would be computed off old data.")
         print("  Run `python csmom.py fetch` to refresh the price cache, then try again.")
         return
@@ -378,7 +415,7 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
     # never select one (target_book scores off `prices`, not just `stocks`).
     if stale_cols:
         prices = prices.drop(columns=stale_cols)
-        stocks = prices.drop(columns=["SPY"], errors="ignore")
+        stocks = prices.drop(columns=data_mod.NON_STOCK_COLS, errors="ignore")
 
     # ── Build the EXACT book the backtest holds today ────────────────────────
     # target_book() is the single source of truth: top-quintile → equal-dollar
@@ -388,15 +425,20 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
     print(f"\nBuilding target book as of {today.date()} …")
     book = port_mod.target_book(prices, cfg, pit_df=pit_df, as_of=today)
 
-    reg_cfg   = cfg.get("regime_filter", {})
-    regime_ok = sig_mod.spy_regime(
-        prices,
-        ma_days = int(reg_cfg.get("spy_ma_days", 200)),
-        vol_cap = float(reg_cfg.get("vol_cap", 0.25)),
-    )
-    in_regime = bool(regime_ok.get(today, True))
+    expo_ser  = sig_mod.regime_exposure(prices, cfg)
+    exposure  = float(expo_ser.get(today, 1.0))
+    in_regime = exposure > 0.0
 
+    # Loaded once here (reused below for the cadence note + trade diff) so the
+    # rebalance $ diff always compares against what capital the book was last
+    # sized at, not this run's forgotten/changed --capital flag.
+    prev = _load_prev_book(out_dir)
     capital = getattr(args, "capital", None)
+    if capital is None:
+        prev_capital = (prev or {}).get("header", {}).get("capital")
+        if prev_capital is not None:
+            capital = float(prev_capital)
+            print(f"  No --capital given — using last book's capital: ${capital:,.0f}")
 
     signals   = sig_mod.primary_signal(prices, cfg)
     today_sig = signals.loc[today]
@@ -422,7 +464,6 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
     gross = float(book.sum()) if not book.empty else 0.0
 
     # ── Cadence note + rebalance diff vs the previously held book ─────────────
-    prev = _load_prev_book(out_dir)
     rebal_freq = int(cfg.get("portfolio", {}).get("rebal_freq", 5))
     cadence_note = ""
     if prev and prev.get("header", {}).get("as_of"):
@@ -446,6 +487,7 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
     header = {
         "as_of":      str(today.date()),
         "regime_on":  in_regime,
+        "regime_exposure_pct": round(exposure * 100, 1),
         "gross_pct":  round(gross * 100, 1),
         "cash_pct":   round((1.0 - gross) * 100, 1),
         "n_names":    len(rows),
@@ -456,7 +498,7 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
 
     if not rows:
         if not in_regime:
-            print("\nREGIME OFF (SPY below its 200-dma / high vol) → hold 100% CASH.")
+            print("\nREGIME OFF (trend/vol/VIX-structure conditions failed) → no equity longs.")
             print("  The strategy takes no new longs; close existing per the exit rule.")
         else:
             print("\nNo names cleared the book today (too few candidates).")
@@ -496,15 +538,19 @@ def cmd_verify_book(cfg: dict, args: argparse.Namespace) -> None:
         tickers=ever, start=_ideas_start(cfg), end=_live_end(), cache_dir=cache_dir,
     )
 
+    # Same coverage-guarded as-of date `ideas` uses (skip a partial last row).
+    _cov_thresh = max(50, prices.shape[1] // 2)
+    as_of       = prices.dropna(thresh=_cov_thresh).index[-1]
+
     # Engine path (what the backtest trades), end-anchored so the last row is fresh.
     signals = sig_mod.primary_signal(prices, cfg)
     pos     = port_mod.build_positions(signals, prices, cfg, pit_df=pit_df,
                                        rebal_anchor="end")
-    engine  = pos.iloc[-1]
+    engine  = pos.loc[as_of]
     engine  = engine[engine > 0.0].sort_values(ascending=False)
 
     # Live path (what `ideas` shows).
-    live = port_mod.target_book(prices, cfg, pit_df=pit_df)
+    live = port_mod.target_book(prices, cfg, pit_df=pit_df, as_of=as_of)
 
     same_names = set(engine.index) == set(live.index)
     max_w_diff = float((engine.reindex(sorted(set(engine.index) | set(live.index)))

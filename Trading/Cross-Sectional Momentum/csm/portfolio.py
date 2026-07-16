@@ -12,7 +12,32 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from csm.signals import spy_regime, vol_scale_factor
+from csm.data import NON_STOCK_COLS
+from csm.signals import regime_exposure, vol_scale_factor
+
+# Known dual-class share pairs in the S&P 1500 universe: both classes track the
+# same underlying business, so holding both wastes a book slot on one issuer.
+# Keyed ticker -> issuer group; keep only the highest-signal class per group.
+_DUAL_CLASS_GROUP = {
+    "GOOG": "GOOGL", "GOOGL": "GOOGL",
+    "FOX":  "FOXA",  "FOXA":  "FOXA",
+    "NWS":  "NWSA",  "NWSA":  "NWSA",
+}
+
+
+def _dedupe_share_classes(ranked: pd.Index) -> list[str]:
+    """Keep the first (highest-conviction) ticker per dual-class issuer group.
+
+    `ranked` must already be sorted by conviction descending.
+    """
+    seen, out = set(), []
+    for t in ranked:
+        issuer = _DUAL_CLASS_GROUP.get(t, t)
+        if issuer in seen:
+            continue
+        seen.add(issuer)
+        out.append(t)
+    return out
 
 
 def build_positions(
@@ -49,23 +74,25 @@ def build_positions(
     rebal_freq = int(port_cfg.get("rebal_freq",  5))
     max_names  = int(port_cfg.get("max_names",   100))
     min_names  = int(port_cfg.get("min_names",   10))
+    hold_band  = port_cfg.get("hold_band")      # e.g. 0.60; null/none = off
+    hold_band  = (float(hold_band)
+                  if hold_band not in (None, "", "none", False) else None)
+    defensive  = str(reg_cfg.get("defensive", "none"))
 
-    stocks    = prices.drop(columns=["SPY"], errors="ignore")
+    stocks    = prices.drop(columns=NON_STOCK_COLS, errors="ignore")
     stock_ret = stocks.ffill(limit=3).pct_change().fillna(0.0)
     index     = stocks.index
     T, N      = len(index), len(stocks.columns)
     scols     = list(stocks.columns)
 
-    # --- Regime filter (broadcast to daily Series) ---
-    regime_enabled = reg_cfg.get("enabled", True)
-    if regime_enabled:
-        regime_ok = spy_regime(
-            prices,
-            ma_days = int(reg_cfg.get("spy_ma_days", 200)),
-            vol_cap = float(reg_cfg.get("vol_cap",    0.25)),
-        )
-    else:
-        regime_ok = pd.Series(True, index=index)
+    # Tradeable defensive sleeve (regime_filter.defensive): lives in the stock
+    # panel so the engine can hold it, but never receives a signal score, so
+    # the ranking below can never select it.
+    def_col    = defensive if defensive in scols and defensive.lower() != "none" else None
+    stock_cols = [c for c in scols if c != def_col]
+
+    # --- Regime filter: daily exposure multiplier in [0, 1] ---
+    expo = regime_exposure(prices, cfg)
 
     # --- Point-in-time membership filter ---
     from csm.universe import get_members_on
@@ -87,41 +114,63 @@ def build_positions(
         rebal_mask[::rebal_freq] = True
     rebal_dates = index[rebal_mask & valid_sig_mask.values]
 
+    prev_longs: list[str] = []
     for date in rebal_dates:
-        if not regime_ok.get(date, True):
+        e = float(expo.get(date, 1.0))
+        if e <= 0.0:
             # Regime filter: go flat on this rebalance date
             target.loc[date] = 0.0
+            prev_longs = []
             continue
 
         valid_cols = valid_stocks_on(date)
         row        = signals.loc[date].reindex(valid_cols).dropna()
         if len(row) < min_names:
             target.loc[date] = 0.0
+            prev_longs = []
             continue
 
         thresh = row.quantile(quantile)
         cand   = row[row >= thresh].sort_values(ascending=False)  # rank by conviction
-        longs  = cand.index[:max_names].tolist()  # keep the strongest max_names
+        if hold_band is not None and prev_longs:
+            # Hysteresis: buy only from the top quantile, but HOLD an incumbent
+            # until it decays below the wider hold_band percentile — kills the
+            # churn of names oscillating around the entry threshold.
+            pct  = row.rank(pct=True)
+            keep = [t for t in prev_longs if float(pct.get(t, 0.0)) >= hold_band]
+            new  = [t for t in cand.index if t not in keep]
+            longs = _dedupe_share_classes(pd.Index(keep + new))[:max_names]
+        else:
+            longs = _dedupe_share_classes(cand.index)[:max_names]  # strongest, one class/issuer
         if not longs:
             target.loc[date] = 0.0
+            prev_longs = []
             continue
 
         target.loc[date, scols] = 0.0         # zero all first
-        target.loc[date, longs] = 1.0 / len(longs)
+        target.loc[date, longs] = e / len(longs)
+        prev_longs = longs
 
     pos = target.ffill().fillna(0.0)
 
-    # --- Volatility scaling ---
+    # --- Volatility scaling (stock sleeve only) ---
     vs_enabled = vs_cfg.get("enabled", True)
     if vs_enabled:
         # Compute a rough portfolio return series from current positions
-        rough_ret  = (pos.shift(1).fillna(0.0) * stock_ret).sum(axis=1)
+        rough_ret  = (pos[stock_cols].shift(1).fillna(0.0)
+                      * stock_ret[stock_cols]).sum(axis=1)
         scale      = vol_scale_factor(
             rough_ret,
             target_vol = float(vs_cfg.get("target_vol",       0.15)),
             window     = int(vs_cfg.get("estimation_window",  63)),
-        )
-        pos = pos.multiply(scale, axis=0).clip(upper=1.0)
+        ).clip(upper=1.0)  # never lever gross above 100% — a cash account can't
+        pos[stock_cols] = pos[stock_cols].multiply(scale, axis=0).clip(upper=1.0)
+
+    # --- Defensive sleeve: park all uninvested capital in the defensive ETF ---
+    # Applied AFTER vol-scaling so whatever the stock sleeve gives up (regime
+    # gating, vol de-risking, no-signal periods) flows to the sleeve, not cash.
+    if def_col is not None:
+        pos[def_col] = (1.0 - pos[stock_cols].sum(axis=1)).clip(lower=0.0, upper=1.0)
 
     return pos
 
@@ -134,7 +183,7 @@ def portfolio_returns(
     """Compute daily net portfolio returns (close-to-close with next-day execution lag)."""
     from csm.costs import apply_costs
 
-    stocks    = prices.drop(columns=["SPY"], errors="ignore")
+    stocks    = prices.drop(columns=NON_STOCK_COLS, errors="ignore")
     stock_ret = stocks.ffill(limit=3).pct_change().fillna(0.0)
 
     exec_pos  = positions.shift(1).fillna(0.0)   # next-day execution

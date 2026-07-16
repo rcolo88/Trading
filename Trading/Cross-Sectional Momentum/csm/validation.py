@@ -137,9 +137,10 @@ def run_mcpt(
     -------
     dict with keys: p_value, null_mean, null_std, null_95th, pass
     """
+    from csm.data import SIGNAL_EXCLUDE
     rng         = np.random.default_rng(seed)
     ret         = prices.ffill(limit=3).pct_change().fillna(0.0)
-    stocks      = ret.drop(columns=["SPY"], errors="ignore")
+    stocks      = ret.drop(columns=SIGNAL_EXCLUDE, errors="ignore")
     scols       = list(stocks.columns)
 
     sig_np = signals.reindex(columns=scols).values.astype(np.float64)  # (T, N)

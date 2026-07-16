@@ -1,7 +1,8 @@
 # Cross-Sectional Residual Momentum — Trade-Idea Engine
 
-Ranks US large/mid/small-cap stocks by **residual (idiosyncratic) momentum** —
-how much a stock outperformed its market exposure, not just its raw return — and
+Ranks US large/mid/small-cap stocks by a **composite momentum score** — residual
+(idiosyncratic) momentum blended with frog-in-the-pan information continuity and
+52-week-high proximity, equal-weighted — and
 outputs the **exact long-only portfolio book the backtest trades**: every name,
 its target weight, and (given capital) dollars + shares, plus this week's
 buy/sell/resize list.  The backtest and the live `ideas` book run the *same*
@@ -27,21 +28,26 @@ tests so results are honest, not optimistic curve-fits.
 # 0. Install dependencies (once)
 pip install -r requirements.txt
 
-# 1. Download prices and build the S&P 1500 universe (20–40 min first time, <1 min after)
+# 1. Build the S&P 1500 point-in-time universe + initial price download (20–40 min; re-run monthly)
 python csmom.py fetch
 
-# 2. Run the walk-forward backtest + validation
+# 2. Run the walk-forward backtest + validation (re-run after fetch or config changes)
 python csmom.py backtest
 
-# 3. Generate today's target book + this week's trades
+# 3. Generate today's target book + trade list  (run any trading day — prices auto-refresh)
 python csmom.py ideas --capital 100000
 ```
 
 That's it. The book is written to `outputs/ideas_TIMESTAMP.txt` and `.json`.
 
-> **Run `ideas` once every 5 trading days (weekly).** That cadence *is* the
-> backtest's rebalance schedule — run it daily and you trade more than was
-> validated. `verify-book` asserts the live book equals the backtest engine.
+> **Daily workflow:** run `python csmom.py ideas --capital N` each trading day.
+> It auto-refreshes prices before scoring — no manual `fetch` needed for price data.
+>
+> **Execute trades on the weekly cadence** (every 5 trading days): that is the
+> backtest's rebalance schedule.  The book between rebalances is held with drift;
+> trading it daily incurs extra costs beyond what was validated.
+>
+> `verify-book` asserts the live book equals the backtest engine at any time.
 
 > **Tip:** `python csmom.py` with no arguments opens an interactive menu if you prefer.
 
@@ -51,10 +57,13 @@ That's it. The book is written to `outputs/ideas_TIMESTAMP.txt` and `.json`.
 
 ### Step 1 — `fetch` (run once, then monthly)
 
-Downloads prices for every stock ever in the S&P 500/400/600 from Yahoo Finance
-and reconstructs *which* stocks were in the index *on each date*, so the backtest
-never looks ahead.  First run takes 20–40 minutes; after that the cache makes it
-under a minute.
+Reconstructs *which* stocks were in the S&P 500/400/600 *on each date* (point-in-time
+membership), so the backtest never looks ahead, and downloads the initial price history.
+First run takes 20–40 minutes; after that under a minute.
+
+**You do not need to run `fetch` before each `ideas` run.**  `ideas` auto-refreshes
+the price cache whenever it detects the cache is behind by even one trading day.
+Run `fetch` monthly (or when the backtest output warns that the PIT table is stale).
 
 ### Step 2 — `backtest`
 
@@ -70,13 +79,29 @@ Output: `outputs/backtest_TIMESTAMP.[txt|json|png]`
 
 ### Step 3 — `ideas [--capital N]`
 
-Builds the exact target portfolio book for today — the same engine the backtest
-trades — and prints every holding with its target weight, and (with `--capital`)
-the **dollar amount to buy** per name (fractional shares, e.g. Robinhood), plus an
-exposure/regime header and the **dollar** buy/sell/resize trades vs your last book.
-Hold each name until it leaves the weekly book; there are no intraday stops.
-`--holdings file.json` (a `{"TICKER": dollar_value}` map of your current positions)
-diffs against your actual broker holdings instead of the saved book.
+**The only command you need to run daily.**  It auto-refreshes prices from Yahoo
+Finance if the cache is even one trading day stale — an *incremental* refresh that
+downloads only the last ~10 trading days and splices them onto the cache (tickers
+whose adjusted-price basis shifted from a dividend/split are detected on the
+overlap and re-downloaded in full), so the daily update is fast and doesn't trip
+Yahoo's rate limits.  Partially-failed downloads are dropped rather than cached,
+so the book is always scored off a complete cross-section of closes.
+
+**The book is always scored off the latest *completed* close — never an intraday
+print — exactly matching the backtest** (signal at close of day t, execution day
+t+1).  Run any time: during market hours the book is as-of yesterday's close and
+you execute today (that IS the backtest's t+1 lag); after ~4:05pm ET it scores
+off today's final close for execution tomorrow.  Yahoo's live intraday price is
+never treated as a close and never cached.
+
+It then builds the exact target portfolio book — the same engine the backtest
+trades — and prints every holding
+with its target weight, and (with `--capital`) the **dollar amount to buy** per name
+(fractional shares, e.g. Robinhood), plus an exposure/regime header and the **dollar**
+buy/sell/resize trades vs your last book.  Hold each name until it leaves the weekly
+book; there are no intraday stops.  `--holdings file.json` (a `{"TICKER": dollar_value}`
+map of your current positions) diffs against your actual broker holdings instead of
+the saved book.
 
 Output: `outputs/ideas_TIMESTAMP.[txt|json]` (+ `outputs/portfolio_book.json` state)
 
@@ -179,13 +204,16 @@ portfolio:
 
 ---
 
-## Validated results (as of initial run)
+## Validated results (last updated 2026-07-16)
 
-> All numbers below are **S&P 500 only** (fetch not yet run).
-> Expect results to change — likely modestly lower — once the full S&P 1500
-> is used, because mid/small-cap names have wider spreads and higher turnover costs.
+> The **Stage 0 spike** below is the original S&P-500-only exploration run with
+> no point-in-time correction — kept for historical reference, not what's traded.
+> The **Walk-forward OOS** table further down uses the full PIT-corrected S&P 1500
+> (`fetch` has been run) with gross capped at 100% (no untradeable leverage) and
+> dual-class shares deduped — those are the numbers the live book and the
+> stopping-rule bars below are validated against.
 
-**Stage 0 spike — current S&P 500 only, 2010–2025 (survivorship-biased upper bound)**
+**Stage 0 spike — S&P 500 only, 2010–2025, no PIT correction (survivorship-biased upper bound, historical reference only)**
 
 | Strategy                    | Sharpe | CAGR   | Max Drawdown |
 |-----------------------------|--------|--------|--------------|
@@ -198,22 +226,48 @@ portfolio:
 - **Permutation test p-value ≈ 0.000** (the strategy sits ~12 standard deviations above what
   a random stock-picking strategy would achieve with the same mechanics)
 
-**Walk-forward OOS — realistic weekly-rebalance simulation (S&P 1500, 30% holdout)**
+**Walk-forward OOS — realistic weekly-rebalance simulation (S&P 1500, PIT, 30% holdout)**
 
 These come from the unified engine: rebalance every 5 trading days, hold shares
-with drift between, costs on real turnover — the **same book `ideas` gives you**.
+with drift between, costs on real turnover, gross capped at 100% (no leverage) —
+the **same book `ideas` gives you**.
 
 | Strategy | Sharpe | CAGR | Max Drawdown | Ann. turnover |
 |---|---|---|---|---|
-| Primary (OOS) | +1.38 | +23.9% | -11.4% | 16.6× |
-| SPY buy-and-hold | +1.46 | +23.4% | -18.8% | — |
+| Composite (OOS) | +1.33 | +22.0% | -11.1% | 18.4× |
+| SPY buy-and-hold | +1.38 | +21.7% | -18.8% | — |
 
-DSR = 0.994 (pass), MCPT p = 0.000 (pass).
+DSR = 0.978 **across all 8 configurations ever tried** (pass); MCPT p = 0.0000
+(1000 permutations — null 95th-percentile Sharpe is +0.22).
+
+_Prior run (2026-07-09, plain residual momentum): Sharpe +1.14, CAGR +19.0%,
+MaxDD -12.5%, DSR 0.981 — re-run `backtest` yourself any time to refresh this row._
+
+> **Signal upgrade (2026-07-16): composite conviction rank.** The signal is now
+> the equal-weight mean of three cross-sectional z-scores: residual momentum
+> (Blitz–Huij–Martens), **frog-in-the-pan information continuity** (Da–Gurun–
+> Warachka — prefer names whose gains came in many small steps), and **52-week-
+> high proximity** (George–Hwang). A 7-variant sweep on identical data tested
+> this against a graded VIX-term-structure regime gate, turnover-hysteresis
+> bands (3 widths), and a defensive-IEF sleeve: the composite was the **only**
+> variant to clear the pre-registered +0.1 Sharpe bar (+1.33 vs the +1.17
+> residual-momentum baseline, same MaxDD). Component weights are fixed at
+> equal **by design** — no weight optimization — and every trial's Sharpe is
+> recorded in `config.yaml → validation.trial_sharpes`, so the DSR permanently
+> deflates against the full search. The losing variants remain available as
+> config flags (`regime_filter.mode: graded`, `portfolio.hold_band`,
+> `regime_filter.defensive: IEF`) but default off.
 
 > **Concentration:** the book holds the **25 highest-conviction** names of the top
-> quintile (`max_names: 25`), ranked by signal strength. A sweep showed Sharpe
-> decays monotonically as the cap grows — the long tail of the quintile dilutes
-> the strongest signals and worsens drawdowns. `sweep_max_names.py` reproduces it.
+> quintile (`max_names: 25`), ranked by signal strength. A sweep on the current
+> engine (2026-07-12, `sweep_max_names.py` reproduces it) shows OOS Sharpe is a
+> **flat plateau across caps 10–75** (spread ≈ 0.12, well inside estimation noise
+> on ~2.9 years of OOS data — no cap in that range is statistically distinguishable),
+> with clear degradation only past ~100 names as the long tail of the quintile
+> dilutes the signal. So 25 is kept as a diversification/robustness choice, **not**
+> a fitted optimum: tighter caps concentrate single-name and theme risk (10% per
+> name at cap 10) for no reliable Sharpe gain, and the flat surface around the
+> parameter is itself evidence the strategy isn't overfit to it.
 
 > **Note on meta-labeling (removed):** an ML "meta filter" (RandomForest on
 > triple-barrier labels) was tested and **removed**. When re-scored every
@@ -271,6 +325,29 @@ Cross-Sectional Momentum/
    data, transaction costs, and market-impact on mid/small-cap names.
 3. **This is a research tool, not a signal service.**  Past validation does not
    guarantee future performance.
+
+---
+
+## When to stop trusting a live drawdown (pre-registered rule)
+
+Decide the bar *before* going live, or every bad week will feel like a reason to
+second-guess the strategy — a Sharpe ~1.2 book still loses money over plenty of
+short windows by design. Only act on one of these:
+
+1. **Drawdown bar** — live drawdown-from-peak exceeds **-12.5%** (the current
+   validated OOS MaxDD, see *Validated results* above) by a meaningful margin.
+   A live DD near or inside that historical worst case is what "validated"
+   means, not evidence something broke.
+2. **Sharpe bar** — trailing 6-month live Sharpe goes negative. A single bad
+   week is well inside the base-rate noise of a strategy with OOS Sharpe ~1.14
+   (roughly 1-in-10 rolling 9-trading-day windows lose more than 2.5%, per the
+   engine's own 2023+ history; about a quarter of 9-day windows lose money at all).
+3. **Structural bar** — act immediately, regardless of P&L: `verify-book`
+   fails, the universe/PIT build errors, or the price cache goes stale
+   without raising. These are implementation failures, not variance.
+
+Re-run `backtest` after any code or config change — the drawdown/Sharpe bars
+above are only meaningful relative to the *current* engine's validated numbers.
 
 ---
 

@@ -43,6 +43,7 @@ def write_backtest_report(
     mcpt_result:  dict | None,
     out_dir:      Path,
     suffix:       str = "",
+    has_pit:      bool = False,
 ) -> None:
     """Write backtest report to JSON, TXT, and PNG."""
     ts      = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -63,8 +64,9 @@ def write_backtest_report(
     lines.append("Cross-Sectional Residual Momentum — Backtest Report")
     lines.append(f"Generated: {datetime.now():%Y-%m-%d %H:%M}")
     lines.append("=" * 70)
-    lines.append("\nNOTE: Survivorship bias present (current constituents only).")
-    lines.append("      PIT correction reduces these numbers; treat as optimistic estimate.\n")
+    if not has_pit:
+        lines.append("\nNOTE: Survivorship bias present (current constituents only).")
+        lines.append("      PIT correction reduces these numbers; treat as optimistic estimate.\n")
 
     headers = ["Strategy", "Sharpe", "CAGR", "MaxDD", "Calmar", "+Months", "Ann.Turn"]
     lines.append(f"  {'Strategy':<28}  {'Sharpe':>7}  {'CAGR':>8}  {'MaxDD':>8}  "
@@ -176,7 +178,13 @@ def write_ideas_report(
     lines.append("Cross-Sectional Residual Momentum — Target Portfolio Book")
     lines.append(f"Generated: {datetime.now():%Y-%m-%d %H:%M}   |   As of close: {header.get('as_of')}")
     lines.append("=" * 84)
-    lines.append(f"  Regime:         {'ON — taking longs' if header.get('regime_on') else 'OFF — go to CASH'}")
+    _expo = header.get("regime_exposure_pct")
+    if header.get("regime_on"):
+        _reg = "ON — taking longs" + (f" at {_expo:.0f}% exposure"
+                                      if _expo is not None and _expo < 100 else "")
+    else:
+        _reg = "OFF — no equity longs"
+    lines.append(f"  Regime:         {_reg}")
     lines.append(f"  Names held:     {header.get('n_names', 0)}")
     lines.append(f"  Gross exposure: {header.get('gross_pct', 0.0):.1f}%   "
                  f"Cash: {header.get('cash_pct', 0.0):.1f}%")

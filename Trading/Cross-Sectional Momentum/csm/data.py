@@ -1,13 +1,27 @@
-"""Price panel data layer: bulk yfinance download + parquet cache.
+"""Price panel data layer: yfinance download + parquet cache.
 
 All price data is split/dividend-adjusted (auto_adjust=True).
 The cache stores a single Close-price parquet keyed by the union of all
-tickers requested; incremental re-downloads add new tickers but re-use
-cached columns so re-runs are fast.
+tickers requested.
+
+Refresh strategy (see load_price_panel):
+  auto — serve the cache when fresh; tail-refresh when stale.
+  tail — incremental: pull only the last ~10 trading days for all tickers and
+         splice onto the cache; fully re-download ONLY tickers whose
+         adjusted-price basis shifted (dividend/split since the last pull) or
+         that are new to the cache. ~1000× less data than a full pull, so it is
+         fast and rarely rate-limited.
+  full — re-download everything (the `fetch` command).
+
+A partially-failed bulk download (rate limiting, DNS outage) leaves the newest
+row populated for only a subset of tickers; such trailing rows are DROPPED
+before caching so consumers always see complete closes — better to hold
+yesterday's full cross-section than today's fragment.
 """
 from __future__ import annotations
 
 import warnings
+from datetime import time as _dtime
 from pathlib import Path
 
 import numpy as np
@@ -26,74 +40,232 @@ def _yfmt(ticker: str) -> str:
 # Changing start_date in config.yaml restricts the *analysis* window, not the download.
 _CACHE_HISTORY_START = "2010-01-01"
 
+# ── Panel column roles ────────────────────────────────────────────────────────
+# AUX_COLS are index series carried in the panel for regime overlays (VIX term
+# structure); they are never tradeable and never part of the stock cross-section.
+# DEFENSIVE_TICKER is a tradeable ETF sleeve (regime_filter.defensive) held by
+# the engine like a position but excluded from signal computation, so the
+# cross-sectional ranking can never select it.
+AUX_COLS         = ["^VIX", "^VIX3M"]
+DEFENSIVE_TICKER = "IEF"
+NON_STOCK_COLS   = ["SPY"] + AUX_COLS            # drop these to get the stock panel
+SIGNAL_EXCLUDE   = NON_STOCK_COLS + [DEFENSIVE_TICKER]  # never receive a signal score
+
+# Tail refresh: trading days of overlap re-downloaded to verify the adjustment
+# basis (a dividend/split re-bases the ENTIRE adjusted history, not just the tail).
+_TAIL_OVERLAP_BD = 10
+# Overlap prices differing by more than this (relative) → ticker was re-based.
+_BASIS_RTOL = 1e-3
+
+
+def market_close_passed() -> bool:
+    """True once today's NYSE regular-session close (16:00 ET + buffer) has passed.
+
+    On early-close days (half sessions) this treats 13:00–16:05 ET as still
+    in-progress, so the loader falls back to the prior close for a few hours —
+    always the safe direction (an older real close, never an intraday print).
+    """
+    return pd.Timestamp.now(tz="America/New_York").time() >= _dtime(16, 5)
+
+
+def _drop_intraday_row(panel: pd.DataFrame,
+                       now: pd.Timestamp | None = None) -> pd.DataFrame:
+    """Drop a trailing row dated today while today's session is still open.
+
+    Yahoo reports the live intraday price as today's "close" during market
+    hours. The backtest only ever sees completed closes (signal at close of t,
+    execution t+1), so an intraday row must never reach the signal, the book,
+    or the cache — a cached intraday print would later masquerade as the final
+    close and suppress the evening refresh.
+    """
+    if now is None:
+        now = pd.Timestamp.now(tz="America/New_York")
+    if (len(panel) and panel.index[-1].date() == now.date()
+            and now.time() < _dtime(16, 5)):
+        print(f"  Dropping in-progress session row {panel.index[-1].date()} — "
+              f"intraday prices are not closes.")
+        panel = panel.iloc[:-1]
+    return panel
+
+
+def _drop_partial_tail(panel: pd.DataFrame, min_frac: float = 0.5) -> pd.DataFrame:
+    """Drop trailing rows whose ticker coverage collapses vs the recent norm.
+
+    Persisting a partial row poisons every consumer: ffill imputes fake 0%
+    returns for the missing tickers and the freshness gate reads the cache as
+    current. Compares each trailing row's non-NaN count against the median of
+    the 21 rows before it.
+    """
+    if panel.empty:
+        return panel
+    cov = panel.notna().sum(axis=1)
+    while len(panel) > 21:
+        ref = float(cov.iloc[-22:-1].median())
+        if ref > 0 and float(cov.iloc[-1]) < min_frac * ref:
+            print(f"  Dropping partial trailing row {panel.index[-1].date()} "
+                  f"({int(cov.iloc[-1])}/{int(ref)} tickers) — incomplete download.")
+            panel = panel.iloc[:-1]
+            cov   = cov.iloc[:-1]
+        else:
+            break
+    return panel
+
+
+def _yf_close(tickers: list[str], start, end, tries: int = 2) -> pd.DataFrame:
+    """Bulk-download adjusted closes, retrying tickers that returned nothing."""
+    out = pd.DataFrame()
+    remaining = list(tickers)
+    for attempt in range(tries):
+        if not remaining:
+            break
+        if attempt:
+            print(f"  Retrying {len(remaining)} tickers that returned no data …")
+        raw = yf.download(remaining, start=start, end=end,
+                          auto_adjust=True, progress=True, threads=True, timeout=60)
+        if raw is None or len(raw) == 0:
+            continue
+        close = (raw["Close"] if isinstance(raw.columns, pd.MultiIndex)
+                 else raw[["Close"]].rename(columns={"Close": remaining[0]}))
+        close.index = pd.to_datetime(close.index)
+        out = close.combine_first(out) if not out.empty else close
+        got = set(out.columns[out.notna().any()])
+        remaining = [t for t in remaining if t not in got]
+    return out
+
+
+def _tail_refresh(cached: pd.DataFrame, needed_yf: list[str],
+                  inv_map: dict, end) -> pd.DataFrame:
+    """Splice fresh closes onto the cache, fully re-downloading only where needed."""
+    last_good  = cached.index[-1]        # last complete row (partial tail already dropped)
+    tail_start = (last_good - pd.tseries.offsets.BDay(_TAIL_OVERLAP_BD)).strftime("%Y-%m-%d")
+    print(f"Tail refresh: downloading closes from {tail_start} …")
+    tail = _yf_close(needed_yf, tail_start, end).rename(columns=inv_map)
+
+    fresh     = [c for c in tail.columns if tail[c].notna().any()]
+    known     = [c for c in fresh if c in cached.columns]
+    brand_new = [c for c in fresh if c not in cached.columns]   # new universe entrants
+
+    # Adjustment-basis check on the overlap: if a dividend/split hit since the
+    # last pull, the whole adjusted history shifted → full re-download for that
+    # ticker. Unverifiable overlaps (no common non-NaN dates) are re-based too.
+    overlap = cached.index.intersection(tail.index)
+    rebase, matched = list(brand_new), []
+    if len(overlap) and known:
+        rel = (tail.loc[overlap, known] / cached.loc[overlap, known] - 1.0).abs().max()
+        for c in known:
+            (matched if rel.get(c, np.nan) <= _BASIS_RTOL else rebase).append(c)
+    else:
+        rebase += known
+
+    panel = cached
+    if matched:
+        panel = tail[matched].combine_first(panel)   # new tail wins on the overlap
+
+    if rebase:
+        print(f"  {len(rebase)} tickers re-based (dividend/split) or new to the "
+              f"cache — re-downloading their full history …")
+        full = _yf_close([_yfmt(c) for c in rebase],
+                         _CACHE_HISTORY_START, end).rename(columns=inv_map)
+        got  = [c for c in full.columns if full[c].notna().any()]
+        panel = pd.concat([panel.drop(columns=[c for c in got if c in panel.columns]),
+                           full[got]], axis=1)
+        failed = sorted(set(rebase) - set(got))
+        if failed:
+            print(f"  WARNING: {len(failed)} re-based tickers failed to download — "
+                  f"keeping their cached (possibly stale-basis) history: "
+                  f"{', '.join(failed[:8])}" + (" …" if len(failed) > 8 else ""))
+
+    n_stale = len([c for c in cached.columns if c not in fresh])
+    if n_stale:
+        print(f"  {len(fresh)} tickers updated; {n_stale} returned no new data "
+              f"(delisted or failed) — cached history retained.")
+    return panel
+
 
 def load_price_panel(
-    tickers:   list[str],
-    start:     str,
-    end:       str,
-    cache_dir: Path,
+    tickers:        list[str],
+    start:          str,
+    end:            str,
+    cache_dir:      Path,
+    refresh:        str = "auto",
+    force_download: bool = False,   # back-compat alias for refresh="full"
 ) -> pd.DataFrame:
     """Return adj-close price panel (DatetimeIndex × tickers) sliced to [start, end].
 
     The on-disk cache always covers _CACHE_HISTORY_START → end so the momentum
     signal (252-day window) has enough history regardless of start_date in config.
-    Changing start_date in config.yaml does NOT require re-running fetch.
 
-    Cache is refreshed when any ticker's last real close lags end by > 5 trading days.
+    refresh = "auto" | "tail" | "full"  (see module docstring). In "auto" mode the
+    cache is served as-is when its latest complete close is within 5 trading days
+    of `end` — callers that need same-day data (`ideas`) check the exact lag
+    themselves and re-call with refresh="tail".
     """
+    if force_download:
+        refresh = "full"
+    if start in (None, "", "auto"):
+        start = _CACHE_HISTORY_START
+
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_path = cache_dir / "prices.parquet"
 
-    yfmt_map = {t: _yfmt(t) for t in tickers}
-    inv_map  = {v: k for k, v in yfmt_map.items()}
-    needed_yf = sorted(set(yfmt_map.values()) | {"SPY"})
+    yfmt_map   = {t: _yfmt(t) for t in tickers}
+    inv_map    = {v: k for k, v in yfmt_map.items()}
+    needed_yf  = sorted(set(yfmt_map.values()) | {"SPY"} | set(AUX_COLS)
+                        | {DEFENSIVE_TICKER})
     target_end = pd.Timestamp(end)
 
-    # ── Decide whether the cache is usable ───────────────────────────────────
     cached = pd.DataFrame()
     if cache_path.exists():
         cached = pd.read_parquet(cache_path)
         cached.columns = [inv_map.get(c, c) for c in cached.columns]
+        cached = _drop_intraday_row(cached)   # heal a same-day intraday row
+        cached = _drop_partial_tail(cached)   # heal a previously-poisoned tail
 
-        missing = [t for t in needed_yf if inv_map.get(t, t) not in cached.columns]
-        if not missing:
-            # Freshness is judged by the MOST RECENT close in the cache (the latest
-            # market trading day we hold), NOT by every individual ticker. Names that
-            # have legitimately stopped trading (delisted/acquired/halted) will never
-            # update again, so requiring *all* tickers to be current would force a
-            # full re-download on every run. Individually-stale tickers are dropped
-            # downstream by the per-ticker freshness guard in `ideas`.
-            last_valid = cached.apply(lambda c: c.dropna().index.max())
-            cutoff     = target_end - pd.tseries.offsets.BDay(5)
-            panel_last = last_valid.max()           # latest market close we hold
-            if panel_last >= cutoff:
-                present = [t for t in tickers + ["SPY"] if t in cached.columns]
-                panel   = cached[present].loc[start:end]
-                print(f"Loaded price cache: {len(present)} tickers × {len(panel)} days  "
-                      f"(history from {cached.index.min().date()}, "
-                      f"fresh through {panel_last.date()})")
-                return panel
-            print(f"Cache STALE: latest close {panel_last.date()} is behind "
-                  f"{cutoff.date()}.  Re-downloading all …")
-        else:
-            print(f"Cache missing {len(missing)} tickers; re-downloading all …")
+    # ── auto: serve the cache when complete and fresh ─────────────────────────
+    if refresh == "auto" and not cached.empty:
+        missing    = [t for t in needed_yf if inv_map.get(t, t) not in cached.columns]
+        panel_last = cached.index[-1]
+        if not missing and panel_last >= target_end - pd.tseries.offsets.BDay(5):
+            present = [t for t in list(tickers) + SIGNAL_EXCLUDE
+                       if t in cached.columns]
+            panel   = cached[present].loc[start:end]
+            print(f"Loaded price cache: {len(present)} tickers × {len(panel)} days  "
+                  f"(history from {cached.index.min().date()}, "
+                  f"fresh through {panel_last.date()})")
+            return panel
+        print(f"Cache stale/incomplete (latest complete close {panel_last.date()}"
+              + (f", {len(missing)} tickers missing" if missing else "")
+              + ") — incremental refresh …")
+        refresh = "tail"
 
-    # ── Full download (new or stale): always from _CACHE_HISTORY_START ───────
-    raw = yf.download(
-        needed_yf, start=_CACHE_HISTORY_START, end=end,
-        auto_adjust=True, progress=True, threads=True, timeout=60,
-    )
-    if isinstance(raw.columns, pd.MultiIndex):
-        new_prices = raw["Close"]
+    # ── tail: incremental splice onto the existing cache ─────────────────────
+    if refresh == "tail" and not cached.empty:
+        panel = _tail_refresh(cached, needed_yf, inv_map, end)
+    # ── full: re-download everything (fetch, or no usable cache) ─────────────
     else:
-        new_prices = raw[["Close"]].rename(columns={"Close": needed_yf[0]})
+        print("Full re-download of all price history …")
+        new = _yf_close(needed_yf, _CACHE_HISTORY_START, end).rename(columns=inv_map)
+        got = [c for c in new.columns if new[c].notna().any()]
+        # Column-wise merge: a ticker that downloaded takes its ENTIRE new column
+        # (never mix old and new adjusted-price bases); a ticker that failed
+        # keeps its cached column.
+        keep = [c for c in cached.columns if c not in got]
+        if got:
+            panel = pd.concat([new[got], cached[keep]], axis=1) if keep else new[got]
+        else:
+            panel = cached
+        if panel.empty:
+            raise RuntimeError("Price download returned no data and no cache exists — "
+                               "check network / Yahoo availability and retry.")
+        failed = sorted(set(inv_map.get(t, t) for t in needed_yf) - set(got))
+        if failed:
+            print(f"  WARNING: {len(failed)} tickers failed to download — "
+                  f"cached history retained where available: "
+                  f"{', '.join(failed[:8])}" + (" …" if len(failed) > 8 else ""))
 
-    new_prices.index = pd.to_datetime(new_prices.index)
-    new_prices = new_prices.rename(columns=inv_map)
-
-    # New data takes priority over anything previously cached
-    panel = new_prices.combine_first(cached) if not cached.empty else new_prices
-    panel = panel.dropna(axis=1, how="all")
+    panel = panel.dropna(axis=1, how="all").sort_index()
+    panel = _drop_intraday_row(panel)   # never cache an in-progress session
+    panel = _drop_partial_tail(panel)
 
     panel.rename(columns=yfmt_map).to_parquet(cache_path)
     print(f"Price cache updated: {panel.shape[1]} tickers × {panel.shape[0]} days  "

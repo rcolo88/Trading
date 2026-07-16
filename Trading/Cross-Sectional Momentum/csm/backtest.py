@@ -104,10 +104,11 @@ def _cost_rate(cfg: dict) -> float:
 
 
 def _rebalance_dates(index: pd.DatetimeIndex, rebal_freq: int) -> pd.DatetimeIndex:
-    """Rebalance every `rebal_freq` trading days, anchored at the first bar
-    (same grid build_positions uses, so pos.loc[date] is a fresh target)."""
+    """Rebalance every `rebal_freq` trading days, end-anchored (same grid as
+    build_positions with rebal_anchor="end") so the last bar is always a rebal
+    date and pos.loc[date] is a fresh target on every rebal date."""
     mask = np.zeros(len(index), dtype=bool)
-    mask[::rebal_freq] = True
+    mask[np.arange(len(index) - 1, -1, -rebal_freq)] = True
     return index[mask]
 
 
@@ -129,12 +130,13 @@ def simulate_live(
     This makes the backtest identical-by-construction to `ideas`/`target_book`:
     the same per-date book, chained weekly with realistic drift and costs.
     """
-    stocks  = prices.drop(columns=["SPY"], errors="ignore")
+    from csm.data import NON_STOCK_COLS
+    stocks  = prices.drop(columns=NON_STOCK_COLS, errors="ignore")
     ret     = stocks.ffill(limit=3).pct_change().fillna(0.0)
     cols    = list(stocks.columns)
 
     signals = sig_mod.primary_signal(prices, cfg)
-    pos     = port_mod.build_positions(signals, prices, cfg, pit_df=pit_df)  # start-anchor grid
+    pos     = port_mod.build_positions(signals, prices, cfg, pit_df=pit_df, rebal_anchor="end")
 
     rebal_freq = int(cfg.get("portfolio", {}).get("rebal_freq", 5))
     all_rebal  = _rebalance_dates(prices.index, rebal_freq)
