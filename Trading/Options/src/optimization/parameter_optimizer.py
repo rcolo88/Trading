@@ -152,7 +152,7 @@ class ParameterOptimizer:
 
     # Strategy-specific allowed parameters
     VERTICAL_PARAMETERS = {
-        'entry': ['dte', 'short_delta', 'long_delta', 'vix'],
+        'entry': ['dte', 'short_delta', 'long_delta', 'vix_min', 'vix_max'],
         'exit': ['profit_target', 'stop_loss', 'dte_min']
     }
 
@@ -173,8 +173,13 @@ class ParameterOptimizer:
     # Used to map single parameters to multiple config keys
     PARAMETER_EXPANSION = {
         'vertical': {
-            'dte': ['dte_min', 'dte_max'],  # Single dte value sets both min and max (target DTE)
-            'vix': ['vix_min', 'vix_max']  # Single vix value sets both min and max
+            # 'dte' is a TARGET: the strategy pins the expiration closest to it within
+            # ± dte_tolerance (default 5). The old expansion set dte_min=dte_max=value, which
+            # required an expiration EXACTLY that many days out — entries only fired on the rare
+            # days the grid happened to line up. Same trap as the removed 'vix' expansion, which
+            # set vix_min=vix_max=value and so demanded the day's VIX equal it exactly (~never):
+            # verticals now take explicit vix_min / vix_max, like calendars.
+            'dte': ['dte_target'],
         },
         'calendar': {
             # Note: Calendar spreads use explicit vix_min and vix_max
@@ -973,20 +978,25 @@ class ParameterOptimizer:
             if 'vix_max' in entry and 'vix_min' not in entry:
                 strategy_config['entry']['vix_min'] = 0
 
-            # Validate dte_exit < near_dte. dte_exit closes the trade when the NEAR leg has
-            # <= dte_exit days left, so it must be strictly less than the DTE the near leg is
-            # sold at — otherwise the exit condition is already true on entry day and the
-            # "calendar" is held ~0 days. Unlike near_dte<far_dte and vix_min<vix_max (guaranteed
-            # by DISJOINT search ranges), near_dte {7..28} and dte_exit {2..14} OVERLAP, so the
-            # optimizer can otherwise pick e.g. near_dte=7, dte_exit=11 — a logically impossible
-            # exit that produced degenerate ~1-day trades and an absurd inflated Sharpe.
+            # Validate dte_exit < the MINIMUM near-leg DTE the entry window can actually select,
+            # not just the center. dte_exit closes the trade when the NEAR leg has <= dte_exit days
+            # left, so any expiration in the window at or below dte_exit is force-closed ~on entry.
+            # The original guard compared dte_exit to the near_dte CENTER only; with
+            # dte_tolerance=5 that let near_dte=7/dte_exit=5 through, and the earliest-expiration
+            # selection then sold 2-3 DTE calls exited the next day — 295/296 "calendar" trades
+            # were 1-day degenerates (2026-07-12 audit). The strategy now also refuses near legs
+            # with dte <= dte_exit at entry; this guard keeps the SEARCH from wasting trials on
+            # windows that are mostly/entirely below the exit line.
             exit_cfg = strategy_config.get('exit', {})
-            if 'dte_exit' in exit_cfg and 'near_dte' in entry:
-                if exit_cfg['dte_exit'] >= entry['near_dte']:
+            if 'dte_exit' in exit_cfg and ('near_dte' in entry or 'near_dte_min' in entry):
+                near_min_eff = entry.get('near_dte_min')
+                if near_min_eff is None:
+                    near_min_eff = entry['near_dte'] - entry.get('dte_tolerance', 5)
+                if exit_cfg['dte_exit'] >= near_min_eff:
                     raise ValueError(
-                        f"dte_exit ({exit_cfg['dte_exit']}) must be < near_dte "
-                        f"({entry['near_dte']}): cannot exit at more DTE than the near leg is "
-                        f"sold with (the exit would fire on entry day)."
+                        f"dte_exit ({exit_cfg['dte_exit']}) must be < the minimum selectable "
+                        f"near-leg DTE ({near_min_eff}, i.e. near_dte - dte_tolerance): otherwise "
+                        f"part of the entry window is already past the exit trigger at entry."
                     )
 
         elif self.strategy_type == 'vertical':
@@ -998,6 +1008,13 @@ class ParameterOptimizer:
                         f"stop_loss must be between 0.0 and 1.0 (got {sl}). "
                         f"Use 0.50 for 50% of max loss, not 1.5 or -0.50."
                     )
+
+            # Validate vix_max >= vix_min (an inverted band silently blocks every entry)
+            entry = strategy_config.get('entry', {})
+            if 'vix_max' in entry and 'vix_min' in entry and entry['vix_max'] < entry['vix_min']:
+                raise ValueError(
+                    f"vix_max ({entry['vix_max']}) must be >= vix_min ({entry['vix_min']})"
+                )
 
         # Create strategy instance with merged config
         # CRITICAL: Pass only the strategy-specific portion of config (with 'entry'/'exit' at top level)
@@ -1202,7 +1219,7 @@ def quick_optimize_vertical(
         base_config=config
     )
 
-    # Simplified parameter syntax - 'dte' sets both dte_min and dte_max
+    # Simplified parameter syntax - 'dte' is a target; the strategy pins the closest expiration
     optimizer.set_parameter_range('dte', min=dte_range[0], max=dte_range[1], step=5)
     optimizer.set_parameter_range('short_delta', min=short_delta_range[0], max=short_delta_range[1], step=0.05)
     optimizer.set_parameter_range('long_delta', min=long_delta_range[0], max=long_delta_range[1], step=0.05)

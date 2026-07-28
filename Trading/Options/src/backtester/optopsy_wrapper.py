@@ -11,8 +11,6 @@ from typing import Dict, List, Optional, Tuple
 import pandas as pd
 import numpy as np
 import optopsy as op  # Will be imported once data is ready
-from pandas.tseries.holiday import USFederalHolidayCalendar
-from pandas.tseries.offsets import CustomBusinessDay
 
 from ..strategies.base_strategy import BaseStrategy, Position, Signal
 from ..utils.execution import net_open
@@ -245,18 +243,12 @@ class OptopsyBacktester:
                 f"Underlying data: {underlying_start.date()} to {underlying_end.date()}"
             )
 
-        # Get trading dates with US market holiday filtering and 12pm ET timestamps
-        us_calendar = USFederalHolidayCalendar()
-        us_bd = CustomBusinessDay(calendar=us_calendar)
-
-        trading_dates = pd.date_range(
-            start=actual_start,
-            end=actual_end,
-            freq=us_bd  # US business days (excludes federal holidays)
-        )
-
-        # Set all timestamps to 12:00 PM (noon) ET - market midday
-        trading_dates = trading_dates.map(lambda x: x.replace(hour=12, minute=0, second=0, microsecond=0))
+        # Trading dates = the days the options data actually quotes (already noon-normalized).
+        # The previous USFederalHolidayCalendar range was wrong in both directions: it included
+        # Good Fridays (market closed, no data — harmlessly skipped) but EXCLUDED Columbus and
+        # Veterans Day (market open, data present), leaving open positions unmanaged those days.
+        trading_dates = pd.DatetimeIndex(optopsy_data['quote_date'].unique()).sort_values()
+        trading_dates = trading_dates[(trading_dates >= actual_start) & (trading_dates <= actual_end)]
 
         if verbose:
             print(f"Running backtest for {strategy.name}")
@@ -297,6 +289,10 @@ class OptopsyBacktester:
 
             if underlying_price is None:
                 continue
+
+            # Day's VIX, read once up front: exit records used to reference whatever `vix` was
+            # left over from a PREVIOUS day's entry attempt (stale by at least one day).
+            vix = daily_options['vix'].iloc[0] if 'vix' in daily_options.columns else None
 
             # Check exit signals for open positions
             open_positions = strategy.get_open_positions()
@@ -343,7 +339,7 @@ class OptopsyBacktester:
                         'underlying_price_entry': getattr(position, 'underlying_price_entry', None),
                         'underlying_price_exit': underlying_price,
                         'vix_entry': getattr(position, 'vix_entry', None),
-                        'vix_exit': vix if 'vix' in daily_options.columns else None,
+                        'vix_exit': vix,
                         'entry_dte': entry_dte,
                         'entry_price': position.entry_price,
                         'exit_price': position.exit_price,
@@ -382,9 +378,6 @@ class OptopsyBacktester:
 
                 # Only attempt entry if we have risk budget available
                 if available_risk_budget > 0:
-                    # Get VIX for the day (if available)
-                    vix = daily_options['vix'].iloc[0] if 'vix' in daily_options.columns and not daily_options.empty else None
-
                     entry_signal = strategy.generate_entry_signal(
                         date=current_date,
                         options_data=daily_options,
@@ -505,6 +498,7 @@ class OptopsyBacktester:
                 exit_reason="End of backtest period"
             )
             self.account_value += position.realized_pnl
+            self.account_value -= self._calculate_commission(position.contracts)
 
         # Compile results
         results = self._compile_results(strategy)
@@ -545,10 +539,15 @@ class OptopsyBacktester:
             debit = net_open([(near['bid'], near['ask'], False), (far['bid'], far['ask'], True)], fraction, extra)
             return debit if debit > 0 else None
 
-        # Vertical spread - distinct strikes
+        # Vertical spread - distinct strikes, both legs pinned to the signal's expiration (without
+        # the pin, iloc[0] booked the entry off whichever expiration listed the strike first).
         long_option = options_data[
             (options_data['strike'] == signal.long_strike) & (options_data['option_type'] == option_type)
         ]
+        exp = getattr(signal, 'expiration', None)
+        if exp is not None and 'expiration' in options_data.columns:
+            same = same[same['expiration'] == exp]
+            long_option = long_option[long_option['expiration'] == exp]
         if same.empty or long_option.empty:
             return None
         short, long = same.iloc[0], long_option.iloc[0]
@@ -640,11 +639,15 @@ class OptopsyBacktester:
                 ].sort_values('dte')
                 leg_options = leg_options.iloc[[-1] if is_long else [0]]
         else:
-            # Vertical spread - just filter by strike
+            # Vertical spread - filter by strike AND the signal's pinned expiration, so the leg
+            # record (delta/price/expiration) describes the contract actually traded.
             leg_options = options_data[
                 (options_data['strike'] == strike) &
                 (options_data['option_type'] == option_type)
             ]
+            exp = getattr(signal, 'expiration', None)
+            if exp is not None and 'expiration' in options_data.columns:
+                leg_options = leg_options[leg_options['expiration'] == exp]
 
         if leg_options.empty:
             return {'delta': None, 'price': None, 'expiration': None}

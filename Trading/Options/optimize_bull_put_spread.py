@@ -106,13 +106,18 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
 
     # Reflective credit-vertical ranges (tastytrade's ~200k-trade study: 30-45 DTE entry, 16-30 delta
     # short, manage at ~50% profit / ~21 DTE, in elevated IV). short_delta > long_delta = real credit.
-    optimizer.set_parameter_range('dte', min=30, max=45, step=5)                  # 30-45 DTE
+    # Conventions that MATTER here:
+    #   dte       -> a TARGET; the strategy pins the expiration closest to it (± dte_tolerance=5).
+    #   stop_loss -> POSITIVE fraction of MAX LOSS in [0,1] (vertical convention; the calendar's
+    #                negative fraction-of-debit convention fails the vertical validator).
+    #   vix_min   -> premium-rich entry gate (VIX >= this); vix_max stays at the config value (35).
+    optimizer.set_parameter_range('dte', min=30, max=45, step=5)                  # target 30-45 DTE
     optimizer.set_parameter_range('short_delta', min=0.16, max=0.30, step=0.02)   # sell 16-30 delta
     optimizer.set_parameter_range('long_delta', min=0.08, max=0.16, step=0.02)    # protective wing
     optimizer.set_parameter_range('profit_target', min=0.40, max=0.60, step=0.05) # manage ~50%
-    optimizer.set_parameter_range('stop_loss', min=-0.60, max=-0.30, step=0.10)   # % of max loss
+    optimizer.set_parameter_range('stop_loss', min=0.30, max=0.90, step=0.20)     # of max loss; 0.9≈hold
     optimizer.set_parameter_range('dte_min', min=18, max=24, step=2)              # exit near 21 DTE
-    optimizer.set_parameter_range('vix', min=15, max=40, step=5)                  # premium-rich IV
+    optimizer.set_parameter_range('vix_min', min=10, max=25, step=5)              # 10≈off .. 25=rich IV
 
     total: int = optimizer.get_total_combinations()
     print(f"  ✓ Optimizer configured")

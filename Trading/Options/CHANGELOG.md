@@ -4,6 +4,178 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Results — Bull put regime attribution + pre-registered overlay validation (2026-07-19)
+
+Added `src/utils/regime.py` (fixed-rule VIX-level, VIX IV-rank, SPY-trend, and composite regime
+labels/gates — zero fitted thresholds, reuses `vix_gate`/`trend_gate`), `regime_attribution.py`
+(Phase 1 diagnostic: labels every trade/day of a single continuous full-window backtest by regime,
+no search) and `regime_overlay_validation.py` (Phase 2: 6 pre-registered entry-gate overlays
+scored honestly via `walk_forward.evaluate_oos_continuous` on the walk-forward IS params, NOT
+`--final`, since `--final` already saw the OOS dates).
+
+**Phase 1 (diagnostic):** both the walk-forward and `--final` parameter sets show the same
+pattern — composite "risk-on" days (bull trend + VIX<25) score Sharpe 2.2-2.5 with -8% to -17%
+isolated drawdown; composite "stress" days (VIX>=25 or bear trend) score ~0.1 to -0.16 Sharpe with
+-48% to -63% isolated drawdown. The worst full-window drawdown episode for BOTH param sets is the
+same 2022 rate-hike bear (peak Jan/Apr 2022 → trough Sep/Oct 2022) — not 2020 COVID or 2018
+Volmageddon. Counter-intuitively, "VIX IV-Rank >= 50" (the tastytrade rich-premium heuristic)
+scores Sharpe -3.2 to -5.9 with -72% to -93% isolated drawdown — the opposite of the textbook
+expectation — while IV-Rank < 50 scores +2.5 to +2.9. As of 2026-07-17, current conditions
+(VIX 18.8, IVR 30, SPY trend bull) classify as composite "risk-on" — the strategy's best
+historical bucket, not a distinct/adverse regime, at least by this VIX+trend regime definition.
+
+**Phase 2 (honest overlay validation, walk-forward IS params, OOS-scored):** baseline (no
+overlay) OOS Sharpe 1.195 (46 trades, -20.1% DD). All 6 pre-registered overlays beat baseline
+except V2 (IVR>=50 entries only: Sharpe collapses to 0.15 on 5 trades, confirming the Phase 1
+warning). Best: **V1 "skip entries when VIX>30"** — Sharpe 1.526, -13.8% DD, 45 trades (barely
+fewer than baseline's 46 — nearly free). **V5 "IVR<50 only"** scored highest (Sharpe 1.616,
+-14.2% DD) but cuts to 41 trades. Deflated-Sharpe on the best-of-7 (V0-V5 + V3b) selection: DSR
+0.931 — short of the 0.95 PASS bar but far stronger than the original 1000+-trial numeric search
+(bull put walk-forward DSR 0.65; calendar DSR 0.004), because a 7-variant pre-registered set adds
+far less selection risk than an open-ended grid.
+
+**Recommendation:** add "skip entries when VIX>30" (V1) as a production overlay on the `--final`
+params — minimal trade-count cost, meaningfully shallower drawdown, high face-validity (avoids
+opening new short-premium risk during acute vol spikes). Treat V5 (IVR<50) as a promising but
+second-order finding pending Phase 3 diagnosis, since it inverts a market convention and its
+mechanism (IV-rank spikes on the VIX complex co-occurring with market-wide crisis, unlike a
+single-stock IV rank) is a hypothesis, not yet verified. Phase 3 (per-regime *parameter* refit,
+not just an entry gate) is GO per the plan's own criterion (composite/IVR Sharpe spread >2.0 with
+>=30 trades/regime) but not yet run — pending user decision given its multi-hour compute cost and
+required engine changes.
+
+### Results — Bull put vs. call calendar walk-forward comparison + bull put production fit (2026-07-16 to 2026-07-18)
+
+Ran both strategies' walk-forward validation under the identical current config ($20k, 30% risk
+cap, 2018-01-02..2026-07-10, IS 2018-2023 / OOS 2023-12-21..2026-07-10) for an honest, apples-to-
+apples comparison — the previous calendar result on disk predates the config change and used a
+2021-2026 window that excludes the 2018 Volmageddon, Dec-2018 selloff, and 2020 COVID crash
+entirely, so it was not a fair comparison basis.
+
+| | Bull Put | Call Calendar |
+|---|---|---|
+| OOS Sharpe | 1.19 | 2.06 |
+| OOS return | +83% | +456% |
+| OOS trades | 46 | 288 |
+| OOS max drawdown | -20% | -29% |
+| Deflated Sharpe (IS search) | best 1.10 vs benchmark 0.95 → **DSR 0.65** | best 1.89 vs benchmark **2.95** → **DSR 0.004** |
+
+**Recommendation: bull put, not calendar, for real capital.** The calendar's headline numbers are
+larger, but its deflated-Sharpe check is far worse — the best of ~950 trials actually UNDERSHOT
+the Sharpe expected from pure chance across that (wide) grid, meaning the search provides no
+statistical basis to call the result skill rather than noise. This is consistent with the
+2026-07-12 audit's finding that a long calendar's edge in this dataset is entangled with a
+term-structure premium the generator bakes in from real VIX9D/VIX/VIX3M/VIX6M history (calendars
+are structurally long that premium) — OOS "survival" may reflect the dataset's structural
+contango bias more than a market inefficiency. Bull put's DSR (0.65) is also below the 0.95 PASS
+bar but at least clears the no-skill benchmark, and its search space is narrower/economically
+motivated (tastytrade-anchored), reducing the raw opportunity for search overfitting. Before
+trusting the calendar further: revalidate on real quoted chains (OptionsDX/DoltHub, not the
+VIX-calibrated synthetic generator) with a tightened parameter grid.
+
+**Bull put `--final` production fit** (all 8.5 years, no holdout — 1,500 Optuna trials, ~37h):
+`dte target=30, short_delta=0.30, long_delta=0.08, profit_target=0.45, stop_loss=0.50×max-loss,
+dte_min=20, vix_min=10`. Full-window Sharpe 1.36 (deflated-Sharpe DSR 0.881, still below the 0.95
+PASS bar — expected, since this fit has no holdout to test against). Max drawdown -47%, deeper
+than the OOS-only slice (-20%) because it spans the full 2018-2023 stress years compounding
+continuously. Shifted modestly from the walk-forward's IS-chosen params (wider VIX entry band
+10 vs 20, tighter stop 0.50 vs 0.70, earlier profit-take 0.45 vs 0.55) — expected when fitting on
+8.5y vs the 6y IS slice. Recommend trading these `--final` params (per the script's own design:
+walk-forward already confirmed the edge survives OOS in this region of parameter space) with
+half-Kelly sizing given the still-weak DSR and the depth of the full-window drawdown.
+
+### Changed — $20k account, 30% risk cap, 8.5-year backtest window (2026-07-15)
+
+- `backtest.initial_capital` 10000 → **20000**; `position_sizing.max_risk_percent` 10 → **30**.
+  Together these lift the per-entry risk budget from $1,000 to ~$6,000: a 30Δ/10Δ SPY put spread
+  runs ~$2.5-4k max risk per contract, so the old budget sized every wide-delta entry to 0
+  contracts and silently restricted any vertical optimization to narrow spreads.
+- `synthetic_data.start_date` 2021-01-01 → **2018-01-01** and end extended to **2026-07-10**
+  (backtest window matched): the window now contains the Feb-2018 Volmageddon, the Dec-2018
+  selloff, the 2020 COVID crash and the 2022 bear — the stress regimes a short-put strategy must
+  be optimized THROUGH, not around. Dataset regenerated (VIX complex fully covered, 2,140 days).
+- `optimization.min_trades` 10 → **15** (floor scales with the longer history).
+- Stale bull_put comments corrected (profit_target/stop_loss/dte_min descriptions didn't match
+  their values).
+
+### Fixed — Bull put spread backtest was structurally broken (2026-07-15)
+
+A review of the vertical-spread path ahead of a bull put optimization found the same failure
+class the 2026-07-12 calendar audit fixed — plus two parameter-mapping bugs that made the
+`optimize_bull_put_spread.py` search a no-op:
+
+- **Expiration pinning (`vertical_spreads.py`, `optopsy_wrapper.py`)** — verticals never pinned an
+  expiration. Entry delta-targeted each leg across the WHOLE DTE window (legs could come from
+  different expirations = a diagonal priced as a vertical), the wrapper booked the entry off
+  `iloc[0]` at the strike (any expiration), and every exit re-quoted/DTE-checked the position
+  against whichever expiration listed the strike first — usually the nearest weekly, whose
+  near-zero time value systematically faked credit-spread profits and fired the DTE exit on the
+  wrong calendar. Both legs are now pinned at entry to the ONE expiration closest to the target
+  DTE, the expiration is stored on the signal/legs, exits re-quote strike+expiration, and a
+  position whose expiration passes settles at intrinsic value instead of lingering as a zombie.
+- **`vix` grid param was an exact-match filter (`parameter_optimizer.py`)** — the vertical
+  expansion set `vix_min = vix_max = value`, so an entry required the day's VIX to EQUAL the grid
+  value (~never true; the calendar comment even documents the trap). Verticals now take explicit
+  `vix_min` / `vix_max`, and `optimize_bull_put_spread.py` optimizes `vix_min` (premium-rich gate).
+- **`dte` grid param required an exact-DTE expiration** — same expansion trap
+  (`dte_min = dte_max = value`); entries could only fire on days where some expiration was exactly
+  N days out. `dte` now maps to `dte_target` and the strategy pins the closest expiration within
+  ± `dte_tolerance` (default 5), mirroring the calendar's design.
+- **`stop_loss` grid used the wrong sign convention (`optimize_bull_put_spread.py`)** — the grid
+  was `-0.60..-0.30` (the calendar's fraction-of-debit convention) but the vertical validator
+  requires `0..1` (fraction of max loss), so EVERY combination raised and scored NaN/-999. Grid is
+  now `0.30..0.90`.
+- **Degenerate-entry guard** — entries whose expiration is already at/below the exit `dte_min` are
+  refused (the calendar audit's 1-day-trade failure class), and a credit spread that would open at
+  a debit (or debit spread at a credit — inverted delta targeting) is rejected.
+- **Sizing uses actual max loss** — `calculate_position_size` now sizes off the real per-contract
+  risk (credit: width − credit; debit: the debit) when the backtester supplies the open price,
+  matching the wrapper's risk-budget accounting instead of over-reserving the full strike width.
+- **Stop overshoot parity** — vertical stop-loss exits now book the `stop_slippage_percent`
+  monitoring-lag overshoot like calendars (no resting multi-leg stops on Robinhood).
+
+Known constraint surfaced (not a bug): with `initial_capital: 10000` and
+`position_sizing.max_risk_percent: 10` the risk budget is $1,000, but a 30Δ/10Δ SPY put spread is
+~$25-40 wide (~$2,500-4,000 max risk per contract) → 0 contracts. Wide-delta combos are only
+tradeable at a higher risk cap or larger account; the optimizer will otherwise select narrow
+spreads by construction.
+
+### Fixed — Calendar leg selection degeneracy + audit fixes (2026-07-12)
+
+A full audit of the call-calendar backtest found the engine sound and the VIX-complex synthetic
+dataset clean (82.7% contango days, 0% no-arb inversions, no missing trading days, exact
+reproduction of the saved optimization), **but the optimizer's "best" strategy was not a calendar**:
+
+- **Root cause** — with `near_dte=7` and `dte_tolerance=5`, the near window was [2,12] DTE and leg
+  selection took `iloc[0]` = the EARLIEST expiration, so ~60% of entries sold 2-3 DTE calls. Those
+  were already at/below `dte_exit=5`, so 295/296 exits were the DTE exit with a median 1-day hold —
+  an overnight VRP harvest, not a time spread. Worse, sub-9-DTE options sit BELOW the shortest VIX
+  tenor (^VIX9D): `term_ratio()` clamps flat there (measured 1-3 DTE ATM IV == 9d IV exactly), so
+  the sold leg was priced in the surface's pure-extrapolation blind zone.
+- **Fix (strategy, `calendar_spreads.py`)** — each leg is now pinned to the expiration whose DTE is
+  CLOSEST to its target (near_dte/far_dte center, or the window midpoint in min/max mode), and near
+  candidates with `dte <= dte_exit` are refused at entry. The net debit is priced from the exact
+  selected legs (was: a ±2-day DTE re-lookup that could match a different expiration on dense chains).
+- **Fix (guard, `parameter_optimizer.py`)** — the `dte_exit < near_dte` guard now compares against
+  the minimum SELECTABLE near DTE (`near_dte - dte_tolerance`, or `near_dte_min`), not the center.
+- **Fix (search grid, `optimize_call_calendar_spread.py`)** — `near_dte` floor raised 7 → 14 so the
+  selectable window (±5) bottoms out at 9 DTE, keeping the sold leg on market-anchored pricing.
+- **Fix (generator, `synthetic_generator.py`)** — put rows recorded the flat base vol in `iv`
+  instead of the surface IV `iv_k` (calls were correct). Prices/greeks were unaffected; put-side IV
+  consumers (contango gate, `_estimate_iv` remarks for put calendars) were reading garbage.
+  Regenerate the dataset before running any PUT-side strategy; call-side runs are unaffected.
+- **Fix (engine, `optopsy_wrapper.py`)** — trading dates now come from the data's own quote dates
+  (the USFederalHolidayCalendar range skipped Columbus/Veterans Day — market open, positions
+  unmanaged — and included Good Fridays); `vix_exit` in trade records was read from a stale loop
+  variable (off by ≥1 day); end-of-backtest force-closes now pay exit commission.
+- **Config** — `require_contango: true` (its default-off rationale was the corrupt Massive data;
+  the current dataset's term structure is real); stale calendar comments corrected.
+
+Recovered (previously unsaved) walk-forward numbers for the DEGENERATE winner, for the record:
+IS Sharpe 2.369 (296 trades), OOS Sharpe 2.42 (53 trades). Treat as an artifact of the above, not
+as a validated edge. Re-run `caffeinate -i python optimize_call_calendar_spread.py` for an honest
+result under the fixed selection.
+
 ### Changed — VIX-complex–driven synthetic chains; cost-model fix; repo cleanup (2026-06-26)
 
 **Root cause of prior "no edge" result:** Two read-only audits confirmed DoltHub's `iv` column has

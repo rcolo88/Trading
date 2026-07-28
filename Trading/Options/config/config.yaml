@@ -11,8 +11,10 @@ underlying:
 # Change the dataset here once -- no script edits needed.
 synthetic_data:
   symbol: SPY
-  start_date: "2021-01-01"   # Extended for 5-year WF/OOS window (VIX complex available from 2011+)
-  end_date: "2026-06-12"
+  start_date: "2018-01-01"   # 8.5-year window (VIX complex available from 2011+). Includes the
+                             #   Feb-2018 Volmageddon, Dec-2018 selloff, 2020 COVID crash and the
+                             #   2022 bear — the stress regimes a short-put backtest must survive.
+  end_date: "2026-07-10"
   max_dte: 90
 
 # Backtesting period (the window a backtest runs over; may be a SUBSET of the
@@ -22,16 +24,17 @@ backtest:
   # its EOD closes back-solve to iv ~1.35x VIX and invert the term structure on 34% of slices
   # (no-arbitrage violations) — a calendar's P&L IS the near-vs-far relationship, so it's unusable.
   # The loader's data-quality gate now HARD-FAILS such data. See CHANGELOG 2026-06-25.
-  start_date: "2021-01-04"   # Synthetic VIX-complex data, 5-year WF/OOS window
-  end_date:   "2026-06-12"
-  initial_capital: 10000
+  start_date: "2018-01-02"   # Synthetic VIX-complex data, 8.5-year WF/OOS window
+  end_date:   "2026-07-10"
+  initial_capital: 20000
 
 # Optimization controls (read by ParameterOptimizer)
 optimization:
-  min_trades: 10   # Trials with fewer trades than this have their Sharpe/Sortino/Calmar NaN'd, so a
+  min_trades: 15   # Trials with fewer trades than this have their Sharpe/Sortino/Calmar NaN'd, so a
                    #   handful of lucky trades can't win the search and degenerate ~0-volatility
                    #   Sharpes (|SR|~1e16) don't pollute the deflated-Sharpe benchmark. Raise as you
                    #   add history (more days -> more trades -> a higher floor is reasonable).
+                   #   Raised 10 -> 15 with the 2018 window extension (5.4y -> 8.5y of data).
 
 # Data source configuration
 data_source:
@@ -96,16 +99,16 @@ strategies:
   bull_put_spread:          # Credit spread - neutral to bullish
     enabled: true
     entry:
-      dte_min: 35           # Days to expiration
-      dte_max: 45
+      dte_min: 35           # Entry window; the strategy pins the ONE expiration closest to the
+      dte_max: 45           #   window midpoint (or to entry.dte_target ± dte_tolerance if set)
       short_delta: 0.30     # Sell put with ~30 delta
-      long_delta: 0.10      # Buy put with ~20 delta
+      long_delta: 0.10      # Buy put with ~10 delta (protective wing)
       vix_min: 19           # Enter when VIX >= 19 (elevated IV - higher premium)
       vix_max: 35           # Don't enter if VIX > 35 (too volatile)
     exit:
-      profit_target: 0.60   # Close at 50% of max profit
-      stop_loss: 0.20       # Stop at 50% of max loss
-      dte_min: 10           # Close if DTE drops below 21
+      profit_target: 0.60   # Close at 60% of max profit
+      stop_loss: 0.20       # Stop at 20% of max loss (positive fraction — vertical convention)
+      dte_min: 10           # Close if DTE drops to 10 (entries with dte <= this are refused)
 
   bull_call_spread:         # Debit spread - moderately bullish
     enabled: true
@@ -139,10 +142,12 @@ strategies:
     enabled: true
     entry:
       # DTE Configuration - Two approaches supported:
-      # Approach 1 (Default): Center ± Tolerance
-      near_dte: 14           # Sell 30 DTE call (center point)
-      far_dte: 42            # Buy 60 DTE call (center point)
-      dte_tolerance: 5       # +/- 1 day tolerance (creates range: 14-16 and 49-51)
+      # Approach 1 (Default): Center ± Tolerance. The strategy pins each leg to the expiration
+      # CLOSEST to its center within the window (not the earliest), and refuses a near leg whose
+      # DTE is <= exit.dte_exit (which would trigger the DTE exit at entry — degenerate 1-day trade).
+      near_dte: 14           # Sell ~14 DTE call (window 9-19 with tolerance 5)
+      far_dte: 42            # Buy ~42 DTE call (window 37-47)
+      dte_tolerance: 5       # +/- days around each center
 
       # Approach 2 (For Optimizer): Min/Max Ranges
       # Uncomment to use explicit ranges instead of center ± tolerance:
@@ -152,17 +157,16 @@ strategies:
       # far_dte_max: 65       # Maximum DTE for far-term leg
       # Note: If min/max specified, they override near_dte/far_dte/dte_tolerance
 
-      require_contango: false # Only enter when front-month IV < back-month IV (normal, upward-sloping
+      require_contango: true # Only enter when front-month IV < back-month IV (normal, upward-sloping
                              #   term structure). Refuses backwardation (vol-spike) entries, where a
                              #   long calendar structurally loses — externally-sourced data: contango
                              #   ~+18% avg vs backwardation ~-15%. Fixed gate (no optimizer dimension,
                              #   so it doesn't deflate the Deflated Sharpe).
-                             # DEFAULT OFF: the Massive/Polygon free-tier dataset's option prices are
-                             #   thin last-trade prints (1-6 contracts/day) that back-solve to IVs 2-4x
-                             #   VIX, inflated WORSE at short DTE — which fabricates backwardation on
-                             #   ~99% of days and makes this gate reject nearly every entry. Turn it ON
-                             #   only on a dataset with trustworthy term structure (genuine exchange
-                             #   bid/ask, e.g. OptionsDX), where near/far IV is real. See CHANGELOG.
+                             # ON because the VIX-complex synthetic dataset carries a REAL term
+                             #   structure (82.7% contango days, 0% no-arb inversions — audited
+                             #   2026-07-12). It was OFF only for the corrupt Massive/Polygon data,
+                             #   whose inflated short-DTE IVs fabricated backwardation on ~99% of
+                             #   days. Keep ON for any dataset whose near/far IV is trustworthy.
       strike_selection: "delta"  # Options: atm, delta, moneyness
       target_delta: 0.4     # Used if strike_selection = "delta"
       moneyness: 0.0         # Used if strike_selection = "moneyness" (0.0 = ATM)
@@ -216,7 +220,11 @@ strategies:
 # Position sizing
 position_sizing:
   method: "fixed_risk"  # Options: fixed_risk, kelly
-  max_risk_percent: 10.0  # Maximum portfolio risk exposure (% of current portfolio value)
+  max_risk_percent: 30.0  # Maximum portfolio risk exposure (% of current portfolio value).
+                          # Raised 10 -> 30 with the $20k account: a 30Δ/10Δ SPY put spread runs
+                          # ~$2.5-4k max risk per contract, so a 10% cap ($2k) sized every entry to
+                          # 0 contracts and silently restricted the optimizer to narrow spreads.
+                          # 30% of $20k = $6k ≈ one wide spread + one narrow, or 2-3 narrow.
 
   # Kelly Criterion percentages (manually updated from Kelly_Criteria notebook)
   # Workflow:

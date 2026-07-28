@@ -13,7 +13,9 @@
       "Bash(git commit:*)",
       "Bash(python3:*)",
       "Bash(timeout 180 python:*)",
-      "Bash(timeout 120 python:*)"
+      "Bash(timeout 120 python:*)",
+      "Bash(./opt_venv/bin/python *)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []

@@ -115,12 +115,19 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
     #     trials silently find no contract. We derive that cap from the loaded data (which is
     #     governed by config/config.yaml -> synthetic_data.max_dte at generation time) and
     #     round it down to the step grid -- no more hand-coding it against the generator.
-    #   * near_dte < far_dte and vix_min < vix_max by construction (DISJOINT ranges: near {7..28}
+    #   * near_dte < far_dte and vix_min < vix_max by construction (DISJOINT ranges: near {14..28}
     #     vs far {30..45}; vix_min {5..20} vs vix_max {25..60}), so no trial is wasted on those
-    #     invalid orderings. The near_dte {7..28} and dte_exit {2..14} ranges OVERLAP, though, so
-    #     dte_exit < near_dte CANNOT be guaranteed by the ranges — it is enforced as a runtime guard
-    #     in ParameterOptimizer._run_single_backtest (dte_exit >= near_dte raises and is dropped),
-    #     since dte_exit >= near_dte would force the calendar to exit on entry day.
+    #     invalid orderings. The near_dte and dte_exit {2..14} ranges OVERLAP, though, so
+    #     dte_exit < (near_dte - dte_tolerance) CANNOT be guaranteed by the ranges — it is enforced
+    #     as a runtime guard in ParameterOptimizer._run_single_backtest (raises and is dropped).
+    #     The 2026-07-12 audit found the old center-only guard let near_dte=7/dte_exit=5 through:
+    #     the ±5 window admitted 2-3 DTE near legs already past the exit trigger, so 295/296
+    #     "calendar" trades were 1-day degenerates. The strategy now pins each leg to the
+    #     expiration CLOSEST to its target and refuses near legs with dte <= dte_exit.
+    #   * near_dte FLOOR = 14: with dte_tolerance 5 the selectable window bottoms out at 9 DTE.
+    #     The synthetic IV surface has no tenor below ^VIX9D (9d) — term_ratio() clamps flat below
+    #     it, so sub-9-DTE options are pure extrapolation (measured: 1-3 DTE ATM IV == 9d IV
+    #     exactly). Keeping the near leg >= 9 DTE keeps the SOLD leg on market-anchored pricing.
     #   * STEP is deliberately fine (3): real chains list only a few expirations/day at irregular
     #     DTEs (e.g. DoltHub clusters near ~{13, 28, 60}). A coarse step-7 grid {42,49,56,63} can
     #     straddle the actual far expiration and find NO contract (far_dte=42 lands in a gap -> 1
@@ -144,7 +151,7 @@ def setup_optimizer(config: Dict[str, Any], options_data: pd.DataFrame, underlyi
         data_max_dte = int(options_data['dte'].max())
     far_dte_cap = min(FAR_DTE_CEIL, max(FAR_DTE_FLOOR, (data_max_dte // FAR_DTE_STEP) * FAR_DTE_STEP))
 
-    optimizer.set_parameter_range('near_dte', min=7, max=28, step=7)        # sell the near leg (7-28)
+    optimizer.set_parameter_range('near_dte', min=14, max=28, step=7)       # sell the near leg (14-28; window floor 9 DTE)
     optimizer.set_parameter_range('far_dte', min=FAR_DTE_FLOOR, max=far_dte_cap, step=FAR_DTE_STEP)  # buy the far leg (30-45)
     optimizer.set_parameter_range('target_delta', min=0.45, max=0.55, step=0.05)  # ATM / slightly OTM
     optimizer.set_parameter_range('profit_target', min=0.10, max=0.60, step=0.10)

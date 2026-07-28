@@ -125,43 +125,6 @@ class CalendarSpread(BaseStrategy):
 
         return None
 
-    def _get_spread_price(
-        self,
-        options_chain: pd.DataFrame,
-        strike: float,
-        near_dte: int,
-        far_dte: int,
-        option_type: str,
-        fraction: float = 0.5,
-        extra: float = 0.0,
-    ) -> Optional[float]:
-        """Net debit to open the calendar (sell near, buy far) at the limit-fill price.
-
-        Returns a positive debit, or None if the far leg isn't richer than the near (not a
-        valid calendar) or a leg is missing.
-        """
-        near_option = options_chain[
-            (options_chain['strike'] == strike) &
-            (options_chain['option_type'] == option_type) &
-            (options_chain['dte'] >= near_dte - 2) &
-            (options_chain['dte'] <= near_dte + 2)
-        ]
-        far_option = options_chain[
-            (options_chain['strike'] == strike) &
-            (options_chain['option_type'] == option_type) &
-            (options_chain['dte'] >= far_dte - 2) &
-            (options_chain['dte'] <= far_dte + 2)
-        ]
-
-        if near_option.empty or far_option.empty:
-            return None
-
-        near, far = near_option.iloc[0], far_option.iloc[0]
-        net_debit = net_open(
-            [(near['bid'], near['ask'], False), (far['bid'], far['ask'], True)], fraction, extra
-        )
-        return net_debit if net_debit > 0 else None
-
     def generate_entry_signal(
         self,
         date: datetime,
@@ -204,6 +167,10 @@ class CalendarSpread(BaseStrategy):
             if debug:
                 print(f"  Using min/max for far DTE: [{far_dte_min}, {far_dte_max}]")
 
+        # Targets for picking ONE expiration per leg (min/max mode targets the window midpoint).
+        near_target = self.entry_config.get('near_dte', (near_dte_min + near_dte_max) / 2.0)
+        far_target = self.entry_config.get('far_dte', (far_dte_min + far_dte_max) / 2.0)
+
         # Filter options within DTE ranges
         near_options = options_data[
             (options_data['dte'] >= near_dte_min) &
@@ -219,6 +186,23 @@ class CalendarSpread(BaseStrategy):
             if debug:
                 print(f"  ❌ DTE filter failed: near={len(near_options)}, far={len(far_options)}")
             return None
+
+        # The near leg must OUTLIVE the dte_exit rule, or the exit condition is already true at
+        # entry and the "calendar" is force-closed the next day (the degenerate ~1-day trades a
+        # wide dte_tolerance let through: near_dte=7 ± 5 admitted 2-3 DTE entries under dte_exit=5).
+        dte_exit = self.exit_config.get('dte_exit', 7)
+        near_options = near_options[near_options['dte'] > dte_exit]
+        if near_options.empty:
+            if debug:
+                print(f"  ❌ No near expiration in [{near_dte_min}, {near_dte_max}] "
+                      f"beyond dte_exit={dte_exit}")
+            return None
+
+        # Pin each leg to the expiration whose DTE is CLOSEST to its target — not whatever row
+        # happens to come first in the window. iloc[0] on a multi-expiration window silently took
+        # the EARLIEST expiration, which turned "near_dte=7" into systematic 2-3 DTE entries.
+        near_dte_pick = min(near_options['dte'].unique(), key=lambda d: abs(d - near_target))
+        near_options = near_options[near_options['dte'] == near_dte_pick]
 
         # Check VIX filters - strategy-specific first, then global fallback
         vix = kwargs.get('vix')
@@ -257,26 +241,23 @@ class CalendarSpread(BaseStrategy):
                 print(f"  ❌ Strike selection failed (method: {strike_selection})")
             return None
 
-        # Verify the strike exists in far-term options too
-        far_strike_exists = not far_options[
+        # Far leg: same strike, expiration closest to the far target among those quoting it.
+        far_candidates = far_options[
             (far_options['strike'] == strike) &
             (far_options['option_type'] == option_type)
-        ].empty
-
-        if not far_strike_exists:
+        ]
+        if far_candidates.empty:
             if debug:
                 print(f"  ❌ Strike ${strike} not found in far-term options")
             return None
+        far_dte_pick = min(far_candidates['dte'].unique(), key=lambda d: abs(d - far_target))
 
-        # The two selected legs (same strike, near vs far expiration).
+        # The two selected legs (same strike, near vs far expiration; both pinned above).
         near_row = near_options[
             (near_options['strike'] == strike) &
             (near_options['option_type'] == option_type)
         ].iloc[0]
-        far_row = far_options[
-            (far_options['strike'] == strike) &
-            (far_options['option_type'] == option_type)
-        ].iloc[0]
+        far_row = far_candidates[far_candidates['dte'] == far_dte_pick].iloc[0]
 
         # --- Term-structure (contango) gate -------------------------------------------------
         # A long calendar SELLS the front month and BUYS the back, so it profits from the normal
@@ -301,14 +282,17 @@ class CalendarSpread(BaseStrategy):
         near_dte_actual = near_row['dte']
         far_dte_actual = far_row['dte']
 
-        # Get spread price
-        spread_price = self._get_spread_price(
-            options_data, strike, near_dte_actual, far_dte_actual, option_type, fraction, extra
+        # Net debit to open (sell near, buy far) priced from the EXACT legs selected above —
+        # not a re-lookup by a ±2-day DTE window, which on a dense chain can silently match a
+        # different expiration than the one the signal commits to.
+        spread_price = net_open(
+            [(near_row['bid'], near_row['ask'], False), (far_row['bid'], far_row['ask'], True)],
+            fraction, extra
         )
 
-        if spread_price is None or spread_price <= 0:
+        if spread_price <= 0:
             if debug:
-                print(f"  ❌ Spread price calculation failed: price={spread_price}")
+                print(f"  ❌ Not a valid calendar debit: price={spread_price}")
             return None
 
         # Optional: Check minimum credit/debit requirements

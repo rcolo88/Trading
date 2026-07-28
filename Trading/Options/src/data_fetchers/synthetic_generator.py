@@ -445,7 +445,7 @@ class SyntheticOptionsGenerator:
                 'last': put_data['price'],
                 'volume': np.random.randint(100, 5000),
                 'open_interest': np.random.randint(500, 20000),
-                'iv': volatility,
+                'iv': iv_k,  # surface IV — was the flat base vol, corrupting put-side IV reads
                 'delta': put_data['delta'],
                 'abs_delta': abs(put_data['delta']),  # Absolute delta for filtering
                 'gamma': put_data['gamma'],
