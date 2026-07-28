@@ -40,12 +40,19 @@ python csmom.py ideas --capital 100000
 
 That's it. The book is written to `outputs/ideas_TIMESTAMP.txt` and `.json`.
 
-> **Daily workflow:** run `python csmom.py ideas --capital N` each trading day.
-> It auto-refreshes prices before scoring — no manual `fetch` needed for price data.
+> **Daily workflow:** run `python csmom.py ideas --capital N` each trading day
+> (or put it on a daily cron) — it auto-refreshes prices before scoring, no manual
+> `fetch` needed for price data.
 >
-> **Execute trades on the weekly cadence** (every 5 trading days): that is the
-> backtest's rebalance schedule.  The book between rebalances is held with drift;
-> trading it daily incurs extra costs beyond what was validated.
+> **Self-gated on the weekly cadence:** the command checks how many trading days
+> have passed since the last saved book (`outputs/portfolio_book.json`) and only
+> rebuilds/re-trades when a rebalance is actually due (every 5 trading days by
+> default — `portfolio.rebal_freq`), the same schedule the backtest measures.
+> Run it any day; on off-cadence days it just prints a `HOLD` status and the
+> still-current book — no new trades, no network refresh, no output files
+> written. Pass `--force` to rebuild off-schedule anyway (e.g. after a config
+> change), or `--holdings file.json` to diff against external holdings, both of
+> which bypass the gate.
 >
 > `verify-book` asserts the live book equals the backtest engine at any time.
 
@@ -198,7 +205,7 @@ regime_filter:
   spy_ma_days: 200       # go to cash when SPY < its 200-day moving average AND vol is high
 
 portfolio:
-  rebal_freq: 5          # rebalance every 5 trading days (weekly) — run `ideas` on this cadence
+  rebal_freq: 5          # rebalance every 5 trading days (weekly) — `ideas` self-gates on this
   max_names: 25          # hold the 25 highest-conviction names (ranked by signal)
 ```
 

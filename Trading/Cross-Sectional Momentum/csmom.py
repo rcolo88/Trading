@@ -7,14 +7,18 @@ Subcommands:
   backtest   Run a walk-forward backtest (weekly-rebalance simulation) + DSR/MCPT.
   ideas      Output today's target portfolio book — the exact holdings the
              backtest trades (full top-quintile, equal-dollar, vol-scaled,
-             regime-gated) plus the weekly rebalance trade list.
+             regime-gated) plus the weekly rebalance trade list. Self-gated
+             on rebal_freq (default 5 trading days): safe to run every
+             trading day (e.g. from cron) — it no-ops with a HOLD status
+             until a rebalance is actually due, so you never have to track
+             the cadence yourself. Pass --force to rebuild off-schedule.
   verify-book  Assert the live book == the backtest position engine.
 
 Usage:
   python csmom.py                     # interactive menu
   python csmom.py fetch
   python csmom.py backtest [--mcpt N] [--oos-frac 0.30]
-  python csmom.py ideas    [--capital N] [--holdings file.json]
+  python csmom.py ideas    [--capital N] [--holdings file.json] [--force]
   python csmom.py verify-book
 
 HONEST EXPECTATIONS:
@@ -261,6 +265,38 @@ def _save_book(out_dir: Path, payload: dict) -> None:
     (out_dir / BOOK_FILE).write_text(json.dumps(payload, indent=2, default=str))
 
 
+def _print_hold_status(prev: dict, gap: int, rebal_freq: int) -> None:
+    """Console-only status for a non-rebalance day: report the still-current book,
+    make zero trades, and don't touch outputs/ (no new report, no re-persisted book) —
+    there is nothing new to record until the next scheduled rebalance."""
+    header  = prev.get("header", {})
+    rows    = prev.get("book", [])
+    as_of   = header.get("as_of", "?")
+    has_cap = header.get("capital") is not None
+
+    print("\n" + "=" * 84)
+    print("Cross-Sectional Residual Momentum — HOLD (no rebalance due)")
+    print("=" * 84)
+    print(f"  Last book as of: {as_of}   ({gap} trading day(s) elapsed; "
+          f"rebalance every {rebal_freq})")
+    print(f"  Next rebalance due in {rebal_freq - gap} trading day(s).")
+    print("  No trades — continue holding the book below unchanged.")
+    print("=" * 84)
+    if has_cap:
+        print(f"  {'Rank':<5} {'Ticker':<8} {'Weight':>8} {'Buy $':>12} {'Close':>10}")
+        print("  " + "-" * 60)
+        for r in rows:
+            print(f"  {r['rank']:<5} {r['ticker']:<8} {r['weight_pct']:>7.2f}% "
+                  f"{r.get('dollars', 0):>12,.2f} {r['last_close']:>10.2f}")
+    else:
+        print(f"  {'Rank':<5} {'Ticker':<8} {'Weight':>8} {'Close':>10}")
+        print("  " + "-" * 40)
+        for r in rows:
+            print(f"  {r['rank']:<5} {r['ticker']:<8} {r['weight_pct']:>7.2f}% "
+                  f"{r['last_close']:>10.2f}")
+    print("=" * 84)
+
+
 def _read_holdings_file(path: Path) -> dict:
     """Read an external holdings file to diff against.
 
@@ -318,10 +354,36 @@ def _compute_trades(prev_rows: list[dict], new_rows: list[dict],
 # ─────────────────────────────────────────────────────────────────────────────
 
 def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
-    """Score today's universe and output ranked long ideas."""
-    cache_dir = _HERE / cfg["data"]["cache_dir"]
-    out_dir   = _HERE / "outputs"
-    top_n     = int(getattr(args, "top", cfg.get("output", {}).get("top_n_ideas", 25)))
+    """Score today's universe and output ranked long ideas.
+
+    Self-gated on the backtest's rebalance cadence: run this every trading day
+    (e.g. from cron) and it will only do real work when a rebalance is actually
+    due, otherwise it reports the still-held book and exits. `--force` (or
+    `--holdings`, an explicit ad-hoc diff request) bypasses the gate.
+    """
+    cache_dir  = _HERE / cfg["data"]["cache_dir"]
+    out_dir    = _HERE / "outputs"
+    top_n      = int(getattr(args, "top", cfg.get("output", {}).get("top_n_ideas", 25)))
+    rebal_freq = int(cfg.get("portfolio", {}).get("rebal_freq", 5))
+    force      = bool(getattr(args, "force", False)) or bool(getattr(args, "holdings", None))
+    prev       = _load_prev_book(out_dir)
+
+    # ── Fast, network-free pre-check ─────────────────────────────────────────
+    # A plain weekday count can only OVER-count true trading days (it counts
+    # market holidays as business days too), so if it already reads under
+    # rebal_freq, the real trading-day gap is guaranteed to be under it as
+    # well — safe to bail before touching the price cache or network at all.
+    # If it reads >= rebal_freq we can't yet be sure (a holiday may have
+    # inflated it), so fall through to the exact index-based check below once
+    # prices are loaded — that one is authoritative and matches the backtest's
+    # rebalance grid (_rebalance_dates) exactly.
+    if prev and prev.get("header", {}).get("as_of") and not force:
+        prev_as_of = pd.Timestamp(prev["header"]["as_of"])
+        wall_today = pd.Timestamp.today().normalize()
+        quick_gap  = int(np.busday_count(prev_as_of.date(), wall_today.date()))
+        if quick_gap < rebal_freq:
+            _print_hold_status(prev, quick_gap, rebal_freq)
+            return
 
     pit_df_path = cache_dir / "universe_pit.parquet"
     if pit_df_path.exists():
@@ -417,6 +479,19 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
         prices = prices.drop(columns=stale_cols)
         stocks = prices.drop(columns=data_mod.NON_STOCK_COLS, errors="ignore")
 
+    # ── Exact, trading-calendar gate ──────────────────────────────────────────
+    # Authoritative version of the fast pre-check above: `today` is now the
+    # real latest-available trading day (post auto-refresh), so this searchsorted
+    # diff is the identical arithmetic _rebalance_dates()/simulate_live() uses to
+    # place rebal dates on the price index — gap < rebal_freq here means the
+    # backtest itself would not treat today as a rebalance date.
+    if prev and prev.get("header", {}).get("as_of") and not force:
+        prev_as_of = pd.Timestamp(prev["header"]["as_of"])
+        gap = int(prices.index.searchsorted(today) - prices.index.searchsorted(prev_as_of))
+        if gap < rebal_freq:
+            _print_hold_status(prev, gap, rebal_freq)
+            return
+
     # ── Build the EXACT book the backtest holds today ────────────────────────
     # target_book() is the single source of truth: top-quintile → equal-dollar
     # 1/N → vol-scaling → regime gate. Identical math to the backtest engine, so
@@ -429,10 +504,9 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
     exposure  = float(expo_ser.get(today, 1.0))
     in_regime = exposure > 0.0
 
-    # Loaded once here (reused below for the cadence note + trade diff) so the
+    # `prev` was already loaded above for the cadence gate; reused here so the
     # rebalance $ diff always compares against what capital the book was last
     # sized at, not this run's forgotten/changed --capital flag.
-    prev = _load_prev_book(out_dir)
     capital = getattr(args, "capital", None)
     if capital is None:
         prev_capital = (prev or {}).get("header", {}).get("capital")
@@ -464,7 +538,7 @@ def cmd_ideas(cfg: dict, args: argparse.Namespace) -> None:
     gross = float(book.sum()) if not book.empty else 0.0
 
     # ── Cadence note + rebalance diff vs the previously held book ─────────────
-    rebal_freq = int(cfg.get("portfolio", {}).get("rebal_freq", 5))
+    # (rebal_freq already resolved at the top of the function, for the cadence gate)
     cadence_note = ""
     if prev and prev.get("header", {}).get("as_of"):
         prev_as_of = pd.Timestamp(prev["header"]["as_of"])
@@ -587,6 +661,7 @@ def _interactive_menu(cfg: dict) -> None:
         mcpt     = 0
         capital  = None
         holdings = None
+        force    = False
         top      = cfg.get("output", {}).get("top_n_ideas", 25)
 
     if choice in ("1", "fetch"):
@@ -632,6 +707,9 @@ def main() -> None:
                            help="Account capital — adds the $ to buy per name (fractional shares)")
     id_parser.add_argument("--holdings", type=str, default=None,
                            help="Path to a JSON {ticker: dollar_value} of holdings to diff against")
+    id_parser.add_argument("--force", action="store_true",
+                           help="Rebuild the book even if a rebalance isn't due yet "
+                                "(bypasses the rebal_freq cadence gate)")
 
     sub.add_parser("verify-book",
                    help="Assert the live book == the backtest engine (consistency self-check)")
