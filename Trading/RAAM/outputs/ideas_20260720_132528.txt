@@ -1,0 +1,25 @@
+====================================================================================
+RAAM — Ranked Asset Allocation Model — Target Portfolio Book
+Generated: 2026-07-20 13:25   |   As of month-end close: 2026-07-17
+====================================================================================
+  Slots filled:   3 / 5  (2 in cash — negative momentum or no candidate)
+  Cash (SHY):     40.0%
+  Capital:        $100,000
+  Exit rule:      Hold each slot until the next month-end rebalance changes it. No intraday stops.
+  Cadence:        same-day rerun — book unchanged unless data refreshed.
+====================================================================================
+  Rank Ticker  Sleeve                            Weight       Buy $   ~Shares     Close
+  ----------------------------------------------------------------------------------
+  1    SHY     CASH                              40.00%   40,000.00   487.8644     81.99
+  2    VV      US EQUITIES                       20.00%   20,000.00    58.4830    341.98
+  3    RWR     REAL ESTATE                       20.00%   20,000.00   170.0536    117.61
+  4    DBC     NATURAL RESOURCES - COMMODITIES   20.00%   20,000.00   690.1311     28.98
+
+────────────────────────────────────────────────────────────────────────────────────
+REBALANCE — changes vs your previously held book
+────────────────────────────────────────────────────────────────────────────────────
+  (no changes — book matches your last run)
+====================================================================================
+
+DISCLAIMER: For research and educational purposes only.
+Past backtests (even OOS) do not guarantee future performance.

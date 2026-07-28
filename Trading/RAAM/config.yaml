@@ -1,0 +1,110 @@
+# RAAM — Ranked Asset Allocation Model — Strategy Config
+# All date/numeric parameters are exposed here; no magic numbers in code.
+# Recreates Giordano (2018), 2018 Charles H. Dow Award winner.
+
+universe:
+  # An ETF enters the ranking pool once it has this many REAL trading days of
+  # price history (see raam/universe.py:eligible_on). No synthetic/interpolated
+  # data is ever used to backfill a not-yet-listed ETF (DBC 2006-02-06, IGOV
+  # 2009-01-30 — both real inceptions, verified via yfinance) — this is the
+  # deliberate departure from the paper's Jul-2004 start, which required
+  # "interpolations… to achieve temporal homogeneity" through 2 of 12 assets
+  # straight through the 2008 crisis.
+  min_history_days: 252
+
+data:
+  # `fetch` always caches from 2000-01-01 (raam/data.py:_CACHE_HISTORY_START,
+  # before any 7Twelve ETF's real inception) through today, so changing the
+  # dates below never requires re-running `fetch`.
+  start_date: auto        # auto = cache floor (2000-01-01). Set a literal date
+                           #   to restrict backtest analysis to a shorter window.
+  end_date:   auto        # auto = today. `ideas`/`verify-book` ignore this and
+                           #   always price off the latest available close.
+  cache_dir:  "outputs/cache"
+
+indicators:
+  momentum_months:    4    # (M) Absolute Momentum: 4-month ROC on daily closes
+  correlation_months:  4    # (C) Average Relative Correlation: 4-month lookback
+  volatility:
+    lambda:      0.943      # (V) RiskMetrics EWMA decay (J.P. Morgan RiskMetrics)
+    method:      garman_klass  # garman_klass (OHLC range variance) | close_to_close
+                                #   Paper says "OHLC Daily data for calculation" but
+                                #   never names the single-day variance proxy —
+                                #   garman_klass is the standard way to make that an
+                                #   OHLC- rather than close-only estimator.
+    smooth_days: 10          # "a 10-day smoothed variant will be used" (Sec. V) —
+                              #   this smoothed series is what's actually ranked.
+  trend:
+    atr_period:     42       # Wilder ATR lookback for the breakout bands
+    upper_lookback: 63       # Upper Band = ATR(42) + rolling max(Close, 63)
+    lower_lookback: 105      # Lower Band = ATR(42) + rolling max(Low, 105)
+                              #   ATR is ADDED to BOTH bands — confirmed deliberate
+                              #   by the paper's own text (higher vol -> more
+                              #   responsive Lower Band, not less).
+
+ranking:
+  # TOTAL RANK = wM*Rank(M) + wV*Rank(V) + wC*Rank(C) - T + tiebreak_sign*(M/tiebreak_x)
+  # Take the n_select LOWEST Total Rank names (paper: 5, out of 11 ranked ETFs).
+  wM: 0.3333333333333333   # equal weights BY DESIGN — the paper never discloses
+  wV: 0.3333333333333333   #   its own wM/wV/wC (fit in Excel, full-sample, no
+  wC: 0.3333333333333333   #   OOS split, no costs) so we do not try to guess or
+                            #   refit them; see sweep_rank_weights.py for the
+                            #   plateau-vs-peak robustness diagnostic instead.
+  n_select: 5               # names selected each month (paper: 5 of 11)
+
+  # RESOLVED AMBIGUITY — the paper's prose contradicts itself on rank direction
+  # (Rank(M) "ascending" vs Rank(V)/Rank(C) "descending", vs "lowest Total Rank
+  # wins" and "lower volatility... higher ranking"). rank1_best (default) reads
+  # rank-1-is-best consistently for all three components — the only reading
+  # under which -T correctly REWARDS a confirmed uptrend. paper_literal recovers
+  # the literal (self-contradictory) text, exposed so the alternative is
+  # testable rather than just asserted away. See raam/ranking.py module docstring.
+  convention: rank1_best     # rank1_best | paper_literal
+
+  # RESOLVED AMBIGUITY — the paper adds "+M/x" as a tie-breaker "to avoid equal
+  # ranks" (x undisclosed). Taken completely literally this very slightly
+  # DISADVANTAGES higher momentum in a tie — backwards vs. the resolved
+  # convention above. tiebreak_sign=-1 (default) flips it so ties favor higher
+  # momentum; +1 recovers the literal text. tiebreak_x is large enough that
+  # this NEVER overturns a genuine rank difference — it only ever breaks exact
+  # ties (see raam/ranking.py module docstring).
+  tiebreak_sign: -1.0
+  tiebreak_x: 1000.0
+
+costs:
+  commission_bps:  5        # one-way commission in basis points
+  half_spread_bps: 5        # one-way half-spread (total one-way = 10 bps)
+                             # Paper's own backtest is GROSS of all costs —
+                             # ours is not; see the paper-comparison table in
+                             # every backtest report for the resulting gap.
+
+benchmarks:
+  risk_parity:
+    vol_window: 63          # trailing days for realised-vol estimation
+    target_vol: 0.10        # "10% Volatility Targeting" — the paper's own
+                             #   description of the (unobtainable) Salient
+                             #   Risk Parity Index; reconstructed on the same
+                             #   12-ETF universe RAAM ranks, capped at 100%
+                             #   gross (no leverage). See raam/benchmarks.py.
+
+validation:
+  n_perm_mcpt: 1000          # MCPT permutations (>=1000 for publication-grade p-value)
+  # OOS Sharpe of EVERY (wM,wV,wC) configuration tried by sweep_rank_weights.py,
+  # keeping the DSR honest about selection bias (de Prado). 2026-07-20 sweep:
+  # 66-point simplex grid, step=0.1, full walk-forward OOS window. NOT a flat
+  # plateau (range [0.381, 0.890]) — the worst cluster is wV~=0 (no Volatility
+  # weight) combined with moderate wM, which also shows much deeper drawdowns
+  # (-20% to -27% vs -8% to -12% elsewhere): dropping the risk-control
+  # component costs real drawdown protection, an economically sensible reason
+  # for the dispersion rather than arbitrary overfitting. Equal weights
+  # (1/3,1/3,1/3, Sharpe 0.699) is NOT the empirical best of this grid (best:
+  # wM=0.1/wV=0.1/wC=0.8, Sharpe 0.890) — kept anyway BY DESIGN: cherry-picking
+  # the sweep's winner after seeing this table would repeat the exact
+  # undisclosed-fitted-weights problem this recreation exists to avoid. Append
+  # here whenever a new variant/sweep is run.
+  trial_sharpes: [0.8504, 0.8504, 0.8506, 0.8209, 0.8453, 0.8180, 0.7134, 0.6254, 0.5535, 0.7252, 0.7270, 0.8326, 0.8903, 0.8235, 0.7999, 0.7538, 0.7943, 0.6885, 0.5676, 0.5912, 0.6512, 0.7663, 0.7246, 0.7630, 0.7655, 0.7966, 0.7259, 0.6770, 0.5134, 0.6751, 0.5068, 0.5426, 0.7220, 0.7549, 0.8399, 0.7550, 0.7881, 0.7049, 0.3807, 0.4625, 0.5366, 0.6210, 0.5797, 0.6062, 0.6054, 0.5259, 0.4869, 0.5854, 0.6586, 0.6939, 0.5290, 0.5131, 0.5792, 0.5476, 0.5542, 0.5322, 0.6042, 0.5556, 0.5213, 0.5091, 0.5753, 0.5832, 0.5773, 0.5946, 0.5946, 0.5763]
+  n_partitions_pbo: 16       # CSCV partitions for the PBO estimate
+  walk_forward_oos_frac: 0.30  # 30% OOS for the walk-forward split
+
+output:
+  equity_png: true

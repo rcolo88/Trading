@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+
+# generated price caches (large parquet files)
+outputs/cache/
+outputs/cache_sp1500/
+outputs/cache_expanded/
+outputs/cache_niche/

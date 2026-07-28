@@ -1,0 +1,39 @@
+================================================================================================
+RAAM — Ranked Asset Allocation Model — Backtest Report
+Mode: full_sample    Generated: 2026-07-20 13:24
+================================================================================================
+
+  Strategy                                Sharpe     CAGR    MaxDD   DD(3m)  AnnStd  Calmar  Ann.Turn
+  --------------------------------------------------------------------------------------------
+  RAAM (Total Rank)                       +0.819    +5.7%   -17.5%    -8.9%   +7.1%  +0.328      6.1x
+  Core 7Twelve (EW)                       +0.576    +6.4%   -41.6%   -36.0%  +12.1%  +0.155      0.1x
+  Risk Parity 10%vol (reconstructed)      +0.503    +2.7%   -18.8%   -17.4%   +5.7%  +0.146      1.0x
+  SPY buy-and-hold                        +0.507    +8.2%   -55.2%   -41.7%  +19.3%       —         —
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+Paper comparison — Giordano (2018) Figure 19 vs this run
+  Paper: Jul-2004 -> Nov-2017, GROSS of all costs, undisclosed fitted
+  wM/wV/wC weights, and pre-2006 (DBC)/pre-2009 (IGOV) data filled by
+  interpolation. This run: real data only (no synthetic fill), equal
+  wM=wV=wC, net of commission+spread. See README for the full list.
+────────────────────────────────────────────────────────────────────────────────────────────────
+  Stat                        Paper (RAAM)   Paper (Salient)      This run
+  Absolute performance                   —           +147.0%       +338.4%
+  Annualized STD                         —             +9.8%         +7.1%
+  Sharpe                            +1.940            +0.560        +0.819
+  Worst year                             —            -16.9%        -10.3%
+  Best year                              —            +18.6%        +30.5%
+  Worst month                            —            -15.0%         -5.4%
+  Best month                             —             +6.9%         +6.4%
+  Max DD (3-month)                       —            -22.8%         -8.9%
+  Max DD (peak-trough)                   —                 —        -17.5%
+
+  ("Paper (RAAM)" is blank except Sharpe — the paper's Figure 18/19 only
+   reports RAAM's Sharpe explicitly; its other RAAM-specific stats aren't
+   tabulated in the source, only plotted. Paper's claimed RAAM Sharpe: 1.94,
+   gross, full-sample, fitted weights — not a bar this recreation targets.)
+
+─── Overfitting Tests ─────────────────────────────────────────────────
+  [PASS] Deflated Sharpe Ratio (DSR): 1.0000  (threshold > 0.90)  [1 configs tried]
+
+================================================================================================
