@@ -897,7 +897,7 @@ def cmd_blend_backtest(cfg: dict, args: argparse.Namespace) -> None:
 
     print(f"\n─── Walk-forward backtest ({int((1-oos_frac)*100)}% IS / {int(oos_frac*100)}% OOS) ──")
     print("  Monthly rebalance, hold with drift, fixed weights (no regime switching) …")
-    primary_res = blend_mod.walk_forward_blend(prices, cfg, oos_frac=oos_frac)
+    primary_res = blend_mod.walk_forward_blend(prices, cfg, oos_frac=oos_frac, cache_dir=cache_dir)
     results = {"blend (OOS)": primary_res}
 
     observed_sh = val_mod.compute_metrics(primary_res.net_ret, primary_res.bench_ret)["sharpe"]
@@ -910,7 +910,7 @@ def cmd_blend_backtest(cfg: dict, args: argparse.Namespace) -> None:
           f"beta {ab['beta']:.2f} (t={ab['beta_tstat']:.1f})   R² {ab['r_squared']:.2f}")
 
     print(f"\n─── Multi-fold walk-forward ({n_folds} folds, full history) ──────────")
-    folds = blend_mod.walk_forward_blend_folds(prices, cfg, n_folds=n_folds)
+    folds = blend_mod.walk_forward_blend_folds(prices, cfg, n_folds=n_folds, cache_dir=cache_dir)
     fold_sharpes = []
     for flabel, fres in folds.items():
         fm = val_mod.compute_metrics(fres.net_ret, fres.bench_ret)
@@ -923,7 +923,8 @@ def cmd_blend_backtest(cfg: dict, args: argparse.Namespace) -> None:
               + ("  *** FAILS bar ***" if worst <= 0.30 else ""))
 
     print("\n─── Per-year & crisis-window breakdown (full history) ────────────────")
-    full_res = blend_mod.simulate_blend(prices, cfg, prices.index[0], label="full-history")
+    full_res = blend_mod.simulate_blend(prices, cfg, prices.index[0], label="full-history",
+                                        cache_dir=cache_dir)
     rb = val_mod.regime_breakdown(full_res.net_ret, full_res.bench_ret)
     with pd.option_context("display.width", 120):
         print(rb.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
@@ -1040,7 +1041,7 @@ def cmd_blend_ideas(cfg: dict, args: argparse.Namespace) -> None:
         _print_blend_hold_status(prev, status, capital=capital)
         return
 
-    book = blend_mod.target_book(prices, cfg, as_of=today)
+    book = blend_mod.target_book(prices, cfg, as_of=today, cache_dir=cache_dir)
 
     if getattr(args, "capital", None) is None and capital is not None:
         print(f"  No --capital given — using last book's capital: ${capital:,.0f}")
@@ -1167,8 +1168,8 @@ def cmd_blend_verify(cfg: dict, args: argparse.Namespace) -> None:
                                        cache_dir=cache_dir)
     as_of = prices["SPY"].dropna().index.max()
 
-    live   = blend_mod.target_book(prices, cfg, as_of=as_of)
-    target = blend_mod.blend_target_weights(prices, cfg)
+    live   = blend_mod.target_book(prices, cfg, as_of=as_of, cache_dir=cache_dir)
+    target = blend_mod.blend_target_weights(prices, cfg, cache_dir=cache_dir)
     engine = target.loc[as_of]
     engine = engine[engine > 0.0].sort_values(ascending=False)
 

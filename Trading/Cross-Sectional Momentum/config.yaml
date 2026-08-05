@@ -144,12 +144,81 @@ blend:
                                 #   report) always stays literal SPY regardless of
                                 #   this setting — this only controls what the
                                 #   growth sleeve actually HOLDS.
-  weight_spy:      0.40         # growth engine (equity book showed no significant
+  weight_spy: 0.40              # growth engine (equity book showed no significant
                                 #   differentiation from SPY-beta, so an S&P 500
                                 #   tracker is a fair, simpler substitute)
-  weight_macro:    0.30         # csm/macro_regime.py sector/asset tilt
+  weight_macro: 0.30            # csm/macro_regime.py sector/asset tilt
   weight_rotation: 0.30         # csm/multiasset.py defensive rotation
-  rotation_top_n:  2            # rotation slot count (matches validated setting)
+  rotation_top_n: 2             # rotation slot count (matches validated setting)
+  # 2026-08-05 blend-return-research Phase 1: the macro sleeve was measured at
+  # 0.766 daily correlation with the growth sleeve (both are equity, by
+  # construction) — these two flags attack that redundancy. See the Phase 1
+  # comment block below the trial_sharpes list for the full result and
+  # memory csm-market-neutral-macro-tests.
+  macro_growth_axis: price       # price (default — KEEP; the "macro" FRED
+                                #   axis (NFCI+UNRATE+T10Y2Y point-in-time
+                                #   vintage) was tested and found to overfit
+                                #   the 2015-2026 window: best OOS Sharpe of
+                                #   all 4 variants (1.524) but WORST on the
+                                #   2000-2014 holdout (Sharpe 0.586, 2008
+                                #   -18.46% — worse than baseline). Rejected.
+  macro_baskets: v2              # v1 | v2 (REGIME_BASKETS_V2 — majority
+                                #   non-equity stagflation/deflation baskets)
+                                #   — ADOPTED LIVE 2026-08-05, the one
+                                #   surviving finding of a 3-phase
+                                #   return-focused pass (see memory
+                                #   csm-market-neutral-macro-tests): better on
+                                #   every metric in every window tested
+                                #   (full-history, OOS, 2000-2014 holdout)
+                                #   except one narrow multi-fold miss (0.290
+                                #   vs the 0.30 bar), and its DSR (0.945) is
+                                #   HIGHER than v1's (0.924) against the same
+                                #   40-trial list. Set v1 to revert.
+  risk_overlay: none             # none (default — KEEP) | robust | gtt |
+                                #   ladder — csm/blend_overlay.py. 2026-08-05
+                                #   Phase 2 tested all 3 on the Phase 1 base
+                                #   (v2 baskets): NONE clears a clean bar —
+                                #   each trades one problem for another rather
+                                #   than netting a win. robust: best 2015-2026
+                                #   full+OOS Sharpe/alpha (t=2.31, a project
+                                #   record) but WORST on the 2000-2014 holdout
+                                #   (Sharpe 0.465, MaxDD -36.7%) — overfits the
+                                #   recent window, the same pattern Phase 1's
+                                #   FRED-axis variant showed. gtt: dramatic
+                                #   2008 protection (-0.81% vs baseline's
+                                #   -13.27%) but WORSE 2015-2026 Sharpe/CAGR/
+                                #   alpha with no offsetting MaxDD benefit
+                                #   THERE (-16.30%, identical to no-overlay) —
+                                #   insurance that doesn't pay for itself
+                                #   outside the one crisis it's built for.
+                                #   ladder: middling everywhere, worst
+                                #   multi-fold result (0.037). All three also
+                                #   make 2000-2014's OVERALL MaxDD worse than
+                                #   baseline (-35% to -36.7% vs -32.15%) even
+                                #   while helping 2008 specifically — de-risks
+                                #   at the wrong moment somewhere else in that
+                                #   window (dot-com era), the classic static-
+                                #   hedge failure mode already seen with SH-
+                                #   only crisis hedging (memory
+                                #   csm-market-neutral-macro-tests). REJECTED;
+                                #   Phase 3 re-levers on the Phase 1 base
+                                #   alone, no overlay.
+  # 2026-08-05 Phase 3: re-levered growth weight to 50/55/60% (macro absorbing
+  # the reduction, rotation held fixed at 30%) on the Phase 1 base (v2
+  # baskets). DECISIVELY REJECTED — the SAME overfit-to-recent-window
+  # signature as Phase 1's FRED axis and Phase 2's robust overlay, but
+  # cleaner: every re-levered variant's 2015-2026 numbers improve
+  # MONOTONICALLY with growth weight (OOS Sharpe 1.472->1.525->1.543->1.555,
+  # OOS CAGR 14.6%->15.8%->16.4%->16.9%) while every 2000-2014 HOLDOUT metric
+  # gets MONOTONICALLY WORSE (Sharpe 0.656->0.607->0.581->0.554, MaxDD
+  # -32.15%->-35.72%->-37.46%->-39.17%, 2008 -13.27%->-17.61%->-19.73%->
+  # -21.81%). This is the pre-registered rejection criterion firing exactly
+  # as designed: 2015-2026 is a historically exceptional SPY bull run (SPY
+  # B&H Sharpe 0.831 there vs 0.305 over 2000-2014), so more growth weight is
+  # a bet on that continuing, not a genuine improvement — confirms the
+  # original 60/20/20 rejection (above) generalizes even to this
+  # de-redundified base. weight_spy/macro/rotation above stay at 40/30/30 —
+  # the ONLY change this whole 3-phase pass validates is macro_baskets: v2.
   # OOS Sharpe of every blend-weight configuration tried — same DSR-honesty
   # discipline as validation.trial_sharpes above, but tracked SEPARATELY
   # since this is a different strategy/search space. Append on every sweep.
@@ -160,7 +229,40 @@ blend:
   - 1.384
   - 1.1934
   - 1.1382
-
+  - 1.065
+  - 1.171
+  - 1.117
+  - 1.150
+  - 1.230
+  - 1.264
+  - 0.716
+  - 0.660
+  - 1.376
+  - 1.226
+  - 1.165
+  - 1.033
+  - 0.823
+  - 1.358
+  - 1.395
+  - 1.479
+  - 1.477
+  - 1.476
+  - 1.505
+  - 1.560
+  - 1.384
+  - 1.320
+  - 0.722
+  - 0.703
+  - 0.658
+  - 1.524
+  - 1.472
+  - 1.5
+  - 1.488
+  - 1.16
+  - 1.375
+  - 1.525
+  - 1.543
+  - 1.555
 validation:
   n_perm_mcpt: 1000             # MCPT permutations (≥1000 for publication-grade p-value)
   # OOS Sharpe of EVERY configuration tried (keeps the DSR honest about selection

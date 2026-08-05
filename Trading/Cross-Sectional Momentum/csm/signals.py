@@ -233,16 +233,51 @@ def regime_exposure(prices: pd.DataFrame, cfg: dict) -> pd.Series:
     above_ma = spy > spy.rolling(ma_days).mean()
     real_vol = spy.pct_change().rolling(63).std() * np.sqrt(252)
     low_vol  = real_vol < vol_cap
-    if "^VIX" in prices.columns and "^VIX3M" in prices.columns:
-        vix      = prices["^VIX"].ffill()
-        vix3m    = prices["^VIX3M"].ffill()
-        contango = (vix < vix3m) | vix.isna() | vix3m.isna()
-    else:
-        contango = pd.Series(True, index=prices.index)
+    contango = _vix_contango_vote(prices)
 
     score = above_ma.astype(int) + low_vol.astype(int) + contango.astype(int)
     return pd.Series(np.select([score >= 3, score == 2], [1.0, 0.5], default=0.0),
                      index=prices.index)
+
+
+_VIX3M_STALE_DAYS = 5  # a real Yahoo data gap this wide (verified 2026-08-05:
+                       # ^VIX3M was missing 2026-07-20 -> 2026-08-04, 12
+                       # trading days) means the feed itself has no print, not
+                       # just a slow refresh — ffilling silently past this
+                       # point would compare today's real VIX to a stale
+                       # VIX3M read and could assert contango (or backwardation)
+                       # that was never actually observed.
+
+
+def _days_since_valid(s: pd.Series) -> pd.Series:
+    """Calendar days since the last non-NaN print of `s`, at every index date.
+    inf before the first-ever valid print (true warmup, not staleness)."""
+    last_valid_date = s.index.to_series().where(s.notna()).ffill()
+    return (s.index.to_series() - last_valid_date).dt.days.astype(float).fillna(np.inf)
+
+
+def _vix_contango_vote(prices: pd.DataFrame) -> pd.Series:
+    """VIX term-structure vote for the graded regime gate: True = contango
+    (^VIX < ^VIX3M, risk-on) or unknown-before-any-data (warmup, fails open
+    so early dates aren't gated by absent history). A STALE trailing gap
+    (see `_VIX3M_STALE_DAYS`) is explicitly excluded from the ffilled
+    comparison and does not vote contango — the vote is simply withheld
+    rather than silently computed on old data.
+    """
+    if "^VIX" not in prices.columns or "^VIX3M" not in prices.columns:
+        return pd.Series(True, index=prices.index)
+
+    vix, vix3m = prices["^VIX"], prices["^VIX3M"]
+    stale       = _days_since_valid(vix3m) > _VIX3M_STALE_DAYS
+    vix_f, vix3m_f = vix.ffill(), vix3m.ffill()
+    never_seen  = vix_f.isna() | vix3m_f.isna()   # true warmup, no print has ever arrived
+    contango    = ((vix_f < vix3m_f) & ~stale) | never_seen
+    n_stale = int((stale & ~never_seen).sum())
+    if n_stale:
+        print(f"  WARNING: ^VIX3M stale (>{_VIX3M_STALE_DAYS}d since last real "
+              f"print) on {n_stale} date(s) — contango vote withheld (treated "
+              f"as not risk-on) rather than compared against old data.")
+    return contango
 
 
 def vol_scale_factor(portfolio_ret: pd.Series,

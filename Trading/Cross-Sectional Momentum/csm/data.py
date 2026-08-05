@@ -40,6 +40,17 @@ def _yfmt(ticker: str) -> str:
 # Changing start_date in config.yaml restricts the *analysis* window, not the download.
 _CACHE_HISTORY_START = "2010-01-01"
 
+# 2026-08-05 blend-return-research project: the blend (csm/blend.py) trades
+# ONLY the non-stock ETF/index set (SIGNAL_EXCLUDE, below) and never scores
+# individual stocks, so that set can carry a much longer history without
+# paying to re-download 1700+ stock tickers back to 1999 (most don't have
+# that history anyway, and the equity engine's own PIT universe starts 2010).
+# The stock universe stays on _CACHE_HISTORY_START; SIGNAL_EXCLUDE tickers use
+# this floor instead, giving the blend pre-GFC/dotcom coverage for a genuine
+# out-of-sample holdout. yfinance simply returns each ticker's real inception
+# forward when requested from before it existed — no assumed dates.
+_LONG_HISTORY_START = "1999-01-01"
+
 # ── Panel column roles ────────────────────────────────────────────────────────
 # AUX_COLS are index series carried in the panel for regime overlays (VIX term
 # structure); they are never tradeable and never part of the stock cross-section.
@@ -104,6 +115,11 @@ NON_STOCK_COLS   = _dedupe(["SPY"] + AUX_COLS + REGIME_DETECT_COLS
 SIGNAL_EXCLUDE   = _dedupe(NON_STOCK_COLS + [DEFENSIVE_TICKER]
                           + DEFENSIVE_ROSTER + [ROTATION_CASH_TICKER]
                           + [GROWTH_TICKER])  # never receive a signal score
+
+# yfinance-formatted tickers eligible for the _LONG_HISTORY_START floor —
+# every ticker the blend can ever hold, so a full/rebase download reaches
+# back to 1999 for these regardless of the stock-universe floor above.
+_LONG_HISTORY_YF = {_yfmt(t) for t in SIGNAL_EXCLUDE}
 
 # Tail refresh: trading days of overlap re-downloaded to verify the adjustment
 # basis (a dividend/split re-bases the ENTIRE adjusted history, not just the tail).
@@ -187,6 +203,50 @@ def _yf_close(tickers: list[str], start, end, tries: int = 2) -> pd.DataFrame:
     return out
 
 
+def _yf_close_mixed_floor(yf_tickers: list[str], end) -> pd.DataFrame:
+    """Like `_yf_close`, but tickers in `_LONG_HISTORY_YF` (the blend's ETF/
+    index universe) are downloaded from `_LONG_HISTORY_START`; everything
+    else (the stock universe) from `_CACHE_HISTORY_START`. One combined panel."""
+    long_yf  = sorted(set(yf_tickers) & _LONG_HISTORY_YF)
+    short_yf = sorted(set(yf_tickers) - _LONG_HISTORY_YF)
+    parts = []
+    if long_yf:
+        parts.append(_yf_close(long_yf, _LONG_HISTORY_START, end))
+    if short_yf:
+        parts.append(_yf_close(short_yf, _CACHE_HISTORY_START, end))
+    if not parts:
+        return pd.DataFrame()
+    return pd.concat(parts, axis=1) if len(parts) > 1 else parts[0]
+
+
+_STALE_WARN_DAYS = 5  # flag AUX_COLS (regime-signal inputs) whose trailing
+                      # gap exceeds this many calendar days — a real upstream
+                      # feed gap (verified 2026-08-05: ^VIX3M missing 12
+                      # trading days on Yahoo), not something a re-fetch fixes.
+
+
+def _warn_stale_aux(panel: pd.DataFrame) -> None:
+    """Surface a stale AUX_COLS tail explicitly (see csm/signals.py's
+    _vix_contango_vote, which independently withholds its vote on these same
+    dates) instead of letting downstream ffill silently paper over a gap."""
+    if panel.empty:
+        return
+    panel_end = panel.index.max()
+    for col in AUX_COLS:
+        if col not in panel.columns:
+            continue
+        valid = panel[col].dropna()
+        if valid.empty:
+            continue
+        lag = (panel_end - valid.index.max()).days
+        if lag > _STALE_WARN_DAYS:
+            print(f"  WARNING: {col} data is stale — last real print "
+                  f"{valid.index.max().date()}, {lag} calendar days behind "
+                  f"the panel's latest date {panel_end.date()}. This is a "
+                  f"source-side gap (re-fetching will not resolve it); "
+                  f"regime signals that consume {col} handle this explicitly.")
+
+
 def _tail_refresh(cached: pd.DataFrame, needed_yf: list[str],
                   inv_map: dict, end) -> pd.DataFrame:
     """Splice fresh closes onto the cache, fully re-downloading only where needed."""
@@ -218,8 +278,7 @@ def _tail_refresh(cached: pd.DataFrame, needed_yf: list[str],
     if rebase:
         print(f"  {len(rebase)} tickers re-based (dividend/split) or new to the "
               f"cache — re-downloading their full history …")
-        full = _yf_close([_yfmt(c) for c in rebase],
-                         _CACHE_HISTORY_START, end).rename(columns=inv_map)
+        full = _yf_close_mixed_floor([_yfmt(c) for c in rebase], end).rename(columns=inv_map)
         got  = [c for c in full.columns if full[c].notna().any()]
         panel = pd.concat([panel.drop(columns=[c for c in got if c in panel.columns]),
                            full[got]], axis=1)
@@ -282,12 +341,24 @@ def load_price_panel(
     # was extended further back (2010 -> 2004) after the cache was already built.
     # Without this check "auto"/"tail" would silently keep serving the old,
     # shorter-history cache forever (they only ever check tail freshness).
+    # SPY is the reference column for both floors: it is always present and
+    # always long-history-eligible, so its own earliest date reveals whether
+    # the cache was ever rebuilt under the newer (longer) floor.
     if not cached.empty:
         cache_floor = cached.index.min()
-        if cache_floor > pd.Timestamp(_CACHE_HISTORY_START) + pd.Timedelta(days=10):
-            print(f"Cache only starts {cache_floor.date()} — _CACHE_HISTORY_START is "
-                  f"{_CACHE_HISTORY_START}; forcing full re-download …")
-            cached = pd.DataFrame()
+        spy_floor = (cached["SPY"].dropna().index.min()
+                    if "SPY" in cached.columns and cached["SPY"].notna().any()
+                    else cache_floor)
+        want_floor = pd.Timestamp(_LONG_HISTORY_START)
+        if spy_floor > want_floor + pd.Timedelta(days=10):
+            print(f"Cache's long-history reference (SPY) only starts {spy_floor.date()} — "
+                  f"_LONG_HISTORY_START is {_LONG_HISTORY_START}; forcing full re-download "
+                  f"of the long-history (ETF/index) columns …")
+            # Deliberately DON'T clear `cached` — the "full" branch below merges
+            # by column (`keep` falls back to old data for any column absent
+            # from this call's `needed_yf`), so a blend-only call (tickers=[])
+            # correctly extends just the ETF columns while leaving the
+            # separately-floored stock columns untouched.
             refresh = "full"
 
     # ── auto: serve the cache when complete and fresh ─────────────────────────
@@ -301,6 +372,7 @@ def load_price_panel(
             print(f"Loaded price cache: {len(present)} tickers × {len(panel)} days  "
                   f"(history from {cached.index.min().date()}, "
                   f"fresh through {panel_last.date()})")
+            _warn_stale_aux(panel)
             return panel
         print(f"Cache stale/incomplete (latest complete close {panel_last.date()}"
               + (f", {len(missing)} tickers missing" if missing else "")
@@ -313,7 +385,7 @@ def load_price_panel(
     # ── full: re-download everything (fetch, or no usable cache) ─────────────
     else:
         print("Full re-download of all price history …")
-        new = _yf_close(needed_yf, _CACHE_HISTORY_START, end).rename(columns=inv_map)
+        new = _yf_close_mixed_floor(needed_yf, end).rename(columns=inv_map)
         got = [c for c in new.columns if new[c].notna().any()]
         # Column-wise merge: a ticker that downloaded takes its ENTIRE new column
         # (never mix old and new adjusted-price bases); a ticker that failed
@@ -340,7 +412,9 @@ def load_price_panel(
     print(f"Price cache updated: {panel.shape[1]} tickers × {panel.shape[0]} days  "
           f"(history from {panel.index.min().date()}, through {panel.index.max().date()})")
 
-    return panel.loc[start:end]
+    result = panel.loc[start:end]
+    _warn_stale_aux(result)
+    return result
 
 
 def daily_returns(prices: pd.DataFrame) -> pd.DataFrame:

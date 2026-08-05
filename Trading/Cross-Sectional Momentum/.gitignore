@@ -2,6 +2,9 @@ __pycache__/
 *.pyc
 *.pyo
 
+# secrets
+.env
+
 # generated data files
 outputs/cache/
 spike_cache/

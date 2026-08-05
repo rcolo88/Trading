@@ -21,6 +21,7 @@ another project's directory existing.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import NamedTuple
 
 import numpy as np
@@ -69,6 +70,7 @@ def blend_target_weights(
     prices:      pd.DataFrame,
     cfg:         dict,
     rebal_dates: pd.DatetimeIndex | None = None,
+    cache_dir:   Path | None = None,
 ) -> pd.DataFrame:
     """Target weight per ticker (growth ticker + macro basket + rotation basket
     + cash), valid for EVERY day (both `macro_regime.macro_tilt_weights` and
@@ -83,22 +85,69 @@ def blend_target_weights(
     back to 2010, so no backtest gap). This is INDEPENDENT of the benchmark:
     `simulate_blend`'s "SPY buy-and-hold" comparison always reads the literal
     SPY column, regardless of what the growth sleeve actually holds.
+
+    2026-08-05 Phase 1 (blend-return-research): `blend.macro_growth_axis`
+    ("price" default | "macro") and `blend.macro_baskets` ("v1" default |
+    "v2") select the Phase-1.1/1.2 macro-sleeve variants that attack its
+    measured 0.766 daily correlation with the growth sleeve. `cache_dir` is
+    consulted when macro_growth_axis="macro" or `blend.risk_overlay` needs
+    the FRED vintage cache; defaults to `cfg["data"]["cache_dir"]` resolved
+    against the current working directory, matching every CLI entry point's
+    convention.
+
+    2026-08-05 Phase 2: `blend.risk_overlay` ("none" default | "robust" |
+    "gtt" | "ladder") scales the growth+macro legs (the equity-correlated
+    bloc) by a daily exposure e in [0,1], sampled only at rebal dates (same
+    monthly cadence as everything else — this does NOT raise trading
+    frequency), and routes the freed weight into the rotation sleeve. See
+    csm/blend_overlay.py and csm/signals.robust_regime_exposure.
     """
     w_spy, w_macro, w_rot, top_n, growth_ticker = _resolve_weights(cfg)
 
     if rebal_dates is None:
         rebal_dates = ma_mod.month_end_dates(prices.index)
 
-    macro_target = mr_mod.macro_tilt_weights(prices, rebal_dates)
+    b = cfg.get("blend", {})
+    growth_axis = str(b.get("macro_growth_axis", "price"))
+    baskets_ver = str(b.get("macro_baskets", "v1"))
+    overlay     = str(b.get("risk_overlay", "none"))
+
+    if (growth_axis == "macro" or overlay in ("gtt", "ladder")) and cache_dir is None:
+        cache_dir = Path(cfg.get("data", {}).get("cache_dir", "outputs/cache"))
+
+    growth_series = None
+    if growth_axis == "macro":
+        growth_series = mr_mod.growth_score_macro(prices.index, rebal_dates, cache_dir)
+
+    baskets = mr_mod.REGIME_BASKETS_V2 if baskets_ver == "v2" else None
+
+    macro_target = mr_mod.macro_tilt_weights(prices, rebal_dates,
+                                             growth=growth_series, baskets=baskets)
     rot_target   = ma_mod.defensive_weights(prices, rebal_dates, top_n=top_n)
+
+    if overlay == "none":
+        exposure = pd.Series(1.0, index=prices.index)
+    elif overlay == "robust":
+        from csm import signals as sig_mod
+        exposure = sig_mod.robust_regime_exposure(prices)
+    elif overlay == "gtt":
+        from csm import blend_overlay as bo_mod
+        exposure = bo_mod.growth_trend_timing_exposure(prices, rebal_dates, cache_dir)
+    elif overlay == "ladder":
+        from csm import blend_overlay as bo_mod
+        exposure = bo_mod.combination_ladder_exposure(prices, rebal_dates, cache_dir)
+    else:
+        raise ValueError(f"unknown blend.risk_overlay: {overlay!r}")
+    exposure = exposure.reindex(prices.index).fillna(1.0)
+    freed = (w_spy + w_macro) * (1.0 - exposure)
 
     all_cols = sorted(set(macro_target.columns) | set(rot_target.columns) | {growth_ticker})
     target = pd.DataFrame(0.0, index=prices.index, columns=all_cols)
-    target[growth_ticker] = target[growth_ticker] + w_spy
+    target[growth_ticker] = target[growth_ticker] + w_spy * exposure
     for c in macro_target.columns:
-        target[c] = target[c] + w_macro * macro_target[c]
+        target[c] = target[c] + w_macro * exposure * macro_target[c]
     for c in rot_target.columns:
-        target[c] = target[c] + w_rot * rot_target[c]
+        target[c] = target[c] + (w_rot + freed) * rot_target[c]
     return target
 
 
@@ -108,6 +157,7 @@ def simulate_blend(
     oos_start: pd.Timestamp,
     oos_end:   pd.Timestamp | None = None,
     label:     str = "blend",
+    cache_dir: Path | None = None,
 ) -> BacktestResult:
     """Event-driven, monthly-rebalance, hold-with-drift simulation — same
     engine shape as `backtest.simulate_live` / RAAM's `simulate_drift`,
@@ -115,7 +165,7 @@ def simulate_blend(
     signal, so it doesn't reuse `portfolio.build_positions`).
     """
     rebal_dates = ma_mod.month_end_dates(prices.index)
-    target = blend_target_weights(prices, cfg, rebal_dates)
+    target = blend_target_weights(prices, cfg, rebal_dates, cache_dir=cache_dir)
     cols = list(target.columns)
     ret  = prices[cols].ffill(limit=3).pct_change().fillna(0.0)
 
@@ -171,9 +221,10 @@ def simulate_blend(
 
 
 def walk_forward_blend(
-    prices:   pd.DataFrame,
-    cfg:      dict,
-    oos_frac: float = 0.30,
+    prices:    pd.DataFrame,
+    cfg:       dict,
+    oos_frac:  float = 0.30,
+    cache_dir: Path | None = None,
 ) -> BacktestResult:
     index = prices.index
     n     = len(index)
@@ -181,7 +232,7 @@ def walk_forward_blend(
     oos_start = is_end + pd.Timedelta(days=1)
     if len(prices.loc[oos_start:]) < 63:
         raise ValueError(f"OOS window too short ({len(prices.loc[oos_start:])} days).")
-    return simulate_blend(prices, cfg, oos_start, label="blend (OOS)")
+    return simulate_blend(prices, cfg, oos_start, label="blend (OOS)", cache_dir=cache_dir)
 
 
 def walk_forward_blend_folds(
@@ -189,6 +240,7 @@ def walk_forward_blend_folds(
     cfg:           dict,
     n_folds:       int = 5,
     min_fold_days: int = 126,
+    cache_dir:     Path | None = None,
 ) -> dict[str, BacktestResult]:
     index = prices.index
     n     = len(index)
@@ -200,21 +252,23 @@ def walk_forward_blend_folds(
             continue
         fold_start, fold_end = index[lo], index[hi]
         label = f"fold {i+1} ({fold_start.date()}→{fold_end.date()})"
-        results[label] = simulate_blend(prices, cfg, fold_start, oos_end=fold_end, label=label)
+        results[label] = simulate_blend(prices, cfg, fold_start, oos_end=fold_end,
+                                        label=label, cache_dir=cache_dir)
     return results
 
 
 def target_book(
-    prices: pd.DataFrame,
-    cfg:    dict,
-    as_of:  pd.Timestamp | None = None,
+    prices:    pd.DataFrame,
+    cfg:       dict,
+    as_of:     pd.Timestamp | None = None,
+    cache_dir: Path | None = None,
 ) -> pd.Series:
     """Single source of truth for "what the blend holds on `as_of`" — mirrors
     `portfolio.target_book`'s role for the equity engine. `blend_target_weights`
     already resolves a value for every day (both component functions
     forward-fill internally), so this is just a row lookup.
     """
-    target = blend_target_weights(prices, cfg)
+    target = blend_target_weights(prices, cfg, cache_dir=cache_dir)
     if as_of is None:
         as_of = prices.index[-1]
     w = target.loc[as_of].copy()
