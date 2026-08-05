@@ -1,0 +1,112 @@
+{
+  "header": {
+    "as_of": "2026-08-04",
+    "rebal_as_of": "2026-07-31",
+    "next_rebal": "2026-08-31",
+    "capital": 2000.0,
+    "n_names": 9,
+    "cadence": "monthly (last trading day of month), 1-day execution lag",
+    "exit_rule": "Hold with drift until the next month-end rebalance; do not top up to target between rebalances."
+  },
+  "book": [
+    {
+      "rank": 1,
+      "ticker": "SPYM",
+      "sleeve": "growth (SPYM)",
+      "weight": 0.4,
+      "weight_pct": 40.0,
+      "last_close": 90.79,
+      "as_of": "2026-08-04",
+      "dollars": 800.0,
+      "shares": 8.8115
+    },
+    {
+      "rank": 2,
+      "ticker": "GLD",
+      "sleeve": "rotation",
+      "weight": 0.192857,
+      "weight_pct": 19.29,
+      "last_close": 374.16,
+      "as_of": "2026-08-04",
+      "dollars": 385.71,
+      "shares": 1.0309
+    },
+    {
+      "rank": 3,
+      "ticker": "DBMF",
+      "sleeve": "rotation",
+      "weight": 0.15,
+      "weight_pct": 15.0,
+      "last_close": 30.69,
+      "as_of": "2026-08-04",
+      "dollars": 300.0,
+      "shares": 9.7752
+    },
+    {
+      "rank": 4,
+      "ticker": "LQD",
+      "sleeve": "macro tilt",
+      "weight": 0.042857,
+      "weight_pct": 4.29,
+      "last_close": 106.76,
+      "as_of": "2026-08-04",
+      "dollars": 85.71,
+      "shares": 0.8029
+    },
+    {
+      "rank": 5,
+      "ticker": "TLT",
+      "sleeve": "rotation",
+      "weight": 0.042857,
+      "weight_pct": 4.29,
+      "last_close": 82.82,
+      "as_of": "2026-08-04",
+      "dollars": 85.71,
+      "shares": 1.0349
+    },
+    {
+      "rank": 6,
+      "ticker": "XLP",
+      "sleeve": "macro tilt",
+      "weight": 0.042857,
+      "weight_pct": 4.29,
+      "last_close": 85.37,
+      "as_of": "2026-08-04",
+      "dollars": 85.71,
+      "shares": 1.004
+    },
+    {
+      "rank": 7,
+      "ticker": "XLRE",
+      "sleeve": "macro tilt",
+      "weight": 0.042857,
+      "weight_pct": 4.29,
+      "last_close": 45.17,
+      "as_of": "2026-08-04",
+      "dollars": 85.71,
+      "shares": 1.8976
+    },
+    {
+      "rank": 8,
+      "ticker": "XLU",
+      "sleeve": "macro tilt",
+      "weight": 0.042857,
+      "weight_pct": 4.29,
+      "last_close": 44.11,
+      "as_of": "2026-08-04",
+      "dollars": 85.71,
+      "shares": 1.9432
+    },
+    {
+      "rank": 9,
+      "ticker": "XLV",
+      "sleeve": "macro tilt",
+      "weight": 0.042857,
+      "weight_pct": 4.29,
+      "last_close": 162.1,
+      "as_of": "2026-08-04",
+      "dollars": 85.71,
+      "shares": 0.5288
+    }
+  ]
+}

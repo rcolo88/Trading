@@ -40,12 +40,35 @@ def _dedupe_share_classes(ranked: pd.Index) -> list[str]:
     return out
 
 
+def _cap_per_group(ranked: list[str], group_map: dict[str, str],
+                   max_per_group: int | None) -> list[str]:
+    """Keep at most `max_per_group` names per group (e.g. GICS sector), walking
+    down `ranked` (already conviction-sorted) and demoting extras — the same
+    shape of operation as `_dedupe_share_classes`, generalized to arbitrary
+    groups instead of a fixed 3-entry issuer dict. A ticker missing from
+    `group_map` falls into an "UNKNOWN" bucket rather than escaping the cap.
+    `max_per_group=None` is a no-op (returns `ranked` unchanged).
+    """
+    if max_per_group is None:
+        return ranked
+    counts: dict[str, int] = {}
+    out = []
+    for t in ranked:
+        g = group_map.get(t, "UNKNOWN")
+        if counts.get(g, 0) >= max_per_group:
+            continue
+        counts[g] = counts.get(g, 0) + 1
+        out.append(t)
+    return out
+
+
 def build_positions(
     signals:        pd.DataFrame,
     prices:         pd.DataFrame,
     cfg:            dict,
     pit_df:         pd.DataFrame | None = None,
     rebal_anchor:   str = "start",
+    sector_map:     dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Cross-sectional rank → long-only position weights (before execution lag).
 
@@ -60,6 +83,9 @@ def build_positions(
                 anchors the grid at the LAST bar so the final row is always a fresh
                 rebalance (used by live `ideas`/`target_book`: the user's run day IS
                 the rebalance, not a ffilled hold up to 4 days stale).
+    sector_map : ticker -> GICS sector, from `universe.get_sector_map`. Only used
+                if `portfolio.max_per_sector` is set; a ticker missing from the
+                map falls into an "UNKNOWN" bucket rather than escaping the cap.
 
     Returns
     -------
@@ -78,6 +104,14 @@ def build_positions(
     hold_band  = (float(hold_band)
                   if hold_band not in (None, "", "none", False) else None)
     defensive  = str(reg_cfg.get("defensive", "none"))
+    max_per_sector = port_cfg.get("max_per_sector")   # e.g. 6; null/none = off
+    max_per_sector = (int(max_per_sector)
+                      if max_per_sector not in (None, "", "none", False) else None)
+    sector_map = sector_map or {}
+    max_beta   = sig_cfg.get("max_beta")   # e.g. 1.3; null/none = off
+    max_beta   = float(max_beta) if max_beta not in (None, "", "none", False) else None
+    weighting  = str(port_cfg.get("weighting", "equal"))   # "equal" | "inv_vol"
+    weight_win = int(vs_cfg.get("estimation_window", 63))
 
     stocks    = prices.drop(columns=NON_STOCK_COLS, errors="ignore")
     stock_ret = stocks.ffill(limit=3).pct_change().fillna(0.0)
@@ -85,11 +119,36 @@ def build_positions(
     T, N      = len(index), len(stocks.columns)
     scols     = list(stocks.columns)
 
+    # Rolling CAPM beta, only computed if the beta cap is actually enabled — this
+    # targets the observed instability (rolling beta swings 0.24-1.55) by simply
+    # excluding high-beta names from the eligible pool, rather than a full
+    # beta-neutralization/optimization step (kept deliberately simple: a single
+    # pre-registered test, not a tuned parameter).
+    beta_panel = None
+    if max_beta is not None:
+        from csm.signals import _rolling_capm_beta, _log_ret
+        window = int(sig_cfg.get("window", 252))
+        _ret   = _log_ret(prices)
+        beta_panel = _rolling_capm_beta(
+            _ret.drop(columns=NON_STOCK_COLS, errors="ignore"), _ret["SPY"], window)
+
     # Tradeable defensive sleeve (regime_filter.defensive): lives in the stock
     # panel so the engine can hold it, but never receives a signal score, so
-    # the ranking below can never select it.
-    def_col    = defensive if defensive in scols and defensive.lower() != "none" else None
-    stock_cols = [c for c in scols if c != def_col]
+    # the ranking below can never select it. "rotation" generalizes the single
+    # def_col to a multi-asset rotation (csm/multiasset.py) — validated
+    # 2026-08-04 to fix 2022 (a static IEF-only substitution lost -15.2% that
+    # year because bonds fell alongside equities; the rotation made +10.4%
+    # by holding commodities/managed-futures/anti-beta instead).
+    is_rotation = defensive == "rotation"
+    def_col     = defensive if (not is_rotation and defensive in scols
+                                and defensive.lower() != "none") else None
+    if is_rotation:
+        from csm.data import DEFENSIVE_ROSTER, ROTATION_CASH_TICKER
+        rotation_cols = [c for c in DEFENSIVE_ROSTER + [ROTATION_CASH_TICKER] if c in scols]
+        stock_cols = [c for c in scols if c not in rotation_cols]
+    else:
+        rotation_cols = []
+        stock_cols = [c for c in scols if c != def_col]
 
     # --- Regime filter: daily exposure multiplier in [0, 1] ---
     expo = regime_exposure(prices, cfg)
@@ -125,6 +184,9 @@ def build_positions(
 
         valid_cols = valid_stocks_on(date)
         row        = signals.loc[date].reindex(valid_cols).dropna()
+        if beta_panel is not None:
+            brow = beta_panel.loc[date].reindex(row.index)
+            row  = row[brow.isna() | (brow <= max_beta)]   # fail open on missing beta
         if len(row) < min_names:
             target.loc[date] = 0.0
             prev_longs = []
@@ -139,16 +201,33 @@ def build_positions(
             pct  = row.rank(pct=True)
             keep = [t for t in prev_longs if float(pct.get(t, 0.0)) >= hold_band]
             new  = [t for t in cand.index if t not in keep]
-            longs = _dedupe_share_classes(pd.Index(keep + new))[:max_names]
+            deduped = _dedupe_share_classes(pd.Index(keep + new))
+            longs = _cap_per_group(deduped, sector_map, max_per_sector)[:max_names]
         else:
-            longs = _dedupe_share_classes(cand.index)[:max_names]  # strongest, one class/issuer
+            deduped = _dedupe_share_classes(cand.index)  # strongest, one class/issuer
+            longs = _cap_per_group(deduped, sector_map, max_per_sector)[:max_names]
         if not longs:
             target.loc[date] = 0.0
             prev_longs = []
             continue
 
         target.loc[date, scols] = 0.0         # zero all first
-        target.loc[date, longs] = e / len(longs)
+        if weighting == "inv_vol":
+            # Inverse-realized-vol weights within the book (Track-A A3 test):
+            # same trailing window as the vol-scaling overlay, computed only from
+            # data up to and including `date` — no look-ahead. A zero/NaN vol
+            # (new listing, halt) falls back to the cross-sectional median vol
+            # rather than blowing up to an infinite weight.
+            trail = stock_ret[longs].loc[:date].tail(weight_win).std()
+            inv   = (1.0 / trail).replace([np.inf, -np.inf], np.nan)
+            if inv.notna().any():
+                inv = inv.fillna(inv.median())
+            else:
+                inv = pd.Series(1.0, index=longs)
+            w = inv / inv.sum()
+            target.loc[date, longs] = e * w
+        else:
+            target.loc[date, longs] = e / len(longs)
         prev_longs = longs
 
     pos = target.ffill().fillna(0.0)
@@ -169,8 +248,19 @@ def build_positions(
     # --- Defensive sleeve: park all uninvested capital in the defensive ETF ---
     # Applied AFTER vol-scaling so whatever the stock sleeve gives up (regime
     # gating, vol de-risking, no-signal periods) flows to the sleeve, not cash.
-    if def_col is not None:
-        pos[def_col] = (1.0 - pos[stock_cols].sum(axis=1)).clip(lower=0.0, upper=1.0)
+    uninvested = (1.0 - pos[stock_cols].sum(axis=1)).clip(lower=0.0, upper=1.0)
+    if is_rotation and rotation_cols:
+        from csm.data import ROTATION_CASH_TICKER
+        from csm.multiasset import defensive_weights, month_end_dates
+        roster = [c for c in rotation_cols if c != ROTATION_CASH_TICKER]
+        top_n  = int(port_cfg.get("rotation_top_n", 2))
+        rot_rebal  = month_end_dates(index)
+        rot_target = defensive_weights(prices, rot_rebal, roster=roster,
+                                       top_n=top_n, cash_ticker=ROTATION_CASH_TICKER)
+        for col in rotation_cols:
+            pos[col] = rot_target.get(col, pd.Series(0.0, index=index)) * uninvested
+    elif def_col is not None:
+        pos[def_col] = uninvested
 
     return pos
 
@@ -197,6 +287,7 @@ def target_book(
     cfg:          dict,
     pit_df:       pd.DataFrame | None = None,
     as_of:        pd.Timestamp | None = None,
+    sector_map:   dict[str, str] | None = None,
 ) -> pd.Series:
     """The single source of truth for "what the strategy holds on `as_of`".
 
@@ -216,7 +307,8 @@ def target_book(
     from csm import signals as sig_mod
 
     signals = sig_mod.primary_signal(prices, cfg)
-    pos     = build_positions(signals, prices, cfg, pit_df=pit_df, rebal_anchor="end")
+    pos     = build_positions(signals, prices, cfg, pit_df=pit_df, rebal_anchor="end",
+                              sector_map=sector_map)
 
     if as_of is None:
         as_of = pos.index[-1]

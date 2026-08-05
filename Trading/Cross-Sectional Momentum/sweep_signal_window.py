@@ -126,6 +126,10 @@ def main() -> None:
     else:
         print("  PBO skipped — not enough common data.")
 
+    from csm.trials import record_trial_sharpes
+    n_added = record_trial_sharpes(_HERE / "config.yaml", grid_sharpes)
+    print(f"\nRecorded {n_added} new trial Sharpe(s) to config.yaml validation.trial_sharpes.")
+
 
 if __name__ == "__main__":
     main()

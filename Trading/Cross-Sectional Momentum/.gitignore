@@ -12,4 +12,5 @@ outputs/backtest_*.json
 outputs/backtest_*.png
 outputs/ideas_*.txt
 outputs/ideas_*.json
+outputs/blend_ideas_*.json
 spike_output.log

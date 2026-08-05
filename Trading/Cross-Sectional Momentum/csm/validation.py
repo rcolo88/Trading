@@ -19,6 +19,22 @@ import pandas as pd
 
 from csm.afml import deflated_sharpe_ratio, prob_backtest_overfitting
 
+# Fixed, literature/calendar-defined crisis windows — not fit to this backtest's
+# data, so reporting them adds no selection bias. Populated only to the extent
+# the price panel's history actually covers them (empty/NaN otherwise, which is
+# itself informative — e.g. the current CSM stock panel starts 2010, so dotcom
+# and the GFC only populate once a multi-asset/ETF panel with longer history is
+# scored, per the Phase 3 plan).
+CRISIS_WINDOWS = {
+    "dotcom crash (2000-02)":     ("2000-01-01", "2002-12-31"),
+    "GFC (2007-09)":              ("2007-01-01", "2009-12-31"),
+    "euro debt crisis (2011)":    ("2011-01-01", "2011-12-31"),
+    "china scare (2015-16)":      ("2015-06-01", "2016-03-01"),
+    "2018 Q4 selloff":            ("2018-09-01", "2018-12-31"),
+    "COVID crash (2020 Q1)":      ("2020-01-01", "2020-06-30"),
+    "2022 bear":                  ("2022-01-01", "2022-12-31"),
+}
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Standard performance metrics
@@ -71,6 +87,125 @@ def compute_metrics(net_ret: pd.Series, bench_ret: pd.Series) -> dict:
         "bench_sharpe":    bench_sharpe,
         "excess_cagr":     excess_cagr,
         "n_days":          len(r),
+    }
+
+
+def alpha_beta(strat_ret: pd.Series, bench_ret: pd.Series,
+               periods_per_year: int = 252, rf_annual: float = 0.0) -> dict:
+    """OLS market-model regression: strat_ret = alpha + beta*bench_ret + resid.
+
+    Reports the annualized alpha AND its t-stat — a Sharpe edge over a benchmark
+    (e.g. SPY) can be entirely explained by beta exposure (this project's own
+    2017-2026 gross series regresses to alpha t=1.04, i.e. not distinguishable
+    from zero), so beta/alpha should be a standing column on every result, not
+    a one-off check.
+    """
+    import statsmodels.api as sm
+
+    s = strat_ret.dropna()
+    b = bench_ret.reindex(s.index).dropna()
+    common = s.index.intersection(b.index)
+    s, b = s.loc[common], b.loc[common]
+    if len(s) < 30:
+        return {"ann_alpha": np.nan, "alpha_tstat": np.nan, "beta": np.nan,
+                "beta_tstat": np.nan, "r_squared": np.nan, "n_obs": len(s)}
+
+    rf_per = rf_annual / periods_per_year
+    X = sm.add_constant((b - rf_per).values)
+    y = (s - rf_per).values
+    model = sm.OLS(y, X).fit()
+    alpha_per, beta = model.params
+    return {
+        "ann_alpha":    float(alpha_per * periods_per_year),
+        "alpha_tstat":  float(model.tvalues[0]),
+        "beta":         float(beta),
+        "beta_tstat":   float(model.tvalues[1]),
+        "r_squared":    float(model.rsquared),
+        "n_obs":        int(len(s)),
+    }
+
+
+def regime_breakdown(net_ret: pd.Series, bench_ret: pd.Series) -> pd.DataFrame:
+    """Per-calendar-year AND per-crisis-window Sharpe/return/drawdown/alpha/beta.
+
+    `compute_metrics` collapses the whole sample to one number, which is exactly
+    how a strategy can look fine on average while quietly failing every crisis
+    year. This is the diagnostic that would have caught 2018/2022 immediately.
+    """
+    rows = []
+    idx  = net_ret.dropna().index
+    for yr, seg in net_ret.groupby(net_ret.index.year):
+        seg = seg.dropna()
+        if len(seg) < 20:
+            continue
+        m  = compute_metrics(seg, bench_ret)
+        ab = alpha_beta(seg, bench_ret)
+        rows.append({"window": str(yr), "kind": "calendar_year",
+                     "n_days": m["n_days"], "return": m["cagr"], "sharpe": m["sharpe"],
+                     "max_dd": m["max_dd"], "ann_alpha": ab["ann_alpha"],
+                     "alpha_tstat": ab["alpha_tstat"], "beta": ab["beta"]})
+
+    for name, (start, end) in CRISIS_WINDOWS.items():
+        seg = net_ret.loc[start:end].dropna()
+        if len(seg) < 20:
+            rows.append({"window": name, "kind": "crisis", "n_days": len(seg),
+                         "return": np.nan, "sharpe": np.nan, "max_dd": np.nan,
+                         "ann_alpha": np.nan, "alpha_tstat": np.nan, "beta": np.nan})
+            continue
+        eq  = (1.0 + seg).cumprod()
+        std = seg.std(ddof=1)
+        sh  = float(np.sqrt(252) * seg.mean() / std) if std > 0 else 0.0
+        dd  = float((eq / eq.cummax() - 1.0).min())
+        ab  = alpha_beta(seg, bench_ret)
+        rows.append({"window": name, "kind": "crisis", "n_days": len(seg),
+                     "return": float(eq.iloc[-1] - 1.0), "sharpe": sh, "max_dd": dd,
+                     "ann_alpha": ab["ann_alpha"], "alpha_tstat": ab["alpha_tstat"],
+                     "beta": ab["beta"]})
+
+    return pd.DataFrame(rows)
+
+
+def rolling_window_summary(net_ret: pd.Series, window_months: int = 6,
+                           step_months: int = 1, min_obs: int = 40) -> dict:
+    """Distribution of Sharpe/return/drawdown across every rolling window —
+    the actual "consistent Sharpe" metric. A single full-sample Sharpe can't
+    distinguish a strategy that's uniformly OK from one that's brilliant for
+    years then catastrophic for a quarter; the WORST window and the fraction
+    of profitable windows can.
+    """
+    r = net_ret.dropna()
+    if r.empty:
+        return {"n_windows": 0}
+
+    start, end = r.index[0], r.index[-1]
+    window = pd.DateOffset(months=window_months)
+    step   = pd.DateOffset(months=step_months)
+
+    rows = []
+    cur = start
+    while cur + window <= end:
+        seg = r.loc[cur: cur + window]
+        if len(seg) >= min_obs:
+            eq  = (1.0 + seg).cumprod()
+            std = seg.std(ddof=1)
+            sh  = float(np.sqrt(252) * seg.mean() / std) if std > 0 else 0.0
+            dd  = float((eq / eq.cummax() - 1.0).min())
+            rows.append({"start": cur, "end": cur + window, "sharpe": sh,
+                         "return": float(eq.iloc[-1] - 1.0), "max_dd": dd})
+        cur = cur + step
+
+    if not rows:
+        return {"n_windows": 0}
+    df = pd.DataFrame(rows)
+    return {
+        "n_windows":           len(df),
+        "median_sharpe":       float(df["sharpe"].median()),
+        "worst_window_sharpe": float(df["sharpe"].min()),
+        "pct_profitable":      float((df["return"] > 0).mean()),
+        "worst_window_return": float(df["return"].min()),
+        "median_max_dd":       float(df["max_dd"].median()),
+        "worst_max_dd":        float(df["max_dd"].min()),
+        "table":               df,
     }
 
 

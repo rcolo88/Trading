@@ -158,6 +158,43 @@ def spy_regime(prices: pd.DataFrame, ma_days: int = 200, vol_cap: float = 0.25) 
     return above_ma | low_vol   # bad regime = below MA AND high vol
 
 
+_ROBUST_REGIME_ASSETS = ["SPY", "EFA", "EEM", "AGG", "TLT", "RWR", "GLD"]
+
+
+def robust_regime_exposure(prices: pd.DataFrame) -> pd.Series:
+    """0/½/1 exposure from MIN(turbulence/absorption-ratio, slow-bleed) —
+    the 2026-08-04 regime-robustness project's validated replacement for the
+    SPY-trend/vol gate (see memory csm-regime-robustness-project).
+
+    `regime_state.regime_state_exposure` (Kritzman turbulence + absorption
+    ratio) catches ACUTE panics — extreme single-day moves, correlations
+    spiking toward 1 (2008, COVID) — but was shown to miss slow, grinding
+    declines (2022, dotcom) entirely. `slow_bleed.slow_bleed_exposure`
+    (breadth below 200dma AND negative SPY absolute momentum) catches those
+    instead but is weaker on acute panics. Combining via MIN(both) — go
+    defensive if EITHER flags stress — was validated on real 2000-2026 data:
+    it is the only tested variant with no catastrophic loss in ANY tested
+    crisis window, and beats SPY buy-and-hold on Sharpe, MaxDD, and even its
+    own worst rolling-12-month window over the full 26-year sample.
+
+    Falls back to full exposure (1.0) wherever the 7-asset regime panel isn't
+    fully available (e.g. before all tickers have real price history) — same
+    fail-open convention as the VIX-contango check in `regime_exposure`.
+    """
+    from csm import regime_state as rs_mod
+    from csm import slow_bleed as sb_mod
+
+    avail = [c for c in _ROBUST_REGIME_ASSETS if c in prices.columns]
+    if len(avail) < len(_ROBUST_REGIME_ASSETS):
+        return pd.Series(1.0, index=prices.index)
+
+    panel = prices[avail].ffill()
+    turb_ar = rs_mod.regime_state_exposure(panel)
+    bleed   = sb_mod.slow_bleed_exposure(panel)
+    combined = pd.concat([turb_ar, bleed], axis=1).min(axis=1)
+    return combined.reindex(prices.index).fillna(1.0)
+
+
 def regime_exposure(prices: pd.DataFrame, cfg: dict) -> pd.Series:
     """Daily exposure multiplier in [0, 1] from the regime filter.
 
@@ -173,15 +210,23 @@ def regime_exposure(prices: pd.DataFrame, cfg: dict) -> pd.Series:
     nothing whipsaw of the binary gate around the 200-dma.  Condition (c)
     fails OPEN where VIX history is missing so warmup dates aren't gated by
     absent data.  All inputs are closes known at t (decision executes t+1).
+
+    mode "robust" — see `robust_regime_exposure`: MIN(turbulence/absorption
+    ratio, slow-bleed breadth+momentum), validated on 2000-2026 data to beat
+    SPY buy-and-hold with no catastrophic loss in any tested crisis.
     """
     reg_cfg = cfg.get("regime_filter", {})
     if not reg_cfg.get("enabled", True):
         return pd.Series(1.0, index=prices.index)
 
+    mode = str(reg_cfg.get("mode", "binary"))
+    if mode == "robust":
+        return robust_regime_exposure(prices)
+
     ma_days = int(reg_cfg.get("spy_ma_days", 200))
     vol_cap = float(reg_cfg.get("vol_cap",    0.25))
 
-    if str(reg_cfg.get("mode", "binary")) != "graded":
+    if mode != "graded":
         return spy_regime(prices, ma_days=ma_days, vol_cap=vol_cap).astype(float)
 
     spy      = prices["SPY"].ffill()

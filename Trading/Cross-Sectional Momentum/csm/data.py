@@ -48,8 +48,62 @@ _CACHE_HISTORY_START = "2010-01-01"
 # cross-sectional ranking can never select it.
 AUX_COLS         = ["^VIX", "^VIX3M"]
 DEFENSIVE_TICKER = "IEF"
-NON_STOCK_COLS   = ["SPY"] + AUX_COLS            # drop these to get the stock panel
-SIGNAL_EXCLUDE   = NON_STOCK_COLS + [DEFENSIVE_TICKER]  # never receive a signal score
+
+# 2026-08-04 regime-robustness project (see memory csm-regime-robustness-project):
+# REGIME_DETECT_COLS are a 7-asset-class cross-section (SPY + these 4, plus
+# TLT/GLD already covered by DEFENSIVE_ROSTER below) used ONLY to compute the
+# turbulence/absorption-ratio/slow-bleed regime signals (csm/regime_state.py,
+# csm/slow_bleed.py) — never tradeable, never signal-scored, same role as
+# AUX_COLS. DEFENSIVE_ROSTER is the multi-asset rotation's HOLDABLE candidate
+# set (csm/multiasset.py, regime_filter.defensive: rotation) — tradeable like
+# DEFENSIVE_TICKER but excluded from equity signal scoring. ROTATION_CASH_TICKER
+# is the rotation's own cash fallback when no candidate has positive momentum.
+REGIME_DETECT_COLS   = ["EFA", "EEM", "AGG", "RWR"]
+DEFENSIVE_ROSTER     = ["IEF", "TLT", "GLD", "DBC", "DBMF", "BTAL"]
+ROTATION_CASH_TICKER = "SHY"
+
+# 2026-08-05 3-way blend project (see memory csm-market-neutral-macro-tests):
+# MACRO_SECTOR_COLS (11 GICS sector SPDRs) + MACRO_ASSET_COLS (TIP, LQD — the
+# two tickers csm/macro_regime.py needs beyond what REGIME_DETECT_COLS/
+# DEFENSIVE_ROSTER already cover: EEM/DBC/GLD/TLT/IEF) drive the standalone
+# macro regime tilt sleeve (csm/macro_regime.py, csm/blend.py). Pure
+# asset-allocation tickers — never tradeable by the equity cross-sectional
+# ranker, same role as REGIME_DETECT_COLS.
+MACRO_SECTOR_COLS = ["XLB", "XLC", "XLE", "XLF", "XLI", "XLK",
+                     "XLP", "XLRE", "XLU", "XLV", "XLY"]
+MACRO_ASSET_COLS  = ["TIP", "LQD"]
+
+# 2026-08-05: the blend's growth sleeve holds this ETF (config `blend.growth_ticker`,
+# default here) — tradeable like DEFENSIVE_TICKER, excluded from equity signal
+# scoring. Verified via yfinance + State Street directly before adopting: real
+# daily volume back to 2010 (not a backfill artifact), 0.02% expense ratio,
+# $153B AUM, tracks the S&P 500 identically to SPY. SPY itself stays a
+# permanent, separate download regardless of this — it is always the
+# BENCHMARK ("SPY buy-and-hold" row) independent of what the growth sleeve
+# actually holds, so the two roles never collide even when they're the same
+# ticker (the default before 2026-08-05 was SPY for both).
+GROWTH_TICKER = "SPYM"
+
+def _dedupe(cols: list[str]) -> list[str]:
+    """Stable-order de-dup — DEFENSIVE_TICKER ("IEF") is also a member of
+    DEFENSIVE_ROSTER, so naive list concatenation double-lists it, which
+    would duplicate that column wherever these lists select from a price
+    panel (pandas silently returns a 2-column DataFrame for a duplicated
+    label, breaking any Series-shaped arithmetic downstream)."""
+    seen: set[str] = set()
+    out = []
+    for c in cols:
+        if c not in seen:
+            seen.add(c)
+            out.append(c)
+    return out
+
+
+NON_STOCK_COLS   = _dedupe(["SPY"] + AUX_COLS + REGIME_DETECT_COLS
+                           + MACRO_SECTOR_COLS + MACRO_ASSET_COLS)  # drop these to get the stock panel
+SIGNAL_EXCLUDE   = _dedupe(NON_STOCK_COLS + [DEFENSIVE_TICKER]
+                          + DEFENSIVE_ROSTER + [ROTATION_CASH_TICKER]
+                          + [GROWTH_TICKER])  # never receive a signal score
 
 # Tail refresh: trading days of overlap re-downloaded to verify the adjustment
 # basis (a dividend/split re-bases the ENTIRE adjusted history, not just the tail).
@@ -211,7 +265,10 @@ def load_price_panel(
     yfmt_map   = {t: _yfmt(t) for t in tickers}
     inv_map    = {v: k for k, v in yfmt_map.items()}
     needed_yf  = sorted(set(yfmt_map.values()) | {"SPY"} | set(AUX_COLS)
-                        | {DEFENSIVE_TICKER})
+                        | {DEFENSIVE_TICKER} | set(REGIME_DETECT_COLS)
+                        | set(DEFENSIVE_ROSTER) | {ROTATION_CASH_TICKER}
+                        | set(MACRO_SECTOR_COLS) | set(MACRO_ASSET_COLS)
+                        | {GROWTH_TICKER})
     target_end = pd.Timestamp(end)
 
     cached = pd.DataFrame()
@@ -221,13 +278,25 @@ def load_price_panel(
         cached = _drop_intraday_row(cached)   # heal a same-day intraday row
         cached = _drop_partial_tail(cached)   # heal a previously-poisoned tail
 
+    # Rebuild if the cache doesn't cover _CACHE_HISTORY_START — e.g. that constant
+    # was extended further back (2010 -> 2004) after the cache was already built.
+    # Without this check "auto"/"tail" would silently keep serving the old,
+    # shorter-history cache forever (they only ever check tail freshness).
+    if not cached.empty:
+        cache_floor = cached.index.min()
+        if cache_floor > pd.Timestamp(_CACHE_HISTORY_START) + pd.Timedelta(days=10):
+            print(f"Cache only starts {cache_floor.date()} — _CACHE_HISTORY_START is "
+                  f"{_CACHE_HISTORY_START}; forcing full re-download …")
+            cached = pd.DataFrame()
+            refresh = "full"
+
     # ── auto: serve the cache when complete and fresh ─────────────────────────
     if refresh == "auto" and not cached.empty:
         missing    = [t for t in needed_yf if inv_map.get(t, t) not in cached.columns]
         panel_last = cached.index[-1]
         if not missing and panel_last >= target_end - pd.tseries.offsets.BDay(5):
-            present = [t for t in list(tickers) + SIGNAL_EXCLUDE
-                       if t in cached.columns]
+            present = _dedupe([t for t in list(tickers) + SIGNAL_EXCLUDE
+                              if t in cached.columns])
             panel   = cached[present].loc[start:end]
             print(f"Loaded price cache: {len(present)} tickers × {len(panel)} days  "
                   f"(history from {cached.index.min().date()}, "

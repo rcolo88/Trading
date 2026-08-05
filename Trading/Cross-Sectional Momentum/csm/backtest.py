@@ -117,7 +117,9 @@ def simulate_live(
     cfg:           dict,
     pit_df:        pd.DataFrame | None,
     oos_start:     pd.Timestamp,
+    oos_end:       pd.Timestamp | None = None,
     label:         str = "primary (OOS)",
+    sector_map:    dict[str, str] | None = None,
 ) -> BacktestResult:
     """Event-driven simulation of the *actual* live process.
 
@@ -136,7 +138,8 @@ def simulate_live(
     cols    = list(stocks.columns)
 
     signals = sig_mod.primary_signal(prices, cfg)
-    pos     = port_mod.build_positions(signals, prices, cfg, pit_df=pit_df, rebal_anchor="end")
+    pos     = port_mod.build_positions(signals, prices, cfg, pit_df=pit_df, rebal_anchor="end",
+                                       sector_map=sector_map)
 
     rebal_freq = int(cfg.get("portfolio", {}).get("rebal_freq", 5))
     all_rebal  = _rebalance_dates(prices.index, rebal_freq)
@@ -181,14 +184,14 @@ def simulate_live(
     net_full    = equity_full.pct_change().fillna(0.0)
     exec_full   = pd.DataFrame(exec_rows, index=pd.DatetimeIndex(eq_dates))
 
-    nr    = net_full.loc[oos_start:]
-    bench = prices["SPY"].pct_change().fillna(0.0).loc[oos_start:]
+    nr    = net_full.loc[oos_start:oos_end]
+    bench = prices["SPY"].pct_change().fillna(0.0).loc[oos_start:oos_end]
     return BacktestResult(
         net_ret      = nr,
         equity       = _equity(nr),
         bench_ret    = bench,
         bench_equity = _equity(bench),
-        exec_pos     = exec_full.loc[oos_start:],
+        exec_pos     = exec_full.loc[oos_start:oos_end],
         label        = label,
     )
 
@@ -202,6 +205,7 @@ def walk_forward(
     cfg:          dict,
     pit_df:       pd.DataFrame | None = None,
     oos_frac:     float = 0.30,
+    sector_map:   dict[str, str] | None = None,
 ) -> BacktestResult:
     """Walk-forward split: evaluate the strategy on the OOS period only.
 
@@ -219,4 +223,47 @@ def walk_forward(
         raise ValueError(f"OOS window too short ({len(prices.loc[oos_start:])} days).  "
                          "Extend the backtest date range.")
 
-    return simulate_live(prices, cfg, pit_df, oos_start, label="primary (OOS)")
+    return simulate_live(prices, cfg, pit_df, oos_start, label="primary (OOS)",
+                         sector_map=sector_map)
+
+
+def walk_forward_folds(
+    prices:        pd.DataFrame,
+    cfg:           dict,
+    pit_df:        pd.DataFrame | None = None,
+    n_folds:       int = 5,
+    min_fold_days: int = 126,
+    sector_map:    dict[str, str] | None = None,
+) -> dict[str, BacktestResult]:
+    """Multi-fold anchored walk-forward: split the FULL history into `n_folds`
+    contiguous, non-overlapping OOS blocks and score each one.
+
+    A single 70/30 split (`walk_forward`) tells you nothing about consistency —
+    whichever ~30% of history happens to land in the holdout can be a uniquely
+    good or bad regime (this is exactly what happened here: the 2023-08-04 OOS
+    window skipped both 2018 and 2022). Multiple folds, each covering a
+    different multi-year stretch, let the WORST fold — not just the mean —
+    stand in for "how bad can this get".
+
+    Each fold reuses `simulate_live`'s continuous-signal, warm-started,
+    drift-and-cost-aware engine (the same one `walk_forward` uses) — the signal
+    is computed once on the FULL panel so no fold re-burns warmup internally,
+    and each fold's book is warmed from the last rebalance strictly before its
+    start. Folds are drawn by bar count, not calendar year, so each one holds
+    (roughly) equal weight in the aggregate report.
+    """
+    index = prices.index
+    n     = len(index)
+    edges = np.linspace(0, n, n_folds + 1).astype(int)
+
+    results: dict[str, BacktestResult] = {}
+    for i in range(n_folds):
+        lo, hi = edges[i], edges[i + 1] - 1
+        if hi <= lo or (hi - lo) < min_fold_days:
+            continue
+        fold_start, fold_end = index[lo], index[hi]
+        label = f"fold {i+1} ({fold_start.date()}→{fold_end.date()})"
+        results[label] = simulate_live(prices, cfg, pit_df, fold_start,
+                                       oos_end=fold_end, label=label,
+                                       sector_map=sector_map)
+    return results

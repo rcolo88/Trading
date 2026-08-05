@@ -17,7 +17,7 @@ data:
                              #   signal burns ~2×window≈504 days of warmup INSIDE the
                              #   window, and long history spans more regimes → honest
                              #   OOS). "auto"/blank → cache floor (2010). Reproducible.
-  end_date:   auto           # AUTO-ANCHORED by _backtest_window(): today − barrier_window
+  end_date: auto             # AUTO-ANCHORED by _backtest_window(): today − barrier_window
                              #   (~42 trading days), so the backtest always tracks fresh
                              #   data yet never evaluates on the last ~2 months where
                              #   triple-barrier labels can't resolve. Set a literal date
@@ -29,7 +29,7 @@ data:
   # months minimum); 30 months adds a cushion for halts/NaN gaps. Raise if you see
   # names dropping out for "stale"/insufficient-history reasons.
   ideas_warmup_months: 30
-  cache_dir:  "outputs/cache"
+  cache_dir: "outputs/cache"
 
 signal:
   type: composite               # residual | naive | composite (resid-mom + FIP
@@ -38,8 +38,12 @@ signal:
                                 #   residual 1.17, same MaxDD — the only variant of 7
                                 #   that cleared the +0.1 bar (see validation.trial_sharpes).
   window: 252                   # momentum lookback (trading days, ≈12 months)
-  skip:   21                    # skip recent bars (trading days, ≈1 month reversal filter)
+  skip: 21                      # skip recent bars (trading days, ≈1 month reversal filter)
   quantile: 0.80                # top-quantile threshold for long selection (0.80 = top quintile)
+  max_beta:                     # exclude candidates with rolling 252d CAPM beta above
+                                #   this (e.g. 1.3) from the eligible pool before ranking.
+                                #   null = off. Pre-registered Track-A test: rolling
+                                #   portfolio beta swings 0.24-1.55 across 2017-2026.
 
 regime_filter:
   enabled: true
@@ -47,11 +51,29 @@ regime_filter:
                                 #   vol high). graded = 0/½/1 exposure from three
                                 #   conditions: SPY>MA, vol<cap, VIX<VIX3M (term
                                 #   structure catches acute vol shocks the MA lags).
+                                #   robust = MIN(turbulence/absorption-ratio, slow-bleed)
+                                #   — 2026-08-04 regime-robustness project. Validated on
+                                #   real 2000-2026 data: beats SPY buy-hold on Sharpe/MaxDD/
+                                #   worst-rolling-window, no catastrophic loss in ANY tested
+                                #   crisis (GFC/COVID/2011/2022/dotcom). NOT YET made the
+                                #   default — needs a Phase-4 head-to-head on the SAME
+                                #   equity-book harness before flipping live. See memory
+                                #   csm-regime-robustness-project. Requires `fetch` to have
+                                #   downloaded the 7-asset regime panel (SPY/EFA/EEM/AGG/
+                                #   TLT/RWR/GLD) — falls back to full exposure if missing.
   spy_ma_days: 200              # SPY must be above its N-day MA to take new longs
+                                #   (binary/graded modes only — robust mode ignores this)
   vol_cap: 0.25                 # annualised SPY vol above which exposure is reduced
+                                #   (binary/graded modes only)
   defensive: none               # none = uninvested capital sits in cash.
                                 #   IEF = park it in 7-10y Treasuries instead (the
                                 #   sleeve is engine-held but never signal-selected).
+                                #   rotation = multi-asset absolute-momentum rotation among
+                                #   IEF/TLT/GLD/DBC/DBMF/BTAL (csm/multiasset.py), top
+                                #   `portfolio.rotation_top_n` positive-momentum names,
+                                #   else SHY. Validated fix for 2022 (static IEF-only lost
+                                #   -15.2% that year; rotation made +10.4%). Pairs naturally
+                                #   with mode: robust but works with any mode.
 
 vol_scaling:
   enabled: true
@@ -66,18 +88,78 @@ portfolio:
                                 #   tail of the quintile dilutes the strongest signals
                                 #   and worsens drawdowns); ~20-30 is the sweet spot.
   min_names: 10                 # need at least this many longs to trade
-  hold_band: null               # hysteresis sell band (rank percentile): buy only from
+  hold_band:                    # hysteresis sell band (rank percentile): buy only from
                                 #   the top `quantile`, but HOLD an incumbent until its
                                 #   rank falls below this (e.g. 0.60). null = off
                                 #   (sell the week a name slips out of the buy set).
+  max_per_sector:               # cap names per GICS sector (e.g. 6) — demotes extras
+                                #   to the next-best name in another sector, walking
+                                #   down the conviction-ranked list. null = off.
+                                #   Requires `fetch` to have built the sector cache
+                                #   (universe.get_sector_map). Pre-registered Track-A
+                                #   test for the 2022 sector-concentration loss.
+  weighting: equal              # equal (default, 1/N) | inv_vol (inverse trailing-vol
+                                #   weights within the book, same window as vol_scaling
+                                #   below). Pre-registered Track-A risk-weighting test.
+  rotation_top_n: 2             # defensive rotation slot count (only used when
+                                #   regime_filter.defensive: rotation). Validated with 2.
 
 # NOTE: meta-labeling was tested and REMOVED — when re-scored every rebalance (the
 # only tradeable way) it underperformed the plain primary book and ~3×'d turnover.
 # The strategy now trades the primary residual-momentum book directly.
 
 costs:
-  commission_bps: 5             # one-way commission in basis points
-  half_spread_bps: 5            # one-way half-spread (total one-way = 10 bps)
+  commission_bps: 0              # broker trades long stock commission-free
+  half_spread_bps: 5             # one-way half-spread (the real remaining cost)
+
+# 2026-08-05 3-way blend (see memory csm-market-neutral-macro-tests): a
+# SEPARATE strategy from the equity cross-sectional momentum engine above —
+# SPY (growth proxy) / macro regime tilt / multi-asset rotation, fixed
+# weights, monthly rebalanced. Standalone testing (2010-2026) found it beats
+# SPY buy-hold on Sharpe with ~half the MaxDD (alpha t~2.0-2.06). Traded via
+# the `blend-backtest`/`blend-ideas`/`blend-verify` subcommands, NOT the main
+# `backtest`/`ideas` commands. csm/blend.py, csm/macro_regime.py.
+#
+# 2026-08-05 tuning sweep (6 splits, config's own 2015-2026 window/OOS split):
+# OOS Sharpe rose MONOTONICALLY with SPY weight (60/20/20 -> 1.384 best) but
+# so did MaxDD/worst-year (60/20/20: MaxDD -12.0%, worst yr -9.4%, close to
+# breaching the -10% bar) — this is very likely reward for loading up on
+# THIS window's exceptional SPY bull run, the same overfit-to-recent-window
+# pattern this project has repeatedly guarded against, NOT genuine skill.
+# 40/30/30 (Sharpe 1.316, worst fold 0.41, worst year -4.8%) was chosen
+# instead: a modest, defensible improvement over the original equal-ish
+# guess that stays roughly consistent with what performed well on the
+# LONGER 2010-2026 window tested earlier (unlike 60/20/20, optimal on only
+# one window) — consistency across regimes was the original mandate here,
+# not maximizing Sharpe on the most recent bull run.
+blend:
+  growth_ticker: SPYM            # 2026-08-05: switched from SPY on request (lower
+                                #   management fee). SPYM = State Street SPDR
+                                #   Portfolio S&P 500 ETF, 0.02% expense ratio vs
+                                #   SPY's ~0.09%, identical S&P 500 exposure,
+                                #   $153B AUM. Verified real trading history back
+                                #   to 2010 (not a backfill artifact) before
+                                #   adopting, so the backtest needed no changes.
+                                #   The benchmark ("SPY buy-and-hold" row in every
+                                #   report) always stays literal SPY regardless of
+                                #   this setting — this only controls what the
+                                #   growth sleeve actually HOLDS.
+  weight_spy:      0.40         # growth engine (equity book showed no significant
+                                #   differentiation from SPY-beta, so an S&P 500
+                                #   tracker is a fair, simpler substitute)
+  weight_macro:    0.30         # csm/macro_regime.py sector/asset tilt
+  weight_rotation: 0.30         # csm/multiasset.py defensive rotation
+  rotation_top_n:  2            # rotation slot count (matches validated setting)
+  # OOS Sharpe of every blend-weight configuration tried — same DSR-honesty
+  # discipline as validation.trial_sharpes above, but tracked SEPARATELY
+  # since this is a different strategy/search space. Append on every sweep.
+  trial_sharpes:
+  - 1.2751
+  - 1.3621
+  - 1.3161
+  - 1.384
+  - 1.1934
+  - 1.1382
 
 validation:
   n_perm_mcpt: 1000             # MCPT permutations (≥1000 for publication-grade p-value)
@@ -85,7 +167,20 @@ validation:
   # bias — de Prado). Append here whenever a new variant is backtested.
   # 2026-07-16 sweep: baseline residual, graded regime, hold_band .50/.60/.70,
   # composite signal, defensive IEF.
-  trial_sharpes: [1.172, 0.903, 1.101, 1.011, 1.026, 1.326, 1.187]
+  trial_sharpes:
+  - 1.172
+  - 0.903
+  - 1.101
+  - 1.011
+  - 1.026
+  - 1.326
+  - 1.187
+  - 1.34
+  - 1.224
+  - 1.179
+  - 1.199
+  - 1.301
+  - 1.151
   n_partitions_pbo: 16          # CSCV partitions for PBO estimate
   walk_forward_oos_frac: 0.30   # 30% OOS for walk-forward split
 

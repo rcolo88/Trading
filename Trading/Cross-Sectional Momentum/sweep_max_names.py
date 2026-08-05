@@ -84,6 +84,11 @@ def main() -> None:
     print(f"\nBest OOS Sharpe: max_names={best[0]} (avg {best[1]:.0f} held) "
           f"→ Sharpe {best[2]['sharpe']:.3f}")
 
+    from csm.trials import record_trial_sharpes
+    n_added = record_trial_sharpes(_HERE / "config.yaml", [m["sharpe"] for _, _, m in rows])
+    print(f"Recorded {n_added} new trial Sharpe(s) to config.yaml validation.trial_sharpes "
+          f"(DSR will deflate against this sweep automatically next backtest run).")
+
 
 if __name__ == "__main__":
     main()
