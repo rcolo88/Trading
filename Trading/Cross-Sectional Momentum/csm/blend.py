@@ -89,11 +89,15 @@ def blend_target_weights(
     2026-08-05 Phase 1 (blend-return-research): `blend.macro_growth_axis`
     ("price" default | "macro") and `blend.macro_baskets` ("v1" default |
     "v2") select the Phase-1.1/1.2 macro-sleeve variants that attack its
-    measured 0.766 daily correlation with the growth sleeve. `cache_dir` is
-    consulted when macro_growth_axis="macro" or `blend.risk_overlay` needs
-    the FRED vintage cache; defaults to `cfg["data"]["cache_dir"]` resolved
-    against the current working directory, matching every CLI entry point's
-    convention.
+    measured 0.766 daily correlation with the growth sleeve. 2026-08-12
+    Phase 2.5 adds `blend.macro_inflation_axis` ("price" default | "macro"),
+    the symmetric override for the inflation side — see
+    csm.macro_regime.inflation_score_macro's docstring for why it's
+    default-off (built but not yet return-tested). `cache_dir` is consulted
+    when macro_growth_axis="macro", macro_inflation_axis="macro", or
+    `blend.risk_overlay` needs the FRED vintage cache; defaults to
+    `cfg["data"]["cache_dir"]` resolved against the current working
+    directory, matching every CLI entry point's convention.
 
     2026-08-05 Phase 2: `blend.risk_overlay` ("none" default | "robust" |
     "gtt" | "ladder") scales the growth+macro legs (the equity-correlated
@@ -108,21 +112,28 @@ def blend_target_weights(
         rebal_dates = ma_mod.month_end_dates(prices.index)
 
     b = cfg.get("blend", {})
-    growth_axis = str(b.get("macro_growth_axis", "price"))
+    growth_axis    = str(b.get("macro_growth_axis", "price"))
+    inflation_axis = str(b.get("macro_inflation_axis", "price"))
     baskets_ver = str(b.get("macro_baskets", "v1"))
     overlay     = str(b.get("risk_overlay", "none"))
 
-    if (growth_axis == "macro" or overlay in ("gtt", "ladder")) and cache_dir is None:
+    needs_fred = growth_axis == "macro" or inflation_axis == "macro" or overlay in ("gtt", "ladder")
+    if needs_fred and cache_dir is None:
         cache_dir = Path(cfg.get("data", {}).get("cache_dir", "outputs/cache"))
 
     growth_series = None
     if growth_axis == "macro":
         growth_series = mr_mod.growth_score_macro(prices.index, rebal_dates, cache_dir)
 
+    inflation_series = None
+    if inflation_axis == "macro":
+        inflation_series = mr_mod.inflation_score_macro(prices.index, rebal_dates, cache_dir)
+
     baskets = mr_mod.REGIME_BASKETS_V2 if baskets_ver == "v2" else None
 
     macro_target = mr_mod.macro_tilt_weights(prices, rebal_dates,
-                                             growth=growth_series, baskets=baskets)
+                                             growth=growth_series, inflation=inflation_series,
+                                             baskets=baskets)
     rot_target   = ma_mod.defensive_weights(prices, rebal_dates, top_n=top_n)
 
     if overlay == "none":

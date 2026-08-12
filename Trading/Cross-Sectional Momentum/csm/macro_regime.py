@@ -145,18 +145,91 @@ def growth_score_macro(
     return raw.reindex(index).ffill()
 
 
+# 2026-08-12 Phase 2.5: the inflation-axis counterpart to `growth_score_macro`
+# above, DEFAULT-OFF (nothing in `blend.py`/config calls this unless
+# `blend.macro_inflation_axis: macro` is explicitly set — see config.yaml).
+# Built for symmetry with the growth axis, not yet return-tested the way the
+# 2026-08-05 growth-axis variant was (that one was tried and REJECTED for
+# overfitting the recent window — see config.yaml's `macro_growth_axis`
+# comment). Treat this the same way until it's been through an equivalent
+# full-history + OOS + 2000-2014-holdout pass: an available override, not a
+# recommendation.
+#
+# Same equal-weight-vote, own-history-z-score construction as growth_score_
+# macro, but on genuine price-level RELEASES rather than labor/financial-
+# conditions releases: CPIAUCSL YoY change trending above its own trailing
+# 12-month average (headline inflation accelerating), PCEPILFE YoY change
+# (core PCE, the Fed's actual target gauge) trending above its own trailing
+# 12-month average, and T10YIE (10Y market breakeven) above its own trailing
+# history (the market pricing in more inflation). Each vote point-in-time via
+# csm.fred.vintage_series, same look-ahead discipline as growth_score_macro.
+_CPI_MA_MONTHS = 12
+_PCE_MA_MONTHS = 12
+
+
+def inflation_score_macro(
+    index:          pd.DatetimeIndex,
+    rebal_dates:    pd.DatetimeIndex,
+    cache_dir:      Path,
+    project_root:   Path | None = None,
+    api_key:        str | None = None,
+    lookback_years: int = 20,
+) -> pd.Series:
+    """Macro-release inflation axis, computed point-in-time at each date in
+    `rebal_dates` and forward-filled to `index` — shaped like
+    `growth_score_macro`'s output so it can be passed as `classify_regime`'s
+    `inflation=` override. Returns NaN at a date where none of the three
+    inputs have enough point-in-time history yet (early-history warmup);
+    `classify_regime` already treats a NaN growth/inflation score date as
+    "no basket".
+    """
+    from csm import fred as fred_mod
+    if api_key is None:
+        api_key = fred_mod.get_api_key(project_root)
+
+    raw = pd.Series(index=rebal_dates, dtype=float)
+    for d in rebal_dates:
+        obs_start = (d - pd.DateOffset(years=lookback_years)).strftime("%Y-%m-%d")
+        votes = []
+
+        cpi = fred_mod.vintage_series("CPIAUCSL", d, obs_start, cache_dir, api_key=api_key)
+        yoy = cpi.pct_change(12).dropna()
+        trend = (yoy - yoy.rolling(_CPI_MA_MONTHS).mean()).dropna()
+        if len(trend) >= _CPI_MA_MONTHS and trend.std() > 0:
+            votes.append((trend.iloc[-1] - trend.mean()) / trend.std())  # above MA => inflation+
+
+        pce = fred_mod.vintage_series("PCEPILFE", d, obs_start, cache_dir, api_key=api_key)
+        yoy = pce.pct_change(12).dropna()
+        trend = (yoy - yoy.rolling(_PCE_MA_MONTHS).mean()).dropna()
+        if len(trend) >= _PCE_MA_MONTHS and trend.std() > 0:
+            votes.append((trend.iloc[-1] - trend.mean()) / trend.std())  # above MA => inflation+
+
+        breakeven = fred_mod.vintage_series("T10YIE", d, obs_start, cache_dir, api_key=api_key)
+        breakeven = breakeven.dropna()
+        if len(breakeven) >= 252 and breakeven.std() > 0:
+            votes.append((breakeven.iloc[-1] - breakeven.mean()) / breakeven.std())  # higher => inflation+
+
+        if votes:
+            raw.loc[d] = float(np.mean(votes))
+
+    return raw.reindex(index).ffill()
+
+
 def classify_regime(
-    close:   pd.DataFrame,
-    window:  int = 63,
-    growth:  pd.Series | None = None,
+    close:     pd.DataFrame,
+    window:    int = 63,
+    growth:    pd.Series | None = None,
+    inflation: pd.Series | None = None,
 ) -> pd.Series:
     """Returns a Series of {"goldilocks","reflation","stagflation","deflation"}.
 
     `growth` overrides the default price-based `growth_score` — pass
     `growth_score_macro(...)`'s output for the Phase 1.1 macro-release axis.
+    `inflation` overrides the default price-based `inflation_score` — pass
+    `inflation_score_macro(...)`'s output for the Phase 2.5 macro-release axis.
     """
     g = growth if growth is not None else growth_score(close, window=window)
-    i = inflation_score(close, window=window)
+    i = inflation if inflation is not None else inflation_score(close, window=window)
     regime = pd.Series(index=close.index, dtype=object)
     regime[(g >= 0) & (i < 0)]  = "goldilocks"
     regime[(g >= 0) & (i >= 0)] = "reflation"
@@ -171,6 +244,7 @@ def macro_tilt_weights(
     window:      int = 63,
     cash_ticker: str = CASH_TICKER,
     growth:      pd.Series | None = None,
+    inflation:   pd.Series | None = None,
     baskets:     dict[str, list[str]] | None = None,
 ) -> pd.DataFrame:
     """Target weight per basket ticker (+ cash), forward-filled between
@@ -178,10 +252,11 @@ def macro_tilt_weights(
     that regime's AVAILABLE basket tickers (those with real price history by
     that date); any basket with zero available tickers falls back to cash.
 
-    `growth` overrides the price-based growth axis (Phase 1.1); `baskets`
-    overrides REGIME_BASKETS (Phase 1.2, e.g. REGIME_BASKETS_V2).
+    `growth` overrides the price-based growth axis (Phase 1.1); `inflation`
+    overrides the price-based inflation axis (Phase 2.5); `baskets` overrides
+    REGIME_BASKETS (Phase 1.2, e.g. REGIME_BASKETS_V2).
     """
-    regime  = classify_regime(close, window=window, growth=growth)
+    regime  = classify_regime(close, window=window, growth=growth, inflation=inflation)
     baskets = baskets if baskets is not None else REGIME_BASKETS
     all_cols = sorted({t for b in baskets.values() for t in b} | {cash_ticker})
     target = pd.DataFrame(np.nan, index=close.index, columns=all_cols, dtype=np.float64)

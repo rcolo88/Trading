@@ -1,5 +1,12 @@
 # csmom — Multi-Strategy Trade-Idea Engine
 
+> **See [`docs/`](docs/README.md) for the full methodology record**: how this strategy was built
+> ([`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)), the current validated numbers
+> ([`docs/VALIDATION.md`](docs/VALIDATION.md) — the authoritative source; figures below may lag it),
+> the complete data inventory ([`docs/DATA_INPUTS.md`](docs/DATA_INPUTS.md)), open gaps with
+> pre-registered test protocols ([`docs/GAPS.md`](docs/GAPS.md)), and decision history
+> ([`docs/CHANGELOG.md`](docs/CHANGELOG.md), [`docs/decisions/`](docs/decisions/)).
+
 **Primary strategy (as of 2026-08-05): a 3-way fixed-weight blend** —
 40% SPYM (growth) / 30% macro regime tilt / 30% multi-asset absolute-momentum
 rotation — rebalanced **monthly** (last trading day of each month), holding
@@ -273,20 +280,13 @@ regime_filter:
 
 ---
 
-## Validated results — blend (primary, last updated 2026-08-05)
+## Validated results — blend (primary)
 
-**Walk-forward OOS — monthly-rebalance simulation, config's own 2015-2026 window, 30% holdout**
-
-| Strategy | Sharpe | CAGR | Max Drawdown | Ann. turnover |
-|---|---|---|---|---|
-| Blend (OOS) | +1.316 | +13.6% | -8.6% | 4.1× |
-| SPY buy-and-hold | +1.344 | +21.1% | -18.8% | — |
-
-DSR = 0.986 across the blend's own 7-trial weight-split search (pass). Worst
-of 5 walk-forward folds: Sharpe +0.41 (bar: >0.30). 86% of rolling 12-month
-windows profitable; worst window return -7.2%, worst window MaxDD -18.8%.
-Alpha vs SPY on this window: t=+0.65 (not significant *on this specific
-recent, SPY-favorable slice*) — see the honesty note below.
+> **Numbers moved to [`docs/VALIDATION.md`](docs/VALIDATION.md)** — the authoritative,
+> continuously-corrected source. As of the 2026-08-12 docs audit, the DSR figure quoted here
+> historically (0.986 across 7 trials) was stale: `blend.trial_sharpes` has grown to 40 entries and
+> the corresponding DSR is 0.945. See `docs/VALIDATION.md` for the current Sharpe/CAGR/MaxDD/DSR,
+> the walk-forward fold and rolling-window detail, and exactly which run each figure traces to.
 
 > **Composition:** 40% SPYM (`csm/blend.py`, `blend.growth_ticker`) / 30% macro regime tilt
 > (`csm/macro_regime.py` — classifies Goldilocks/Reflation/Stagflation/
@@ -348,13 +348,10 @@ These come from the unified engine: rebalance every 5 trading days, hold shares
 with drift between, costs on real turnover, gross capped at 100% (no leverage) —
 the **same book `ideas` gives you**.
 
-| Strategy | Sharpe | CAGR | Max Drawdown | Ann. turnover |
-|---|---|---|---|---|
-| Composite (OOS) | +1.33 | +22.0% | -11.1% | 18.4× |
-| SPY buy-and-hold | +1.38 | +21.7% | -18.8% | — |
-
-DSR = 0.978 **across all 8 configurations ever tried** (pass); MCPT p = 0.0000
-(1000 permutations — null 95th-percentile Sharpe is +0.22).
+> **Numbers moved to [`docs/VALIDATION.md`](docs/VALIDATION.md).** The table this replaced (Composite
+> OOS +1.33 / MaxDD -11.1% / DSR 0.978) was from a 2026-07-16 run; the most recent actual run
+> (2026-08-04) shows Sharpe +1.157 / MaxDD -13.2% / DSR 0.958 at 14 trials — see `docs/VALIDATION.md`
+> for the current figures and which `outputs/backtest_*.json` each one traces to.
 
 _Prior run (2026-07-09, plain residual momentum): Sharpe +1.14, CAGR +19.0%,
 MaxDD -12.5%, DSR 0.981 — re-run `backtest` yourself any time to refresh this row._
@@ -440,7 +437,9 @@ Cross-Sectional Momentum/
 │   ├── trials.py         ← programmatic trial_sharpes bookkeeping (section-aware — keep
 │   │                        `validation.trial_sharpes` and `blend.trial_sharpes` separate)
 │   │   Equity engine (secondary):
-│   ├── afml.py           ← de Prado ML primitives (triple-barrier, purged CV, DSR, PBO)
+│   ├── afml.py           ← de Prado ML primitives (DSR, PBO live; triple-barrier/purged CV/bet
+│   │                        sizing are dead code since meta-labeling was removed — see
+│   │                        docs/GAPS.md #8)
 │   ├── universe.py       ← point-in-time index membership reconstruction + GICS sector map
 │   ├── signals.py        ← composite momentum, regime filter (binary/graded/robust), vol-scaling
 │   ├── portfolio.py      ← ranking → position weights; target_book (live = backtest)

@@ -162,6 +162,30 @@ blend:
                                 #   all 4 variants (1.524) but WORST on the
                                 #   2000-2014 holdout (Sharpe 0.586, 2008
                                 #   -18.46% — worse than baseline). Rejected.
+                                #   CAVEAT (docs/GAPS.md #1, found 2026-08-12,
+                                #   fixed same day): that 2000-2014 holdout
+                                #   run read a FRED vintage cache with a
+                                #   duplicated-row bug spanning 2000-01-31 to
+                                #   2002-10-31 (100 vintage-date pairs across
+                                #   NFCI/UNRATE/T10Y2Y) that silently halved
+                                #   rolling-window computations there — e.g.
+                                #   UNRATE's 2002-10-31 vote flipped sign
+                                #   (+0.69 buggy vs +0.01 deduped). The cache
+                                #   is now deduped and a uniqueness guard is
+                                #   in place, but this specific rejection has
+                                #   NOT been re-run against the repaired
+                                #   cache — treat it as unproven, not settled,
+                                #   until it is (task: docs/GAPS.md #1 step 4).
+  macro_inflation_axis: price    # price (default — KEEP) | macro — the
+                                #   Phase 2.5 (2026-08-12) symmetric override
+                                #   for the inflation side (CPIAUCSL +
+                                #   PCEPILFE + T10YIE point-in-time vintage,
+                                #   csm.macro_regime.inflation_score_macro).
+                                #   Built but NOT YET return-tested the way
+                                #   macro_growth_axis was — no full-history/
+                                #   OOS/2000-2014-holdout pass has run this
+                                #   yet. Available as an override; not a
+                                #   recommendation. See docs/GAPS.md.
   macro_baskets: v2              # v1 | v2 (REGIME_BASKETS_V2 — majority
                                 #   non-equity stagflation/deflation baskets)
                                 #   — ADOPTED LIVE 2026-08-05, the one

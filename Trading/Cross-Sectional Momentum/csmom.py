@@ -158,8 +158,8 @@ def _backtest_window(cfg: dict) -> tuple[str, str]:
 #  fetch
 # ─────────────────────────────────────────────────────────────────────────────
 
-def cmd_fetch(cfg: dict) -> None:
-    """Build PIT membership + download price panel."""
+def cmd_fetch(cfg: dict, args: argparse.Namespace) -> None:
+    """Build PIT membership + download price panel (+ FRED macro panel)."""
     cache_dir = _HERE / cfg["data"]["cache_dir"]
 
     print("─── Point-in-time S&P 1500 membership ──────────────────────────────")
@@ -183,6 +183,67 @@ def cmd_fetch(cfg: dict) -> None:
     if spy is not None:
         print(f"  SPY price range: {spy.dropna().index[0].date()} → {spy.dropna().index[-1].date()}")
     print("  fetch complete.")
+
+    if getattr(args, "skip_macro", False):
+        print("\n  (--skip-macro: FRED macro panel not refreshed — run "
+              "`python csmom.py fetch-macro` any time.)")
+    else:
+        print()
+        _fetch_macro_panel(cache_dir, cfg)
+
+
+def cmd_fetch_macro(cfg: dict) -> None:
+    """Refresh only the FRED macro panel — the inverse of `fetch --skip-macro`.
+
+    Useful when you want the macro data current without re-running the
+    (slower) PIT membership + full price panel rebuild.
+    """
+    cache_dir = _HERE / cfg["data"]["cache_dir"]
+    _fetch_macro_panel(cache_dir, cfg)
+
+
+def _fetch_macro_panel(cache_dir: Path, cfg: dict) -> None:
+    """Populate/refresh the FRED vintage cache for every series in
+    csm.fred.SERIES_REGISTRY. This acquires data; it does not change what
+    the strategy trades — no config value or blend.trial_sharpes entry is
+    touched here. See docs/GAPS.md and docs/CHANGELOG.md's Unreleased entry.
+
+    `revision: "none"` series (market quotes, curve/credit/FX/commodity) cost
+    ONE call each regardless of history length — cheap, always run.
+    `revision: "revised"` series (survey/estimate releases: payrolls, CPI,
+    industrial production, ...) need a real per-asof vintage, one call per
+    month-end going back to the cache floor — the slow part of this command,
+    run deliberately rather than as a side effect of every `ideas`/`backtest`.
+    """
+    from csm import fred as fred_mod
+    from csm import multiasset as ma_mod
+
+    key   = fred_mod.get_api_key()
+    today = pd.Timestamp.today().normalize()
+    none_series    = sorted(s for s, v in fred_mod.SERIES_REGISTRY.items() if v["revision"] == "none")
+    revised_series = sorted(s for s, v in fred_mod.SERIES_REGISTRY.items() if v["revision"] == "revised")
+
+    print(f"─── Macro data refresh ({len(none_series)} market series + "
+          f"{len(revised_series)} vintaged series) ──────────────────────")
+
+    print(f"  Market-quoted series (one pull each, ~{len(none_series)} calls total):")
+    for sid in none_series:
+        s = fred_mod.vintage_series(sid, today, "1970-01-01", cache_dir, api_key=key)
+        span = f"{s.index.min().date()} → {s.index.max().date()}" if len(s) else "—"
+        print(f"    {sid:14s} n={len(s):6d}  {span}")
+
+    if revised_series:
+        prices = data_mod.load_price_panel(tickers=["SPY"], start="2000-01-01",
+                                           end=_live_end(), cache_dir=cache_dir)
+        rebal_dates = ma_mod.month_end_dates(prices.index)
+        n_calls = len(revised_series) * len(rebal_dates)
+        print(f"\n  Vintaged series (point-in-time, {len(rebal_dates)} asofs × "
+              f"{len(revised_series)} series ≈ {n_calls} calls — this is the slow part):")
+        for sid in revised_series:
+            panel = fred_mod.vintage_panel(sid, rebal_dates, "1970-01-01", cache_dir, api_key=key)
+            print(f"    {sid:14s} {int(panel.notna().sum())}/{len(panel)} asofs populated")
+
+    print("\n  Macro refresh complete.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -945,6 +1006,30 @@ def cmd_blend_backtest(cfg: dict, args: argparse.Namespace) -> None:
                                   suffix="_blend", has_pit=True)
 
 
+def _blend_fred_dependencies(cfg: dict) -> list[str]:
+    """Which FRED series (if any) the live blend config actually consumes —
+    `csm.macro_regime.growth_score_macro` under `macro_growth_axis: macro`,
+    `csm.macro_regime.inflation_score_macro` under `macro_inflation_axis:
+    macro`, or `csm.blend_overlay`'s `growth_trend_timing_exposure`/
+    `combination_ladder_exposure` under `risk_overlay: gtt`/`ladder`. Empty
+    under today's live config (`macro_growth_axis: price`,
+    `macro_inflation_axis: price`, `risk_overlay: none`) — see
+    docs/METHODOLOGY.md.
+    """
+    b = cfg.get("blend", {})
+    series: set[str] = set()
+    if str(b.get("macro_growth_axis", "price")) == "macro":
+        series |= {"UNRATE", "NFCI", "T10Y2Y"}
+    if str(b.get("macro_inflation_axis", "price")) == "macro":
+        series |= {"CPIAUCSL", "PCEPILFE", "T10YIE"}
+    overlay = str(b.get("risk_overlay", "none"))
+    if overlay == "gtt":
+        series |= {"UNRATE"}
+    elif overlay == "ladder":
+        series |= {"NFCI", "UNRATE"}
+    return sorted(series)
+
+
 def cmd_blend_ideas(cfg: dict, args: argparse.Namespace) -> None:
     """Output today's target blend book (SPY / macro tilt / rotation weights).
 
@@ -1040,6 +1125,28 @@ def cmd_blend_ideas(cfg: dict, args: argparse.Namespace) -> None:
     if prev and not force and not status["due"]:
         _print_blend_hold_status(prev, status, capital=capital)
         return
+
+    # ── Macro self-gate: only touch FRED if the live config actually reads it ──
+    # Mirrors the rebalance self-gate above rather than a new pattern: a HOLD
+    # day already returned before this point, so this only runs on an actual
+    # rebalance. Under today's live config (macro_growth_axis: price,
+    # risk_overlay: none) this list is empty and the block below is a no-op —
+    # see docs/METHODOLOGY.md's "what actually gets refreshed" section. It
+    # exists so the day a macro variant IS adopted, `ideas` fails closed on a
+    # broken FRED read instead of silently trading a stale or missing vote.
+    fred_series = _blend_fred_dependencies(cfg)
+    if fred_series:
+        from csm import fred as fred_mod
+        print(f"  Config reads FRED ({', '.join(fred_series)}) — refreshing today's vintage …")
+        obs_start = (today - pd.DateOffset(years=20)).strftime("%Y-%m-%d")
+        try:
+            for sid in fred_series:
+                fred_mod.vintage_series(sid, today, obs_start, cache_dir)
+        except Exception as e:
+            print(f"\nERROR: macro data refresh failed for {fred_series} — {e}")
+            print("  The macro sleeve's regime classification would be computed off stale or")
+            print("  missing data. Fix the FRED connection/FRED_API_KEY and try again.")
+            return
 
     book = blend_mod.target_book(prices, cfg, as_of=today, cache_dir=cache_dir)
 
@@ -1207,10 +1314,12 @@ def _interactive_menu(cfg: dict) -> None:
     choice = input("  Choice: ").strip().lower()
 
     class _Args:
-        oos_frac = 0.30
-        folds    = 5
-        mcpt     = 0
-        capital  = None
+        oos_frac   = 0.30
+        folds      = 5
+        mcpt       = 0
+        skip_macro = True   # interactive menu's `fetch` stays prices-only by
+                            #  default; use `fetch-macro` from the CLI for macro
+        capital    = None
         holdings = None
         force    = False
         top      = cfg.get("output", {}).get("top_n_ideas", 25)
@@ -1220,7 +1329,7 @@ def _interactive_menu(cfg: dict) -> None:
         _Args.capital = float(cap) if cap.replace(".", "", 1).isdigit() else None
 
     if choice in ("1", "fetch"):
-        cmd_fetch(cfg)
+        cmd_fetch(cfg, _Args())
     elif choice in ("2", "backtest"):
         cmd_blend_backtest(cfg, _Args())
     elif choice in ("3", "ideas"):
@@ -1256,7 +1365,10 @@ def main() -> None:
     )
     sub = parser.add_subparsers(dest="cmd")
 
-    sub.add_parser("fetch", help="Build PIT universe + download prices")
+    fetch_p = sub.add_parser("fetch", help="Build PIT universe + download prices + macro panel")
+    fetch_p.add_argument("--skip-macro", action="store_true", dest="skip_macro",
+                         help="Skip the FRED macro panel refresh (prices/PIT only)")
+    sub.add_parser("fetch-macro", help="Refresh only the FRED macro panel (csm.fred.SERIES_REGISTRY)")
 
     # ── PRIMARY flow: the 3-way blend ────────────────────────────────────────
     # `ideas`/`backtest`/`verify-book` run the BLEND as of 2026-08-05, so an
@@ -1312,7 +1424,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.cmd == "fetch":
-        cmd_fetch(cfg)
+        cmd_fetch(cfg, args)
+    elif args.cmd == "fetch-macro":
+        cmd_fetch_macro(cfg)
     elif args.cmd in ("backtest", "blend-backtest"):
         cmd_blend_backtest(cfg, args)
     elif args.cmd in ("ideas", "blend-ideas"):
