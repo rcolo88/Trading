@@ -15,7 +15,24 @@ Status legend: 🔴 open · 🟡 partially addressed · 🟢 resolved (moves her
 
 ---
 
-## 1. 🔴 The duplicated FRED vintage cache
+## 1. 🟢 The duplicated FRED vintage cache — RESOLVED 2026-08-12
+
+**Result:** all four protocol steps are done. `csm/fred.py:312` dedupes on read
+(`_load_mem_index`), `:389` dedupes on write, `repair_vintage_cache()` (`:440-468`) does the
+one-time on-disk repair, and `vintage_series` (`:404-408`) now asserts a unique index as a
+regression guard. Verified directly against the live cache this session: `outputs/cache/
+fred_vintages.parquet` has **0 rows in duplicate `(series_id, asof, date)` groups** (was 429,654),
+and the reproduction case from this entry's original writeup now gives the correct deduped answer:
+`UNRATE`'s growth vote as-of 2002-10-31 is **+0.0148** (240 real monthly observations), not the
+buggy **+0.6902** (480 doubled observations) recorded when this bug was found.
+
+**Consequence for gap 1's own downstream claim:** the 2000-2014 holdout rejection of the FRED
+growth axis (`config.yaml:158-164`) sits partly inside the now-repaired span — the cache
+corruption is fixed, but the rejection test itself has **not been re-run** against the clean
+cache. Treat the rejection as still-unverified-but-now-testable, not as re-confirmed. (Original
+entry, kept below for the record:)
+
+## 1 (original). The duplicated FRED vintage cache
 
 `outputs/cache/fred_vintages.parquet` contains **429,654 rows in exact-duplicate `(series_id, asof,
 date)` groups**, spanning 100 vintage pairs from 2000-01-31 to 2002-10-31 (verified this session:
@@ -52,7 +69,16 @@ cache is repaired and the test is re-run.
 
 ---
 
-## 2. 🔴 The ALFRED non-realtime fallback is a live look-ahead vector for NFCI
+## 2. 🟡 The ALFRED non-realtime fallback is a live look-ahead vector for NFCI
+
+**Status update 2026-08-12:** protocol steps 1-3 are done — `SERIES_REGISTRY` exists
+(`csm/fred.py:79-176`, all 24 entries measured via `verify_revision_rate`, not assumed), a
+`revision: "revised"` series taking the fallback now gets `fallback_revised=True` stamped and a
+printed warning (`:265-268`), and `revision: "none"` series get the one-call cost shortcut
+(`_fetch_full_series`). **Step 4 is not done** — `verify_revision_rate()` (`:471-520`) exists and
+was used to measure all 24 registry entries by hand this session, but there is no `--verify-revisions`
+CLI flag; the check is repeatable only by importing the function directly, not from the command
+line as the protocol specifies. Leaving this 🟡 until that CLI wiring exists.
 
 `csm/fred.py:85-94` asserts NFCI and T10Y2Y "have no real revision history" to justify falling back
 to a non-realtime (fully-revised) query when an `asof` predates ALFRED's vintage archive
@@ -113,7 +139,71 @@ table.
 
 ---
 
-## 5. 🔴 Macro coverage — a dollar/FX axis (the user's yen question)
+## 5. 🟡 Macro coverage — a dollar/FX axis (the user's yen question)
+
+**Status update 2026-08-12 — 2000-2014 holdout result, both framings tested:**
+
+| Variant | Sharpe | CAGR | MaxDD | 2008 return |
+|---|---|---|---|---|
+| Baseline (live config) | 0.6564 | +5.6% | -32.15% | -13.27% |
+| (a) `macro_fx_axis: carry_unwind` | 0.6463 | +5.8% | -32.15% | **-15.63%** |
+| (b) `risk_overlay: fx` | **0.8327** | **+7.3%** | **-28.25%** | **+3.64%** |
+
+**Framing (a) REJECTED** — degrades holdout Sharpe (0.656→0.646) and 2008 return (-13.27%→-15.63%);
+MaxDD ties exactly (the override basket-redirect apparently never touches the actual drawdown path).
+Forcing the deflation basket on a stress date doesn't help here, and hurts in the one year it should
+matter most.
+
+**Framing (b) CLEARS every leg of the acceptance bar, by a wide margin** — better Sharpe, CAGR, and
+MaxDD than baseline, and 2008 flips from a -13.27% loss to a +3.64% gain. This is a materially
+different result from every prior overlay tested in this project (`robust`/`gtt`/`ladder` all traded
+one problem for another — see the rejection table in METHODOLOGY.md); this is the first overlay to
+improve BOTH the holdout and, pending the primary-window check below, the recent window. Plausible
+mechanism, not a fluke: the 2008 crisis's most acute phase (Sept-Oct 2008, post-Lehman) included a
+real, large yen-carry-unwind event — this is exactly the risk this gate is designed to catch, not an
+unrelated correlation. **Primary-window (2015-2026) OOS result, both framings** (baseline 1.4802):
+
+| Variant | Primary-window OOS Sharpe | CAGR | MaxDD |
+|---|---|---|---|
+| (a) `macro_fx_axis: carry_unwind` | 1.4672 | +14.5% | -7.8% |
+| (b) `risk_overlay: fx` | 1.4150 | +14.1% | -7.8% |
+
+Framing (a) stays REJECTED (holdout failure already disqualifies it; primary window is also flat-to-
+slightly-worse, so nothing recovers it).
+
+**Framing (b) 5-fold multi-fold check (2026-08-12, requested follow-up) — REVISES the verdict below.**
+Worst-fold Sharpe: **+0.07** (bar >0.30; baseline's already-marginal fold 1 is +0.29). Full breakdown
+vs. baseline, same 5 folds as everywhere else in this project:
+
+| Fold | Baseline Sharpe | `risk_overlay: fx` Sharpe | Δ |
+|---|---|---|---|
+| 1 (2015-2017) | +0.29 | **+0.07** | -0.22 |
+| 2 (2017-2019) | +1.12 | +0.98 | -0.14 |
+| 3 (2019-2021) | +1.35 | +1.30 | -0.05 |
+| 4 (2021-2024) | +0.66 | +0.62 | -0.04 |
+| 5 (2024-2026) | +1.54 | +1.47 | -0.07 |
+
+**The overlay is worse on every single fold**, not just the one that already failed — confirmed real
+via exact daily-return diffs (not a rounding artifact or bug: e.g. fold 2's Dec-2018 trigger measurably
+reallocates DBC/BTAL/GLD/IEF weights for a month, Sharpe 0.98 vs 1.12 at full precision). Mechanism:
+15 of 139 rebal dates trigger a 0.5-exposure de-risking event, most of them NOT actual crises (2016
+yen strength, 2022-09 dollar strength) — each one is a small "insurance premium" paid in quiet
+periods, and fold 1 (2015-04-2017) happens to contain 7 of the 15 triggers, concentrating the cost
+enough to turn an already-marginal fold meaningfully worse rather than just tied.
+
+**Revised verdict: this is a real risk-management tradeoff, not a free improvement.** The 2000-2014
+holdout result (Sharpe 0.83 vs 0.66, MaxDD -28.3% vs -32.2%, 2008 +3.6% vs -13.3%) is genuine
+catastrophic-tail protection — but unlike `macro_baskets: v2`'s adoption (better on every metric, one
+*narrow* multi-fold miss), this overlay is worse on the *entire* multi-fold breakdown and the primary
+OOS window (1.415 vs 1.480), and makes the one fold that already failed the bar fail it harder. **Not
+recommended for adoption as an unconditional overlay** — it trades ordinary-period Sharpe for crisis
+protection, which is a legitimate choice but a different one than "improves the strategy," and should
+be a deliberate user decision (e.g. "I want this specific insurance") rather than a default flip.
+
+Both framings were smoke-tested against 2015-2026 point-in-time data before the holdout run and
+produce economically sensible triggers (yen-appreciation vote fires 2016-02, 2022-11/12, 2024-07 —
+the run-up to the actual August 2024 unwind; dollar-spike vote fires 2020-03 and 2022-09). Both
+variants' Sharpes are recorded in `blend.trial_sharpes` (43 trials now, was 40).
 
 Zero FX data exists anywhere in the repo (see [`DATA_INPUTS.md`](DATA_INPUTS.md)). The one prior
 FRED experiment this project ran was framed **only as a growth-axis replacement**, and that framing
@@ -138,7 +228,7 @@ registry as `revision: none` series — cheap, ~1 call each, permanently cached)
 
 ---
 
-## 6. 🔴 Macro coverage — credit, curve, and the missing inflation axis
+## 6. 🟢 Macro coverage — credit, curve, and the missing inflation axis — RESOLVED 2026-08-12 (both protocols tested and rejected)
 
 **Missing series:** `BAMLH0A0HYM2` (HY OAS), `BAMLC0A0CM` (IG OAS), `BAA10Y`, `T10Y3M`, `DFII10`,
 `T10YIE`, `T5YIFR`, `CPIAUCSL`, `PCEPILFE`.
@@ -146,11 +236,45 @@ registry as `revision: none` series — cheap, ~1 call each, permanently cached)
 **Protocol A — credit/curve as a risk-off overlay:** test HY OAS widening and/or `T10Y3M` inversion
 as inputs to a new or existing risk-off gate (`csm/blend_overlay.py`), same acceptance bar as gap 5.
 
+**Status update 2026-08-12 — 2000-2014 holdout result:**
+
+| Variant | Sharpe | CAGR | MaxDD | 2008 return |
+|---|---|---|---|---|
+| Baseline (live config) | 0.6564 | +5.6% | -32.15% | -13.27% |
+| `risk_overlay: credit_curve` | 0.6207 | +5.3% | -32.15% | -13.27% |
+
+**REJECTED** — Sharpe/CAGR degrade with no compensating benefit; MaxDD and 2008 return are *exactly*
+identical to baseline to 4 decimal places, meaning the overlay never actually reduced exposure during
+2008 at all. Mechanism: `BAMLH0A0HYM2` fails open for the entire holdout (its own history starts
+2023-08-14, see the data caveat below), so only the `T10Y3M` vote was live — and the curve inverted
+in 2006-2007 (ahead of the crisis, as it classically does) but had already re-steepened by the time
+the actual 2008 crash hit (the Fed's 2008 cuts un-invert the curve at the short end), so the overlay
+de-risked during the pre-crisis runup and was back to full exposure exactly when it would have
+mattered. This is the same lead/lag failure mode already documented for `risk_overlay: gtt`
+(economic-signal overlays tend to normalize before the actual crash). Confirms Protocol A does not
+add value built this way; not worth a second attempt without a genuinely different mechanism.
+
+Important limitation discovered while building it: the `BAMLH0A0HYM2` FRED series ID's own history
+only starts 2023-08-14 (confirmed via the `fred/series` endpoint) — it cannot cover the 2000-2014
+holdout or the GFC at all.
+
 **Protocol B — close the half-migrated quadrant:** add `inflation_score_macro` (CPIAUCSL/PCEPILFE/
 T10YIE point-in-time vote, same pattern as `growth_score_macro`) so that a future
 `macro_growth_axis: macro` test isn't confounded by an inflation axis still on ETF prices. This is a
 prerequisite for re-testing gap 1's contaminated rejection cleanly, not a strategy change on its own
 — safe to build and leave default-off ahead of any adoption decision.
+
+**Protocol B result (2026-08-12) — REJECTED, its first-ever return test:**
+
+| Window | Baseline Sharpe | `macro_inflation_axis: macro` Sharpe | Baseline MaxDD | Variant MaxDD | Baseline 2008 | Variant 2008 |
+|---|---|---|---|---|---|---|
+| Primary (2015-2026) | 1.483 | **1.536** | -7.8% | -7.8% | — | — |
+| Holdout (2000-2014) | 0.656 | **0.640** | -32.1% | -32.8% | -13.27% | -14.13% |
+
+Textbook overfit-to-recent-window signature — the exact pattern this project has rejected every
+previous time it appeared (Phase 3 re-levering, `risk_overlay: robust`, the original FRED growth
+axis): better Sharpe on 2015-2026, worse Sharpe/MaxDD/2008 on the 2000-2014 holdout. **Rejected.**
+Trial Sharpe (1.5363) recorded in `blend.trial_sharpes`.
 
 ---
 
@@ -175,6 +299,28 @@ step has very little structure to exploit — it may not meaningfully differ fro
 inverse-vol weighting at N=3. And running this search adds trials that deflate the DSR further for a
 strategy whose weights might not move much. Worth doing for completeness and because it's the
 literal López de Prado answer to the question asked, but go in with modest expectations.
+
+**Manual grid result (2026-08-12) — supports the counter-argument above, HRP still not run.** Not
+the HRP/NCO protocol above (still not implemented — this was a simpler 10-point manual grid around
+40/30/30, run to directly answer "does 40/30/30 still hold" alongside this session's macro-coverage
+sweep), but directly relevant: no combination tested beats the current 40/30/30 on both the primary
+window AND the 2000-2014 holdout simultaneously.
+
+| Direction | Primary Sharpe | Holdout Sharpe | Holdout MaxDD | Holdout 2008 |
+|---|---|---|---|---|
+| 40/30/30 (current) | 1.483 | 0.656 | -32.1% | -13.27% |
+| More SPY (50/10/40) | **1.540** | 0.589 | -36.4% | -17.91% |
+| Less SPY (30/30/40) | 1.406 | **0.678** | **-29.6%** | **-9.14%** |
+| Less SPY, less macro (20/20/60) | 1.206 | 0.623 | -31.8% | -5.46% |
+| Less macro only (40/20/40) | 1.486 (~tied) | 0.638 | -32.9% | -13.59% |
+
+Every direction reproduces the same Sharpe-vs-robustness tradeoff already seen twice this session (the
+Phase 3 growth-relevering rejection above, and the `risk_overlay: fx` multi-fold result in gap 5):
+more SPY buys recent-window Sharpe by selling holdout/crisis robustness, less SPY does the reverse,
+and no point on the grid gets both. **40/30/30 is a genuine, non-arbitrary point on this tradeoff
+curve, not an unexamined default** — consistent with (though not a substitute for) what HRP would be
+expected to find per the counter-argument above. All 9 new grid-point Sharpes recorded in
+`blend.trial_sharpes` (54 trials now, was 43 before this session's macro-coverage + reweighting pass).
 
 ---
 
@@ -218,3 +364,53 @@ passes skew or kurtosis to its PSR calculation, so it computes under Gaussian de
 negative skew and fat tails. That makes the Options project's DSR **overstated**. This is a
 cross-project bug; fixing it is out of scope for this project's docs effort, but worth flagging to
 whoever next touches `Options/`.
+
+---
+
+## 11. 🟢 Macro coverage — oil — RESOLVED 2026-08-12 (tested and rejected)
+
+Found during a 2026-08-12 macro-coverage audit prompted by the user asking specifically about oil.
+`DCOILWTICO` (WTI, `revision: none`, registered in `csm/fred.py` but zero call sites) was never even
+written up as a candidate, unlike gaps 5-6 — this entry closes that.
+
+**Measurement done (not a trial — a correlation check, per this file's standing rule):** WTI's 63-day
+return vs. `DBC`'s 63-day momentum (the term already inside `inflation_score`,
+`csm/macro_regime.py:79-82`) over their full 2006-2026 overlap (n=5,097 daily obs): **correlation
+0.63** (daily-return correlation 0.41). This is meaningfully lower than the 0.766 correlation that
+motivated `macro_baskets: v2` (memory csm-market-neutral-macro-tests) — oil is NOT simply a relabeled
+version of the existing DBC term — but also not low enough to call clearly orthogonal. Ambiguous
+enough that testing it ad hoc would violate this file's own discipline (see the standing rule at the
+top); it needs its own hypothesis and acceptance bar before any code is written, same as every other
+entry here.
+
+**Hypothesis (not yet tested):** WTI level or momentum carries reflation/stagflation information at
+the margin beyond DBC's broader (multi-commodity, ~similarly energy-heavy) basket — most plausibly as
+a THIRD vote inside `inflation_score_macro` (gap 6 Protocol B) alongside CPIAUCSL/PCEPILFE/T10YIE,
+rather than a standalone axis or overlay (oil doesn't have an obvious risk-off framing the way FX or
+credit spreads do).
+
+**Variant to test:** add a WTI vote (e.g. YoY change vs. its own trailing MA, matching the CPI/PCE
+vote shape already in `inflation_score_macro`) and re-run that axis's still-outstanding first-ever
+return test (gap 6 Protocol B is built but never backtested) with and without the oil vote, isolating
+its marginal contribution.
+
+**Acceptance bar:** same as every other gap here — must not degrade the 2000-2014 holdout on Sharpe /
+MaxDD / 2008 return. `DCOILWTICO`'s own history goes back to 1986, so no coverage gap on this series
+specifically.
+
+**Data prerequisite:** none — `DCOILWTICO` is already registered `revision: none` and cheap.
+
+**Result (2026-08-12) — REJECTED.** Built the 4th vote (`inflation_score_macro(..., include_oil=True)`)
+and isolated its marginal contribution against the 3-vote baseline (itself already rejected, see gap
+6 Protocol B above):
+
+| Window | 3-vote (no oil) Sharpe | +oil (4-vote) Sharpe | Holdout MaxDD (both) | Holdout 2008 (both) |
+|---|---|---|---|---|
+| Primary (2015-2026) | 1.536 | **1.510** (worse) | — | — |
+| Holdout (2000-2014) | 0.640 | **0.622** (worse) | -32.8% (tied) | -14.13% (tied) |
+
+Oil makes the axis strictly worse on both windows, with MaxDD/2008 identical to 4 decimal places —
+the WTI vote's own trigger pattern doesn't touch the base axis's already-set regime calls often
+enough to move drawdown or the 2008 return at all, and where it does move the vote average, it moves
+it the wrong way. No dedicated axis or overlay warranted. Trial Sharpe (1.5101) recorded in
+`blend.trial_sharpes`. This closes gap 11.

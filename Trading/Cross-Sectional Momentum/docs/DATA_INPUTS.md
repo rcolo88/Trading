@@ -36,16 +36,19 @@ returns zero hits anywhere in the repo. **All three of the series that do exist 
 the live config** (`blend.macro_growth_axis: price`, `config.yaml:158`) — no FRED data currently
 touches the traded book. Everything the project calls "macro" is ETF price momentum.
 
-## FX / currency — entirely absent
+## FX / currency — wired, default-off, untested
 
-Grep across `csm/`, `csmom.py`, `config.yaml`, `README.md` for
-`usdjpy|jpy|yen|dxy|dollar|uup|fxy|fxe|dbv|carry` turns up nothing but position-sizing uses of the
-word "dollar" and the ordinary English word "carry". **There is no FX series, no dollar index, and
-no carry signal anywhere in this codebase. USD/JPY has never been tested.** The only non-USD
-exposure at all is unhedged developed/emerging equity beta via EFA/EEM in the (currently unused)
-regime-state panel. Worth noting: the sibling `Options/` project's CHANGELOG treats the August 2024
-yen-carry unwind as a named market-stress window; this project has no visibility into that event at
-all.
+**Update 2026-08-12 (GAPS.md #5):** no longer entirely absent. `DEXJPUS` (USD/JPY) and `DTWEXBGS`
+(broad trade-weighted dollar) now feed two built, default-off variants: `csm.macro_regime.
+fx_stress_axis` (a third orthogonal axis forcing the deflation basket on a carry-unwind stress date,
+`blend.macro_fx_axis: carry_unwind`) and `csm.blend_overlay.fx_carry_unwind_exposure` (a standalone
+continuous exposure gate, `blend.risk_overlay: fx`). Neither is return-tested against the 2000-2014
+holdout yet — see GAPS.md #5 for status. The live config still runs with neither enabled. The only
+non-USD *asset* exposure remains unhedged developed/emerging equity beta via EFA/EEM in the
+(currently unused) regime-state panel — this section is specifically about FX as a *signal*, not an
+asset. The sibling `Options/` project's CHANGELOG treats the August 2024 yen-carry unwind as a named
+market-stress window; the new `fx_stress_axis`/`fx_carry_unwind_exposure` votes both fire in the
+2024-07 rebal date, the run-up to that event, when smoke-tested against 2015-2026 point-in-time data.
 
 ## Yield curve — one series, one vote, and it's off
 
@@ -62,13 +65,19 @@ contamination caveat below). Missing entirely:
 IEF/TLT/SHY are held throughout the codebase as *assets* (rotation roster, regime-state panel,
 deflation basket) — never differenced against each other into an actual curve signal.
 
-## Credit spreads — absent
+## Credit spreads / curve — wired, default-off, untested
 
-No `BAMLH0A0HYM2` (HY OAS), no `BAMLC0A0CM` (IG OAS), no `BAA10Y`, no HYG/JNK. `LQD` appears only as
-a basket constituent (`macro_regime.py:51,66`), never differenced against Treasuries. Every "spread"
-hit anywhere in the repo is a bid/ask half-spread (`config.yaml:113`, `csm/costs.py`,
-`csm/blend.py:49`). `NFCI` implicitly embeds credit conditions — and it's disabled along with the
-rest of the FRED axis.
+**Update 2026-08-12 (GAPS.md #6 Protocol A):** `csm.blend_overlay.credit_curve_risk_off_exposure`
+(`blend.risk_overlay: credit_curve`) now consumes `T10Y3M` (curve inversion) and `BAMLH0A0HYM2` (HY
+OAS widening vs. its own trailing 1-year MA). **Important limitation:** `BAMLH0A0HYM2`'s FRED history
+under this exact series ID only starts 2023-08-14 (confirmed via the `fred/series` endpoint — the
+pre-1997 history some sources cite lives under a different, discontinued ID) — it cannot cover the
+2000-2014 holdout or the GFC, so that vote fails open (reads as neutral risk-on) before 2023-08; only
+the `T10Y3M` vote (full history since 1982) is live for any holdout-era backtest. `BAMLC0A0CM` (IG
+OAS) and `BAA10Y` remain registered but unused; no HYG/JNK. `LQD` still appears only as a basket
+constituent (`macro_regime.py:51,66`), never differenced against Treasuries. `NFCI` implicitly embeds
+credit conditions and remains disabled along with the rest of the FRED growth axis. Not yet
+return-tested against the holdout, and default-off in the live config.
 
 ## Commodities / inflation
 

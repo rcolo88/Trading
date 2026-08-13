@@ -165,6 +165,13 @@ def growth_score_macro(
 # csm.fred.vintage_series, same look-ahead discipline as growth_score_macro.
 _CPI_MA_MONTHS = 12
 _PCE_MA_MONTHS = 12
+# GAPS.md #11 (2026-08-12): WTI YoY-vs-own-trailing-MA vote, same shape as
+# the CPI/PCE votes above. Opt-in via `include_oil=` so the pre-existing
+# 3-vote axis stays available as the clean isolation baseline (GAPS.md #6
+# Protocol B's own still-pending first-ever return test) — comparing
+# with/without this flag is exactly how GAPS.md #11 specifies isolating
+# oil's marginal contribution, not a replacement for the other 3 votes.
+_WTI_MA_MONTHS = 12
 
 
 def inflation_score_macro(
@@ -174,14 +181,21 @@ def inflation_score_macro(
     project_root:   Path | None = None,
     api_key:        str | None = None,
     lookback_years: int = 20,
+    include_oil:    bool = False,
 ) -> pd.Series:
     """Macro-release inflation axis, computed point-in-time at each date in
     `rebal_dates` and forward-filled to `index` — shaped like
     `growth_score_macro`'s output so it can be passed as `classify_regime`'s
     `inflation=` override. Returns NaN at a date where none of the three
-    inputs have enough point-in-time history yet (early-history warmup);
-    `classify_regime` already treats a NaN growth/inflation score date as
-    "no basket".
+    (or four, with `include_oil`) inputs have enough point-in-time history
+    yet (early-history warmup); `classify_regime` already treats a NaN
+    growth/inflation score date as "no basket".
+
+    `include_oil=True` adds a 4th vote: WTI (`DCOILWTICO`) YoY change
+    trending above its own trailing `_WTI_MA_MONTHS`-month average — same
+    construction as the CPI/PCE votes, testing GAPS.md #11's hypothesis
+    that oil carries reflation information beyond what CPI/PCE/breakevens
+    already capture. Default False (the original 3-vote axis).
     """
     from csm import fred as fred_mod
     if api_key is None:
@@ -209,10 +223,85 @@ def inflation_score_macro(
         if len(breakeven) >= 252 and breakeven.std() > 0:
             votes.append((breakeven.iloc[-1] - breakeven.mean()) / breakeven.std())  # higher => inflation+
 
+        if include_oil:
+            wti = fred_mod.vintage_series("DCOILWTICO", d, obs_start, cache_dir, api_key=api_key)
+            yoy = wti.pct_change(252).dropna()
+            trend = (yoy - yoy.rolling(21 * _WTI_MA_MONTHS).mean()).dropna()
+            if len(trend) >= 21 * _WTI_MA_MONTHS and trend.std() > 0:
+                votes.append((trend.iloc[-1] - trend.mean()) / trend.std())  # above MA => inflation+
+
         if votes:
             raw.loc[d] = float(np.mean(votes))
 
     return raw.reindex(index).ffill()
+
+
+# ── FX/dollar carry-unwind votes (GAPS.md #5, "the user's yen question") ───
+# Shared by both framings GAPS.md #5 says to test SEPARATELY: (a)
+# `fx_stress_axis` below, a third-axis override in `classify_regime`; (b)
+# `blend_overlay.fx_carry_unwind_exposure`, a standalone continuous exposure
+# gate. Same two votes, different downstream treatment -- see each
+# function's docstring for how they diverge. Round, source-unfitted
+# parameters: `_FX_MOVE_WINDOW_DAYS` = 21 trading days matches this
+# project's own monthly rebalance cadence (both consumers only ever sample
+# at rebal dates, same "compute continuously, act only at rebal" convention
+# as every other overlay in csm/blend_overlay.py); `_FX_MOVE_THRESHOLD_PCT`
+# = 3.0 is a materially large one-month move for either series -- not
+# calibrated to this backtest.
+_FX_MOVE_WINDOW_DAYS   = 21
+_FX_MOVE_THRESHOLD_PCT = 3.0
+
+
+def _fx_carry_unwind_votes(
+    rebal_dates: pd.DatetimeIndex,
+    cache_dir:   Path,
+    api_key:     str | None = None,
+) -> tuple[pd.Series, pd.Series]:
+    """Point-in-time votes at each rebal date: sharp yen appreciation
+    (USD/JPY `_FX_MOVE_WINDOW_DAYS`-day return < -`_FX_MOVE_THRESHOLD_PCT`%
+    — the carry-unwind direction, e.g. August 2024) and a sharp broad-dollar
+    spike (DTWEXBGS same window > +threshold). Returns `(jpy_vote,
+    usd_vote)`, each a 0/1 Series indexed by `rebal_dates` (missing where
+    there isn't `_FX_MOVE_WINDOW_DAYS`+1 days of point-in-time history yet).
+    """
+    from csm import fred as fred_mod
+
+    def _vote(series_id: str, direction: int) -> pd.Series:
+        v = pd.Series(index=rebal_dates, dtype=float)
+        for d in rebal_dates:
+            obs_start = (d - pd.DateOffset(years=2)).strftime("%Y-%m-%d")
+            s = fred_mod.vintage_series(series_id, d, obs_start, cache_dir,
+                                        api_key=api_key).dropna()
+            if len(s) > _FX_MOVE_WINDOW_DAYS:
+                chg = (s.iloc[-1] / s.iloc[-1 - _FX_MOVE_WINDOW_DAYS] - 1.0) * 100.0
+                triggered = (chg < -_FX_MOVE_THRESHOLD_PCT if direction < 0
+                            else chg > _FX_MOVE_THRESHOLD_PCT)
+                v.loc[d] = float(triggered)
+        return v
+
+    return (_vote("DEXJPUS", direction=-1), _vote("DTWEXBGS", direction=+1))
+
+
+def fx_stress_axis(
+    index:       pd.DatetimeIndex,
+    rebal_dates: pd.DatetimeIndex,
+    cache_dir:   Path,
+    api_key:     str | None = None,
+) -> pd.Series:
+    """GAPS.md #5 framing (a): a THIRD orthogonal axis alongside
+    growth/inflation, not a replacement for either. Boolean Series, True on
+    a carry-unwind stress date (either FX vote in `_fx_carry_unwind_votes`
+    triggers), forward-filled to `index`. Pass as `classify_regime`'s
+    `fx_stress=` override, where it forces the 'deflation' (most defensive)
+    basket regardless of the growth/inflation quadrant — a basket-redirect
+    mechanism, distinct from framing (b)
+    (`blend_overlay.fx_carry_unwind_exposure`), which scales overall
+    exposure rather than changing which assets are held. DEFAULT-OFF:
+    nothing calls this unless `blend.macro_fx_axis: carry_unwind` is set.
+    """
+    jpy_vote, usd_vote = _fx_carry_unwind_votes(rebal_dates, cache_dir, api_key=api_key)
+    stress = (jpy_vote.fillna(0.0) + usd_vote.fillna(0.0)) > 0
+    return stress.reindex(index).ffill().fillna(False)
 
 
 def classify_regime(
@@ -220,6 +309,7 @@ def classify_regime(
     window:    int = 63,
     growth:    pd.Series | None = None,
     inflation: pd.Series | None = None,
+    fx_stress: pd.Series | None = None,
 ) -> pd.Series:
     """Returns a Series of {"goldilocks","reflation","stagflation","deflation"}.
 
@@ -227,6 +317,9 @@ def classify_regime(
     `growth_score_macro(...)`'s output for the Phase 1.1 macro-release axis.
     `inflation` overrides the default price-based `inflation_score` — pass
     `inflation_score_macro(...)`'s output for the Phase 2.5 macro-release axis.
+    `fx_stress` (GAPS.md #5 framing (a), see `fx_stress_axis`) forces
+    'deflation' on a carry-unwind stress date regardless of the
+    growth/inflation quadrant otherwise computed.
     """
     g = growth if growth is not None else growth_score(close, window=window)
     i = inflation if inflation is not None else inflation_score(close, window=window)
@@ -235,6 +328,9 @@ def classify_regime(
     regime[(g >= 0) & (i >= 0)] = "reflation"
     regime[(g < 0)  & (i >= 0)] = "stagflation"
     regime[(g < 0)  & (i < 0)]  = "deflation"
+    if fx_stress is not None:
+        stress = fx_stress.reindex(regime.index).fillna(False).astype(bool)
+        regime[stress] = "deflation"
     return regime
 
 
@@ -246,6 +342,7 @@ def macro_tilt_weights(
     growth:      pd.Series | None = None,
     inflation:   pd.Series | None = None,
     baskets:     dict[str, list[str]] | None = None,
+    fx_stress:   pd.Series | None = None,
 ) -> pd.DataFrame:
     """Target weight per basket ticker (+ cash), forward-filled between
     rebalances. On each rebal date, classify the regime and equal-weight the
@@ -254,9 +351,11 @@ def macro_tilt_weights(
 
     `growth` overrides the price-based growth axis (Phase 1.1); `inflation`
     overrides the price-based inflation axis (Phase 2.5); `baskets` overrides
-    REGIME_BASKETS (Phase 1.2, e.g. REGIME_BASKETS_V2).
+    REGIME_BASKETS (Phase 1.2, e.g. REGIME_BASKETS_V2); `fx_stress` is the
+    GAPS.md #5 framing (a) third-axis override (see `fx_stress_axis`).
     """
-    regime  = classify_regime(close, window=window, growth=growth, inflation=inflation)
+    regime  = classify_regime(close, window=window, growth=growth, inflation=inflation,
+                              fx_stress=fx_stress)
     baskets = baskets if baskets is not None else REGIME_BASKETS
     all_cols = sorted({t for b in baskets.values() for t in b} | {cash_ticker})
     target = pd.DataFrame(np.nan, index=close.index, columns=all_cols, dtype=np.float64)

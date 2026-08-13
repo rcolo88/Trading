@@ -1010,11 +1010,13 @@ def _blend_fred_dependencies(cfg: dict) -> list[str]:
     """Which FRED series (if any) the live blend config actually consumes —
     `csm.macro_regime.growth_score_macro` under `macro_growth_axis: macro`,
     `csm.macro_regime.inflation_score_macro` under `macro_inflation_axis:
-    macro`, or `csm.blend_overlay`'s `growth_trend_timing_exposure`/
-    `combination_ladder_exposure` under `risk_overlay: gtt`/`ladder`. Empty
-    under today's live config (`macro_growth_axis: price`,
-    `macro_inflation_axis: price`, `risk_overlay: none`) — see
-    docs/METHODOLOGY.md.
+    macro`, `csm.macro_regime.fx_stress_axis` under `macro_fx_axis:
+    carry_unwind`, or `csm.blend_overlay`'s `growth_trend_timing_exposure`/
+    `combination_ladder_exposure`/`fx_carry_unwind_exposure`/
+    `credit_curve_risk_off_exposure` under `risk_overlay:
+    gtt`/`ladder`/`fx`/`credit_curve`. Empty under today's live config
+    (`macro_growth_axis: price`, `macro_inflation_axis: price`,
+    `macro_fx_axis: none`, `risk_overlay: none`) — see docs/METHODOLOGY.md.
     """
     b = cfg.get("blend", {})
     series: set[str] = set()
@@ -1022,11 +1024,19 @@ def _blend_fred_dependencies(cfg: dict) -> list[str]:
         series |= {"UNRATE", "NFCI", "T10Y2Y"}
     if str(b.get("macro_inflation_axis", "price")) == "macro":
         series |= {"CPIAUCSL", "PCEPILFE", "T10YIE"}
+        if bool(b.get("macro_inflation_oil", False)):
+            series |= {"DCOILWTICO"}
+    if str(b.get("macro_fx_axis", "none")) == "carry_unwind":
+        series |= {"DEXJPUS", "DTWEXBGS"}
     overlay = str(b.get("risk_overlay", "none"))
     if overlay == "gtt":
         series |= {"UNRATE"}
     elif overlay == "ladder":
         series |= {"NFCI", "UNRATE"}
+    elif overlay == "fx":
+        series |= {"DEXJPUS", "DTWEXBGS"}
+    elif overlay == "credit_curve":
+        series |= {"T10Y3M", "BAMLH0A0HYM2"}
     return sorted(series)
 
 

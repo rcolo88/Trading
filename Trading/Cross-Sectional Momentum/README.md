@@ -280,13 +280,35 @@ regime_filter:
 
 ---
 
-## Validated results — blend (primary)
+## Validated results — blend (primary, last updated 2026-08-12)
 
-> **Numbers moved to [`docs/VALIDATION.md`](docs/VALIDATION.md)** — the authoritative,
-> continuously-corrected source. As of the 2026-08-12 docs audit, the DSR figure quoted here
-> historically (0.986 across 7 trials) was stale: `blend.trial_sharpes` has grown to 40 entries and
-> the corresponding DSR is 0.945. See `docs/VALIDATION.md` for the current Sharpe/CAGR/MaxDD/DSR,
-> the walk-forward fold and rolling-window detail, and exactly which run each figure traces to.
+**Walk-forward OOS — monthly-rebalance simulation, config's own 2015-2026 window, 30% holdout**
+
+| Strategy | Sharpe | CAGR | Max Drawdown | Ann. turnover |
+|---|---|---|---|---|
+| Blend (OOS) | +1.483 | +14.8% | -7.8% | 4.0× |
+| SPY buy-and-hold | +1.354 | +21.2% | -18.8% | — |
+
+DSR = 0.949 across the blend's own 54-trial search (pass, bar >0.90). Worst of 5 walk-forward
+folds: Sharpe **+0.29** (**fails** the >0.30 bar — the only fold that does; folds 2-5 range +0.66 to
++1.54). 86% of rolling 12-month windows profitable; worst window return -6.9%, worst window MaxDD
+-16.3%. Alpha vs SPY: t=+1.25 (not significant on this window). This is the first backtest run
+against the exact current config (post `macro_baskets: v2`) — see
+[`docs/VALIDATION.md`](docs/VALIDATION.md) for full fold/rolling-window detail, the DSR trial-count
+mechanics, and which `outputs/backtest_*.json` this traces to. Treat that file as authoritative if
+these numbers and it ever disagree — this table is not auto-updated.
+
+> **2026-08-12 macro-coverage sweep:** a `risk_overlay: fx` variant (USD/JPY + broad-dollar
+> carry-unwind gate, `csm/blend_overlay.py`) shows genuine 2000-2014 holdout / 2008 crisis
+> protection (Sharpe 0.83 vs baseline 0.66, MaxDD -28.3% vs -32.2%, 2008 flips -13.3%→**+3.6%**) —
+> but the 5-fold multi-fold check found it's **worse on every fold** of the recent window (small
+> "insurance premium" drag in ordinary periods), including making the already-marginal fold 1 fail
+> harder. Net: real crisis insurance, not a free Sharpe improvement — a deliberate risk-preference
+> choice, not adopted here. The rest of the sweep (a FRED inflation axis, +oil vote, a 10-point
+> sleeve-weight grid) was tested the same way and rejected outright — every direction traded primary-
+> window Sharpe for holdout robustness or vice versa, none beat 40/30/30 on both simultaneously. See
+> [`docs/GAPS.md`](docs/GAPS.md) #5-#7 and #11, and [`docs/VALIDATION.md`](docs/VALIDATION.md) for
+> the full fold-by-fold and grid detail.
 
 > **Composition:** 40% SPYM (`csm/blend.py`, `blend.growth_ticker`) / 30% macro regime tilt
 > (`csm/macro_regime.py` — classifies Goldilocks/Reflation/Stagflation/

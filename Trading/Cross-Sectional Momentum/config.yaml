@@ -186,6 +186,16 @@ blend:
                                 #   OOS/2000-2014-holdout pass has run this
                                 #   yet. Available as an override; not a
                                 #   recommendation. See docs/GAPS.md.
+  macro_fx_axis: none            # none (default — KEEP) | carry_unwind —
+                                #   GAPS.md #5 framing (a), "the user's yen
+                                #   question": a THIRD orthogonal axis
+                                #   (csm.macro_regime.fx_stress_axis, DEXJPUS
+                                #   sharp appreciation OR DTWEXBGS sharp
+                                #   spike) that forces the deflation basket
+                                #   on a carry-unwind stress date. Built
+                                #   2026-08-12, NOT YET return-tested. See
+                                #   risk_overlay: fx below for framing (b),
+                                #   the separate standalone-gate hypothesis.
   macro_baskets: v2              # v1 | v2 (REGIME_BASKETS_V2 — majority
                                 #   non-equity stagflation/deflation baskets)
                                 #   — ADOPTED LIVE 2026-08-05, the one
@@ -199,8 +209,9 @@ blend:
                                 #   HIGHER than v1's (0.924) against the same
                                 #   40-trial list. Set v1 to revert.
   risk_overlay: none             # none (default — KEEP) | robust | gtt |
-                                #   ladder — csm/blend_overlay.py. 2026-08-05
-                                #   Phase 2 tested all 3 on the Phase 1 base
+                                #   ladder | fx — csm/blend_overlay.py.
+                                #   2026-08-05 Phase 2 tested robust/gtt/
+                                #   ladder on the Phase 1 base
                                 #   (v2 baskets): NONE clears a clean bar —
                                 #   each trades one problem for another rather
                                 #   than netting a win. robust: best 2015-2026
@@ -226,7 +237,16 @@ blend:
                                 #   only crisis hedging (memory
                                 #   csm-market-neutral-macro-tests). REJECTED;
                                 #   Phase 3 re-levers on the Phase 1 base
-                                #   alone, no overlay.
+                                #   alone, no overlay. fx (2026-08-12,
+                                #   GAPS.md #5 framing (b),
+                                #   csm.blend_overlay.fx_carry_unwind_exposure)
+                                #   and credit_curve (2026-08-12, GAPS.md #6
+                                #   Protocol A,
+                                #   csm.blend_overlay.credit_curve_risk_off_exposure
+                                #   — HY OAS leg can't cover the 2000-2014
+                                #   holdout, see its docstring) are separate,
+                                #   later additions — built but NOT YET
+                                #   return-tested against any of the above.
   # 2026-08-05 Phase 3: re-levered growth weight to 50/55/60% (macro absorbing
   # the reduction, rotation held fixed at 30%) on the Phase 1 base (v2
   # baskets). DECISIVELY REJECTED — the SAME overfit-to-recent-window
@@ -287,6 +307,20 @@ blend:
   - 1.525
   - 1.543
   - 1.555
+  - 1.4672
+  - 1.415
+  - 0.9841
+  - 1.5363
+  - 1.5101
+  - 1.4859
+  - 1.4542
+  - 1.3938
+  - 1.4058
+  - 1.3714
+  - 1.3435
+  - 1.5331
+  - 1.5395
+  - 1.2064
 validation:
   n_perm_mcpt: 1000             # MCPT permutations (≥1000 for publication-grade p-value)
   # OOS Sharpe of EVERY configuration tried (keeps the DSR honest about selection

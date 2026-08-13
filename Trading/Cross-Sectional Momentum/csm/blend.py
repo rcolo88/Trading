@@ -100,11 +100,31 @@ def blend_target_weights(
     directory, matching every CLI entry point's convention.
 
     2026-08-05 Phase 2: `blend.risk_overlay` ("none" default | "robust" |
-    "gtt" | "ladder") scales the growth+macro legs (the equity-correlated
-    bloc) by a daily exposure e in [0,1], sampled only at rebal dates (same
-    monthly cadence as everything else — this does NOT raise trading
-    frequency), and routes the freed weight into the rotation sleeve. See
-    csm/blend_overlay.py and csm/signals.robust_regime_exposure.
+    "gtt" | "ladder" | "fx" | "credit_curve") scales the growth+macro legs
+    (the equity-correlated bloc) by a daily exposure e in [0,1], sampled
+    only at rebal dates (same monthly cadence as everything else — this
+    does NOT raise trading frequency), and routes the freed weight into the
+    rotation sleeve. See csm/blend_overlay.py and
+    csm/signals.robust_regime_exposure.
+
+    2026-08-12 (GAPS.md #5, "the user's yen question"): `blend.macro_fx_axis`
+    ("none" default | "carry_unwind") is framing (a) of the FX/dollar gap —
+    a THIRD orthogonal axis alongside growth/inflation that forces the
+    'deflation' basket on a carry-unwind stress date (see
+    csm.macro_regime.fx_stress_axis). `risk_overlay: fx` is framing (b) —
+    the same FX signal used as a standalone continuous exposure gate instead
+    (see csm.blend_overlay.fx_carry_unwind_exposure). GAPS.md #5 tests these
+    as two SEPARATE hypotheses; both are default-off here.
+
+    2026-08-12 (GAPS.md #6 Protocol A): `risk_overlay: credit_curve` adds HY
+    OAS widening / T10Y3M inversion as a risk-off gate (see
+    csm.blend_overlay.credit_curve_risk_off_exposure — note its docstring's
+    caveat that the HY OAS leg can't cover the 2000-2014 holdout). Default-off.
+
+    2026-08-12 (GAPS.md #11): `blend.macro_inflation_oil` (bool, default
+    False) adds a WTI vote to `inflation_score_macro` when
+    `macro_inflation_axis: macro` is also set — see that function's
+    docstring. Isolates oil's marginal contribution vs. the 3-vote baseline.
     """
     w_spy, w_macro, w_rot, top_n, growth_ticker = _resolve_weights(cfg)
 
@@ -114,10 +134,13 @@ def blend_target_weights(
     b = cfg.get("blend", {})
     growth_axis    = str(b.get("macro_growth_axis", "price"))
     inflation_axis = str(b.get("macro_inflation_axis", "price"))
+    fx_axis     = str(b.get("macro_fx_axis", "none"))
     baskets_ver = str(b.get("macro_baskets", "v1"))
     overlay     = str(b.get("risk_overlay", "none"))
 
-    needs_fred = growth_axis == "macro" or inflation_axis == "macro" or overlay in ("gtt", "ladder")
+    needs_fred = (growth_axis == "macro" or inflation_axis == "macro"
+                 or fx_axis == "carry_unwind"
+                 or overlay in ("gtt", "ladder", "fx", "credit_curve"))
     if needs_fred and cache_dir is None:
         cache_dir = Path(cfg.get("data", {}).get("cache_dir", "outputs/cache"))
 
@@ -127,13 +150,19 @@ def blend_target_weights(
 
     inflation_series = None
     if inflation_axis == "macro":
-        inflation_series = mr_mod.inflation_score_macro(prices.index, rebal_dates, cache_dir)
+        include_oil = bool(b.get("macro_inflation_oil", False))
+        inflation_series = mr_mod.inflation_score_macro(prices.index, rebal_dates, cache_dir,
+                                                         include_oil=include_oil)
+
+    fx_stress_series = None
+    if fx_axis == "carry_unwind":
+        fx_stress_series = mr_mod.fx_stress_axis(prices.index, rebal_dates, cache_dir)
 
     baskets = mr_mod.REGIME_BASKETS_V2 if baskets_ver == "v2" else None
 
     macro_target = mr_mod.macro_tilt_weights(prices, rebal_dates,
                                              growth=growth_series, inflation=inflation_series,
-                                             baskets=baskets)
+                                             baskets=baskets, fx_stress=fx_stress_series)
     rot_target   = ma_mod.defensive_weights(prices, rebal_dates, top_n=top_n)
 
     if overlay == "none":
@@ -147,6 +176,12 @@ def blend_target_weights(
     elif overlay == "ladder":
         from csm import blend_overlay as bo_mod
         exposure = bo_mod.combination_ladder_exposure(prices, rebal_dates, cache_dir)
+    elif overlay == "fx":
+        from csm import blend_overlay as bo_mod
+        exposure = bo_mod.fx_carry_unwind_exposure(prices, rebal_dates, cache_dir)
+    elif overlay == "credit_curve":
+        from csm import blend_overlay as bo_mod
+        exposure = bo_mod.credit_curve_risk_off_exposure(prices, rebal_dates, cache_dir)
     else:
         raise ValueError(f"unknown blend.risk_overlay: {overlay!r}")
     exposure = exposure.reindex(prices.index).fillna(1.0)
