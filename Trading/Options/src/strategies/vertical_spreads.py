@@ -166,7 +166,20 @@ class VerticalSpread(BaseStrategy):
         long_delta = self.entry_config.get('long_delta', 0.20)
 
         short_strike = self._find_strike_by_delta(chain, short_delta, option_type)
-        long_strike = self._find_strike_by_delta(chain, long_delta, option_type)
+        if short_strike is None:
+            return None  # No strike within delta tolerance on this expiration
+
+        # Fixed strike-width wing (takes precedence over long_delta): pin the long leg a fixed
+        # dollar width further OTM than the short leg (puts: lower strike, calls: higher strike).
+        # Intended for credit spreads (bull put / bear call) whose protective wing is the far-OTM
+        # leg; a debit-spread config would invert the legs, price as a credit, and be rejected by
+        # the debit/credit sign guard below.
+        strike_width = self.entry_config.get('strike_width')
+        if strike_width is not None and strike_width > 0:
+            long_strike = (short_strike - strike_width if option_type == 'put'
+                           else short_strike + strike_width)
+        else:
+            long_strike = self._find_strike_by_delta(chain, long_delta, option_type)
 
         if not short_strike or not long_strike or short_strike == long_strike:
             return None  # Need two distinct strikes (degenerate spread otherwise)
@@ -356,6 +369,12 @@ class VerticalSpread(BaseStrategy):
         if full_config:
             position_sizing = full_config.get('position_sizing', {})
             method = position_sizing.get('method', 'fixed_risk')
+
+            if method == 'fixed_contracts':
+                # Daily-cadence trading: always the same contract count, independent of account
+                # value or what else is open. No risk-budget throttling -- the backtester's entry
+                # gate is bypassed for this method (see optopsy_wrapper._calculate_available_risk_budget).
+                return int(position_sizing.get('contracts_per_trade', 1))
 
             if method == 'kelly':
                 # Use Kelly Criterion from config

@@ -152,7 +152,10 @@ class ParameterOptimizer:
 
     # Strategy-specific allowed parameters
     VERTICAL_PARAMETERS = {
-        'entry': ['dte', 'short_delta', 'long_delta', 'vix_min', 'vix_max'],
+        # 'strike_width': fixed-dollar long-wing width (see vertical_spreads.py generate_entry_signal)
+        # — takes precedence over 'long_delta' when set and >0. Maps 1:1 to the config key, no
+        # PARAMETER_EXPANSION entry needed.
+        'entry': ['dte', 'short_delta', 'long_delta', 'strike_width', 'vix_min', 'vix_max'],
         'exit': ['profit_target', 'stop_loss', 'dte_min']
     }
 
@@ -594,7 +597,8 @@ class ParameterOptimizer:
         resume_from: Optional[str] = None,
         resume_from_master: bool = True,
         optuna_n_startup_trials: int = 20,
-        optuna_enable_pruning: bool = True
+        optuna_enable_pruning: bool = True,
+        optuna_storage_path: Optional[str] = None
     ) -> pd.DataFrame:
         """
         Run parameter optimization using either grid search or Optuna.
@@ -620,6 +624,10 @@ class ParameterOptimizer:
             resume_from_master: Skip combinations already in master CSV (default: True)
             optuna_n_startup_trials: Random trials before Bayesian (optuna only)
             optuna_enable_pruning: Enable early stopping (optuna only)
+            optuna_storage_path: SQLite file path for a resumable study (optuna only). A second
+                run with the same path picks up where the last one left off instead of restarting
+                -- survives process death, not just Ctrl+C (added 2026-08-10 after an unattended
+                overnight-style run was killed by a laptop restart with zero results saved).
 
         Returns:
             DataFrame with results for all parameter combinations
@@ -656,7 +664,8 @@ class ParameterOptimizer:
                 n_jobs=1,
                 n_startup_trials=optuna_n_startup_trials,
                 enable_pruning=optuna_enable_pruning,
-                verbose=verbose
+                verbose=verbose,
+                storage_path=optuna_storage_path
             )
 
         # GRID SEARCH MODE: Continue with existing logic
@@ -1015,6 +1024,22 @@ class ParameterOptimizer:
                 raise ValueError(
                     f"vix_max ({entry['vix_max']}) must be >= vix_min ({entry['vix_min']})"
                 )
+
+            # Validate long_delta < short_delta for a credit spread (bull put / bear call): the
+            # protective wing must be FURTHER OTM (lower delta) than the short leg, or the
+            # structure is inverted and degenerate. The 2026-08-10 overnight Optuna run had no
+            # such guard and spent 363/650 trials (56%) on long_delta > short_delta combos --
+            # including the reported "best" result (Sharpe 3.41, 100% win rate, $0 avg loss),
+            # which was this exact inversion, not a real edge.
+            if strategy_name in ('BullPutSpread', 'BearCallSpread'):  # credit spreads only --
+                                                                        # debit spreads (BullCallSpread,
+                                                                        # BearPutSpread) invert this
+                sd, ld = entry.get('short_delta'), entry.get('long_delta')
+                if sd is not None and ld is not None and ld >= sd:
+                    raise ValueError(
+                        f"long_delta ({ld}) must be < short_delta ({sd}): the long leg is the "
+                        f"protective wing and must sit further OTM (lower delta) than the short leg."
+                    )
 
         # Create strategy instance with merged config
         # CRITICAL: Pass only the strategy-specific portion of config (with 'entry'/'exit' at top level)

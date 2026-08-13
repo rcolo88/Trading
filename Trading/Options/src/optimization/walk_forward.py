@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from ..backtester.optopsy_wrapper import OptopsyBacktester
+from ..analysis import regime
 from .parameter_optimizer import ParameterOptimizer
 
 Window = Tuple[str, str]  # (start_date, end_date) as YYYY-MM-DD strings
@@ -137,5 +138,14 @@ def evaluate_oos_continuous(
     total_ret = (end_val - start_val) / start_val * 100.0 if start_val else float("nan")
     cummax = oos["total_value"].cummax()
     max_dd = float(((oos["total_value"] - cummax) / cummax).min() * 100.0)
-    return {"sharpe_ratio": sharpe, "total_return_pct": total_ret,
-            "total_trades": n_oos_trades, "max_drawdown_pct": max_dd}
+    out = {"sharpe_ratio": sharpe, "total_return_pct": total_ret,
+           "total_trades": n_oos_trades, "max_drawdown_pct": max_dd}
+
+    # Regime-conditional breakdown (2026-08-11): calm vs. stress Sharpe/maxDD/win-rate WITHIN the
+    # OOS slice, reported as separate keys -- never blended into the pooled sharpe_ratio above. See
+    # src/analysis/regime.py for why this is a reporting split, not a resampling of training data.
+    oos_trades = None
+    if trades is not None and len(trades) and "entry_date" in trades.columns:
+        oos_trades = trades[pd.to_datetime(trades["entry_date"]) >= cut]
+    out.update(regime.regime_conditional_metrics(oos, oos_trades))
+    return out

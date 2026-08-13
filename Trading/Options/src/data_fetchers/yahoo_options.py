@@ -6,10 +6,18 @@ Note: Yahoo Finance does not provide historical options data, only current chain
 """
 
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Dict, List, Optional
 import pandas as pd
 import yfinance as yf
 import numpy as np
+
+# Local disk cache for underlying price history -- get_underlying_data() is called once at
+# startup by every optimization/backtest script and reused in-memory for the rest of the run, but
+# a FRESH process (a resumed/relaunched job, e.g. after a restart) needs the network again unless
+# this exact (symbol, start, end) was fetched before. Added 2026-08-10 so a long unattended run can
+# survive being disconnected from the internet, not just survive a sleep/restart.
+_UNDERLYING_CACHE_DIR = Path(__file__).resolve().parents[2] / "data" / "cache" / "underlying"
 
 
 class YahooDataFetcher:
@@ -40,6 +48,18 @@ class YahooDataFetcher:
         Returns:
             DataFrame with OHLCV data
         """
+        cache_path = _UNDERLYING_CACHE_DIR / f"{self.symbol}_{start_date}_{end_date}.csv"
+        if cache_path.exists():
+            print(f"Loading {self.symbol} price data from local cache: {cache_path.name}")
+            data = pd.read_csv(cache_path, index_col=0)
+            # parse_dates=True silently leaves a tz-suffixed index as plain strings (object dtype)
+            # instead of parsing it -- reconstruct explicitly so a cached load is bit-identical to
+            # a fresh yfinance fetch (tz-aware DatetimeIndex), not just row-count-identical.
+            data.index = pd.to_datetime(data.index, utc=True).tz_convert('America/New_York')
+            data.index.name = 'Date'
+            print(f"Retrieved {len(data)} days of data (cached, no network)")
+            return data
+
         print(f"Fetching {self.symbol} price data from {start_date} to {end_date}")
 
         data = self.ticker.history(
@@ -55,6 +75,9 @@ class YahooDataFetcher:
         data.columns = [col.lower() for col in data.columns]
 
         print(f"Retrieved {len(data)} days of data")
+
+        _UNDERLYING_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        data.to_csv(cache_path)
 
         return data
 

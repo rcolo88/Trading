@@ -48,7 +48,8 @@ def create_optuna_study(
     strategy_name: str,
     optimization_metric: str = 'sharpe_ratio',
     n_startup_trials: int = 20,
-    enable_pruning: bool = True
+    enable_pruning: bool = True,
+    storage_path: Optional[str] = None
 ) -> optuna.Study:
     """
     Create Optuna study with TPE sampler and optional pruning.
@@ -58,6 +59,10 @@ def create_optuna_study(
         optimization_metric: Metric to maximize ('sharpe_ratio', 'calmar_ratio', etc.)
         n_startup_trials: Number of random trials before Bayesian optimization
         enable_pruning: Enable early stopping of unpromising trials
+        storage_path: If given, a SQLite file path (plain path, not a URL) backing the study --
+            survives process death/reboot. A second call with the same path + study_name resumes
+            in place instead of starting over (2026-08-10: added after a laptop restart silently
+            killed an in-memory, unrecoverable 250-trial run with zero results saved).
 
     Returns:
         Configured Optuna study object
@@ -82,13 +87,15 @@ def create_optuna_study(
             n_warmup_steps=10    # Wait 10 steps before pruning
         )
 
-    # Create study
+    # Create (or resume) study
+    storage = f"sqlite:///{storage_path}" if storage_path else None
     study: optuna.Study = optuna.create_study(
         study_name=f"{strategy_name}_{optimization_metric}",
         sampler=sampler,
         pruner=pruner,
-        direction='maximize',  # We want to maximize sharpe_ratio, etc.
-        load_if_exists=False   # Create new study
+        direction='maximize',
+        storage=storage,
+        load_if_exists=storage is not None  # resume if this study_name already exists in storage
     )
 
     return study
@@ -189,7 +196,8 @@ def run_optuna_optimization(
     n_jobs: int = 1,
     n_startup_trials: int = 20,
     enable_pruning: bool = True,
-    verbose: bool = True
+    verbose: bool = True,
+    storage_path: Optional[str] = None
 ) -> pd.DataFrame:
     """
     Run Optuna-based optimization (Bayesian hyperparameter search).
@@ -227,13 +235,22 @@ def run_optuna_optimization(
         print(f"Optimization metric: {optimization_metric}")
         print(f"{'='*70}\n")
 
-    # Create Optuna study
+    # Create (or resume) Optuna study
     study: optuna.Study = create_optuna_study(
         strategy_name=parameter_optimizer.strategy_class.__name__,
         optimization_metric=optimization_metric,
         n_startup_trials=n_startup_trials,
-        enable_pruning=enable_pruning
+        enable_pruning=enable_pruning,
+        storage_path=storage_path
     )
+
+    # If resuming from persistent storage, only run what's left of the n_trials budget --
+    # study.optimize(n_trials=N) means "N MORE trials", not "N total".
+    already_done = len(study.trials)
+    n_trials_to_run = max(0, n_trials - already_done)
+    if verbose and storage_path and already_done:
+        print(f"Resuming from persistent storage: {already_done} trial(s) already complete, "
+              f"running {n_trials_to_run} more (target {n_trials} total).\n")
 
     # Create objective function
     objective: Callable = create_objective_function(
@@ -245,9 +262,11 @@ def run_optuna_optimization(
     # Run optimization with progress bar
     start_time: float = time.time()
 
-    if TQDM_AVAILABLE and verbose:
+    if n_trials_to_run == 0:
+        pass  # already have enough trials from a prior run
+    elif TQDM_AVAILABLE and verbose:
         # Use tqdm progress bar
-        with tqdm(total=n_trials, desc="Optuna Trials", unit="trial") as pbar:
+        with tqdm(total=n_trials_to_run, desc="Optuna Trials", unit="trial") as pbar:
             def callback(study: optuna.Study, trial: optuna.trial.FrozenTrial) -> None:
                 pbar.update(1)
                 pbar.set_postfix({
@@ -257,7 +276,7 @@ def run_optuna_optimization(
 
             study.optimize(
                 objective,
-                n_trials=n_trials,
+                n_trials=n_trials_to_run,
                 timeout=timeout,
                 n_jobs=n_jobs,
                 callbacks=[callback],
@@ -267,7 +286,7 @@ def run_optuna_optimization(
         # No progress bar
         study.optimize(
             objective,
-            n_trials=n_trials,
+            n_trials=n_trials_to_run,
             timeout=timeout,
             n_jobs=n_jobs
         )

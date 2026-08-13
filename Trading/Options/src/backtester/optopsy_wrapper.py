@@ -52,6 +52,13 @@ class OptopsyBacktester:
         self.account_value = self.initial_capital
         self.equity_curve = []
         self.all_trades = []
+        # Identity-keyed memo caches (2026-08-11) -- see prepare_optopsy_data / _get_day_groups.
+        # Deliberately NOT reset in run_backtest: a ParameterOptimizer search reuses this SAME
+        # backtester + the SAME options_data object across every one of 200-500+ trials, and these
+        # caches are what make repeated calls cheap. A genuinely different options_data object
+        # still correctly invalidates and recomputes (identity check, not a stale-content bug).
+        self._prepared_cache = None    # (raw_data, prepared_df)
+        self._day_groups_cache = None  # (prepared_df, {quote_date: sub_df})
 
     def _calculate_position_max_risk(self, position: Position) -> float:
         """
@@ -102,6 +109,13 @@ class OptopsyBacktester:
         Returns:
             Available risk budget in dollars
         """
+        # fixed_contracts sizing ignores the risk-budget pool entirely -- a daily-cadence trader
+        # opens the next spread regardless of what else is open. Return inf so the entry gate
+        # (`if available_risk_budget > 0`) never blocks; calculate_position_size returns the fixed
+        # count directly and doesn't consume this value.
+        if self.config.get('position_sizing', {}).get('method') == 'fixed_contracts':
+            return float('inf')
+
         # Get current portfolio value (account + unrealized P&L)
         total_unrealized = sum(
             p.unrealized_pnl for p in strategy.get_open_positions()
@@ -143,9 +157,18 @@ class OptopsyBacktester:
 
         Returns:
             DataFrame formatted for Optopsy
+
+        Cached by IDENTITY of raw_data (2026-08-11): a ParameterOptimizer search calls
+        run_backtest -> prepare_optopsy_data with the SAME options_data object on every one of
+        200-500+ trials, and this used to re-copy + re-process (a full-frame .apply() datetime
+        normalization) the entire multi-year DataFrame from scratch every single time -- a denser
+        strike grid (see synthetic_generator.py's delta_band mode) multiplies that waste straight
+        through. Passing a genuinely different DataFrame object still recomputes correctly; this
+        is a pure identity-keyed memo, not a content-keyed cache that could go stale.
         """
-        # This will depend on the source data format
-        # Example transformation:
+        if self._prepared_cache is not None and self._prepared_cache[0] is raw_data:
+            return self._prepared_cache[1]
+
         optopsy_data = raw_data.copy()
 
         # Ensure required columns exist and are properly named
@@ -179,7 +202,23 @@ class OptopsyBacktester:
         # Ensure option_type is lowercase
         optopsy_data['option_type'] = optopsy_data['option_type'].str.lower()
 
+        self._prepared_cache = (raw_data, optopsy_data)
         return optopsy_data
+
+    def _get_day_groups(self, optopsy_data: pd.DataFrame) -> Dict[pd.Timestamp, pd.DataFrame]:
+        """`optopsy_data` grouped by quote_date, cached by IDENTITY (2026-08-11).
+
+        The backtest's day loop used to re-filter the ENTIRE (multi-year) DataFrame by date on
+        every single trading day (`optopsy_data[optopsy_data['quote_date'] == current_date]`),
+        making one backtest ~O(days x rows) even before considering how many trials re-run it (see
+        prepare_optopsy_data's cache note -- same per-trial waste, same fix). Grouping once turns
+        each day's lookup into an O(1) dict access.
+        """
+        if self._day_groups_cache is not None and self._day_groups_cache[0] is optopsy_data:
+            return self._day_groups_cache[1]
+        groups = {date: df for date, df in optopsy_data.groupby('quote_date', sort=False)}
+        self._day_groups_cache = (optopsy_data, groups)
+        return groups
 
     def run_backtest(
         self,
@@ -261,13 +300,13 @@ class OptopsyBacktester:
         trades_entered_today = 0
 
         # Main backtest loop
+        day_groups = self._get_day_groups(optopsy_data)
+        empty_chain = optopsy_data.iloc[0:0]
         for current_date in trading_dates:
             # Reset daily trade counter at start of each day
             trades_entered_today = 0
             # Get data for current date
-            daily_options = optopsy_data[
-                optopsy_data['quote_date'] == current_date
-            ]
+            daily_options = day_groups.get(current_date, empty_chain)
 
             if daily_options.empty:
                 continue
@@ -331,6 +370,22 @@ class OptopsyBacktester:
                     if hasattr(position, 'entry_dte'):
                         entry_dte = position.entry_dte
 
+                    # Friction diagnostics (see entry-time comment above): entry-side slippage is
+                    # exact; gross_credit_dollars is the MID-priced (no-slippage) credit/debit, a
+                    # stable denominator for comparing friction drag across structures of very
+                    # different width/credit (e.g. a $5-wide spread vs a delta-selected wing).
+                    entry_slippage_dollars = getattr(position, 'entry_slippage_dollars', 0.0)
+                    entry_mid_price = getattr(position, 'entry_mid_price', None)
+                    gross_credit_dollars = (
+                        abs(entry_mid_price) * position.contracts * 100
+                        if entry_mid_price is not None else None
+                    )
+                    friction_dollars = commission + entry_slippage_dollars
+                    friction_pct_of_credit = (
+                        friction_dollars / gross_credit_dollars
+                        if gross_credit_dollars else None
+                    )
+
                     # Build detailed trade record
                     trade_record = {
                         'entry_date': position.entry_date,
@@ -348,7 +403,12 @@ class OptopsyBacktester:
                         'commission': commission,
                         'net_pnl': position.realized_pnl - commission,
                         'days_in_trade': position.days_in_trade,
-                        'exit_reason': exit_signal.exit_reason
+                        'exit_reason': exit_signal.exit_reason,
+                        # Entry-side-only lower bound on trading friction -- see comment above.
+                        'entry_slippage_dollars': entry_slippage_dollars,
+                        'gross_credit_dollars': gross_credit_dollars,
+                        'friction_dollars': friction_dollars,
+                        'friction_pct_of_credit': friction_pct_of_credit,
                     }
 
                     # Add leg details
@@ -435,6 +495,19 @@ class OptopsyBacktester:
                             # Store entry market conditions
                             position.underlying_price_entry = underlying_price
                             position.vix_entry = vix
+
+                            # Entry-side friction diagnostics: the SAME leg lookup as entry_price,
+                            # but at fraction=0 (mid, no slippage) -- the gap between the two is
+                            # exactly what crossing the spread cost on this leg pair. Exit-side
+                            # slippage isn't captured here (each strategy prices its own exit), so
+                            # this is a friction LOWER BOUND, not the full round-trip cost -- see
+                            # the 'friction_dollars'/'friction_pct_of_credit' trade_record fields.
+                            entry_mid_price = self._get_entry_price(daily_options, entry_signal, 0.0, 0.0)
+                            position.entry_mid_price = entry_mid_price
+                            position.entry_slippage_dollars = (
+                                abs(entry_price - entry_mid_price) * contracts * 100
+                                if entry_mid_price is not None else 0.0
+                            )
 
                             # Store entry DTE for Kelly analysis
                             if hasattr(entry_signal, 'dte') and entry_signal.dte is not None:
@@ -846,6 +919,10 @@ class OptopsyBacktester:
             'pnl',
             'commission',
             'net_pnl',
+            'entry_slippage_dollars',
+            'gross_credit_dollars',
+            'friction_dollars',
+            'friction_pct_of_credit',
             'days_in_trade',
             'exit_reason'
         ]

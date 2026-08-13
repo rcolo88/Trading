@@ -4,6 +4,396 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Return metrics are denominator-driven; 2022 drawdown anatomy; Sharpe-convention fix (2026-08-13)
+
+Triggered by the user questioning whether a 6.78% CAGR was plausible for a strategy collecting ~$221
+of credit daily at a ~74% win rate. It was — but only because the headline percentage was being
+divided by an arbitrary capital base. Three findings and one real bug in the reporting.
+
+**1. Under `fixed_contracts` sizing, every percentage metric is a denominator choice.** The account
+value never gates entries, so `initial_capital` is a pure reporting divisor. Verified directly in
+new `diag_capital_denominator.py`: running the identical config at $150k / $50k / $25k produces
+**identical trade counts (2,125), identical dollar P&L ($111,691.56) and identical dollar drawdown
+(-$22,821.74)** — only CAGR (6.78% / 14.83% / 22.16%) and max DD% (-10.69% / -20.77% / -34.62%)
+move. The per-trade economics reconcile exactly: $223 credit, $777 max loss, avg win $183 / avg loss
+-$308 at a 73.7% win rate → EV **+$52.56/trade** × 249 trades/yr ≈ **$13,109/yr**. The CAGR decays
+across the span because the numerator is a flat dollar stream while the denominator compounds
+($13.1k is 8.7% of the $150k start but 5.0% of the $261k finish). Average concurrent positions are
+9.95, so peak *defined* risk is only ~$13.2k — roughly 7.5% of the $150k reported against.
+
+**2. The max drawdown is the 2022 bear market, and it is a grind rather than a blow-up.** New
+`diag_drawdown_anatomy.py` locates it: peak 2022-01-03 ($213,506) → trough 2022-10-12 ($190,684),
+-$22,822 over 282 days, then **337 more days to recover** (~20 months underwater). Inside that
+window 192 trades closed at a **43.2%** win rate (vs 73.7% overall); 109 losers averaging **-$325**
+did the damage against 83 winners. The **worst single trade was -$607** — nothing approached its
+$777 max loss — and the worst 10 losers together are only 16% of the window's losses. The stop fired
+on **51.6%** of trades there, working as designed. This resolves the apparent paradox that dollar
+drawdown (-$22.8k) exceeds peak defined risk ($13.2k): a drawdown accumulates sequentially across
+non-overlapping cohorts over months, it is not a simultaneous max-loss event. 2022 is the **only**
+losing year in the span (-$17,951); 2020 was **+$13,579**, so a fast crash that snaps back is
+survivable while a slow year-long bleed is what hurts.
+
+**3. FIXED — full-span and IS/OOS Sharpe were being reported under different conventions.**
+`metrics.py:84` subtracts a 2% risk-free rate (excess Sharpe), but the IS/OOS slice Sharpes computed
+in `compare_delta_stop_grid.py` and quoted in `DAILY_CADENCE_STRATEGY.md` were raw (no rf). At $150k
+the gap is ~0.36, so "OOS 1.662 vs full-span 0.843" overstated OOS strength by roughly that much.
+**Parameter rankings are unaffected** — every row within a column used the same formula — but the two
+columns were never on the same scale. `make_account_size_chart.py` now matches the project
+convention (`RISK_FREE = 0.02`) and reports the raw figure alongside as `sharpe_raw_no_rf`;
+`DAILY_CADENCE_STRATEGY.md` gains caveat 7 spelling this out and caveat 8 on denominator dependence.
+Note that under the excess convention Sharpe *falls* as capital rises (0.99 at $25k → 0.75 at
+$200k), because the risk-free drag grows as percentage volatility shrinks.
+
+**New: `DAILY_CADENCE_CARD.md`** — a deliberately short (~485 word) trading card: parameters,
+per-trade economics, dollar-first results, an account-size table, and a four-sentence account of the
+2022 drawdown. Intended as the day-to-day reference; `DAILY_CADENCE_STRATEGY.md` remains the full
+analysis.
+
+**New: `make_account_size_chart.py`** → `charts/daily_cadence_account_size.png`, plotting CAGR and
+max drawdown against starting account size on a single percentage axis. Because the dollar P&L path
+is fixed, the curve is computed exactly from one backtest (`total_value(C,t) = C + pnl_path(t)`)
+rather than sampled; the P&L path is cached to `backtest_results/daily_cadence_pnl_path.csv` so
+re-renders skip the backtest entirely.
+
+### Controlled delta × stop-loss sweep — daily-cadence wing changed to a $10 FIXED width (2026-08-13)
+
+Triggered by pushback on the 2026-08-11 recommendation: user challenged the 0.35Δ short as "too
+close" and the 30% stop as "too tight," expecting the search to have landed on 25-30Δ with a 50-70%
+stop for more room to manage. Investigating produced a parameter-surface tool, corrected two
+misreadings, and changed the recommended wing.
+
+**Why the existing Optuna log could not answer the question.** TPE concentrates samples in whatever
+region looks promising early, so its trial log is not a parameter surface. Of 127 unique trials, 58
+sat on `short_delta=0.35` — which is also the search's hard ceiling
+(`optimize_daily_cadence.py:148`, `min=0.15, max=0.35`) — while 0.15-0.25Δ drew 2-5 trials each,
+each with a random companion set of profit-target/exit-DTE values. The apparent "low delta scores
+badly" marginal is confounded with "low delta was only ever tried alongside bad exit params." Same
+for the stop-loss axis: 43 samples in the 0.25-0.35 band vs 12 in 0.55-0.70.
+
+**New: `compare_delta_stop_grid.py`** — full factorial short_delta × stop_loss with every other
+parameter pinned at the winner, so the comparison is causal. `--width N` pins the wing to a dollar
+width instead of a constant delta gap. Outputs `backtest_results/compare_delta_stop_grid.csv` and
+`compare_delta_stop_grid_w10.csv`.
+
+**New: `make_delta_width_charts.py`** — renders the three figures now embedded in
+`DAILY_CADENCE_STRATEGY.md` (`charts/daily_cadence_delta_stop_grid.png`,
+`daily_cadence_width_vs_delta_dd.png`, `daily_cadence_wing_headtohead.png`).
+
+**Finding 1 — `stop_loss` is a fraction of MAX LOSS, not of credit.** `vertical_spreads.py:301`
+triggers on `(-profit) / max_loss >= stop_loss` with `max_loss = strike_width - credit`. At
+0.35Δ/$10 (credit = 22.3% of width) the recommended `stop_loss: 0.30` is a loss of 104% of credit —
+a conventional **~2× credit stop**, not a tight one. The same config number means something very
+different at another delta (251% of credit at 0.20Δ). The stop is a live control at these settings,
+taking 23.0% of trades; an earlier `dte_min=22` config made it look inert (0.4%) only because the
+DTE floor closed everything first.
+
+**Finding 2 — drawdown is set by WIDTH, not short delta.** The constant-0.20Δ-gap grid appears to
+show low delta causing deep drawdowns (25Δ at -28.8%), but a constant delta gap makes the spread
+*wider in dollars* as delta falls (credit is 6.3% of width at 0.20Δ/0.03Δ vs 20.4% at 0.35Δ/0.15Δ) —
+so that test silently varied position size along with delta. Pin the dollar width and the delta axis
+goes flat: -9.8 / -10.7 / -11.3 / -10.7% across 0.20→0.35Δ. **Short delta is the probability knob;
+width is the risk knob.**
+
+**Finding 3 — at constant width, 0.35Δ and SL 30% win on every cut.** Sharpe rises monotonically
+with short delta on full-span (0.243 → 0.843), OOS (0.861 → 1.662), stress (0.465 → 0.847) and calm,
+with no drawdown penalty, and 0.35Δ posts the *smallest* worst single trade in the grid (-$806) —
+its larger credit cushions and the stop fires earlier against it. SL 30% is best at every delta on
+Sharpe, stress, CAGR and drawdown; loosening to 70% costs 5-7 drawdown points. Stepping down to
+0.25Δ costs ~2.5 points of CAGR for zero drawdown reduction. The user's stop-loss intuition holds
+only in the calm OOS slice at 0.20-0.25Δ, and is reversed at 0.35Δ.
+
+**Recommendation change: the wing, not the delta.** At 0.35Δ / SL 30%, a **$10 fixed wing** beats
+the 0.15Δ delta-selected wing on Calmar (0.634 vs 0.562), max drawdown (-10.69% vs -16.31%) and
+worst single trade (-$806 vs -$1,306), giving up 2.4 points of CAGR (6.78% vs 9.16%) and 0.13 Sharpe.
+It also removes a structural tail risk: a delta-selected wing's dollar width balloons when vol
+spikes — the 0.30Δ/0.10Δ row recorded a single -$6,194 trade — whereas a fixed wing's per-contract
+risk is identical every day.
+
+**This does NOT contradict the 2026-08-11 "fixed-width NOT recommended" verdict.** That rejected a
+**$20** wing at 0.31Δ (OOS-stress Sharpe -1.05) chosen by a search that pinned to the top of its own
+$5-$20 range. A $10 wing at 0.35Δ posts stress Sharpe +0.847. Different structures; both results
+stand. `DAILY_CADENCE_STRATEGY.md` restructured accordingly — current recommendation at the top,
+2026-08-11 section retained with scope notes rather than deleted.
+
+**Unchanged caveats:** DSR 0.002 (weak) — the monotonic ranking across five metrics is the evidence,
+not the absolute magnitudes; 0.35Δ remains the untested search ceiling with every trend pointing
+upward; and **no rolling/adjustment logic exists in the strategy code**, which remains the most
+plausible explanation for the standing tension with live 20Δ experience.
+
+### Skew-tail + strike-grid fix, daily-cadence re-optimization — SUPERSEDES the 2026-08-10/11 daily-cadence recommendation (2026-08-11)
+
+Triggered by pushback on the daily-cadence recommendation: user asked whether the SPY chain's
+strike gaps were too coarse for precise delta matching, and whether the training window was too
+benign (too little GFC/COVID) to find a robust delta/width. Investigation found a third,
+compounding problem that subsumed both.
+
+**1. IV surface skew was extrapolated unbounded past where it was actually fitted.**
+`skew_calibration.py` fits the put/call skew quadratics only over `m` (log-moneyness) in
+`[-0.20, 0]` / `[0, 0.06]`. Outside that band the old code let the quadratic's own curvature
+(19.51/20.0) keep running — it hit 11x by `m=-0.67` on a low-spot day. Measured: 17-50% of the
+2018-2023 (IS) search space priced on this extrapolation per year, worst in exactly the volatile
+years (2018, 2020) that dominate the IS window, vs. ~0-1% in 2024-2026 (OOS). This inflated the
+protective (long) leg's cost specifically during stress, biasing every prior daily-cadence search
+against wide/low-delta structures. Fixed in `synthetic_generator.py::_iv_surface`: continues
+LINEARLY at the fitted quadratic's own slope at the knot instead of letting the quadratic itself
+run unbounded — continuous in value and first derivative, knots sourced directly from
+`skew_calibration.py`'s `PUT_M_MIN`/`CALL_M_MAX` so the fit range and extrapolation boundary can
+never drift apart.
+
+**2. Strike grid was a fixed $5/±$100 band.** ±45% of spot in 2020 vs ±13% in 2026 — a 0.10-0.20Δ
+long wing was literally unreachable on crisis days (verified: 2020-03-23's minimum available
+|delta| on a 20-45 DTE put was 0.105). Fixed: `synthetic_generator.py::generate_delta_band_strikes`
+— $1 spacing (matching real SPY) across a vol-adaptive band computed per (day, expiration) to span
+|Δ| in [0.02, 0.60], plus a coarse $5 outer tail for marking positions that move deep ITM/OTM
+after entry. `synthetic_data_filename()` now encodes grid mode so a finer regen can never silently
+overwrite the old coarse-grid file. New config keys under `synthetic_data:` (`grid_mode`,
+`fine_interval`, `coarse_interval`, `fine_min_abs_delta`, `fine_max_abs_delta`,
+`coarse_extra_frac`) — default (`grid_mode: fixed`) unchanged so every other optimizer's reference
+dataset is untouched.
+
+**3. Performance fix (enables the above at scale).** `optopsy_wrapper.py::prepare_optopsy_data`
+and a new `_get_day_groups` now memoize by IDENTITY of the input DataFrame, so a 150+ trial Optuna
+search doesn't re-copy and re-process the entire multi-year dataset (previously O(days × rows) per
+trial, unbounded across trials) from scratch on every single trial — required so the ~4.4x denser
+corrected grid doesn't multiply search time by the same factor. Verified as a pure no-op:
+identical Sharpe/trades/return/maxDD across repeated trials on the same data.
+
+**4. Regime-conditional robustness (new).** `src/analysis/regime.py`: calm vs. stress Sharpe/max
+DD/win-rate reported as SEPARATE columns, never blended into pooled Sharpe (stress windows: 2018
+Q4 selloff, COVID crash, 2022 bear, plus the Aug-2024 yen-carry spike and Apr-2025 tariff-shock
+selloff inside the OOS window). This is a reporting split, not a resampling of the training
+data — reweighting toward stress would bias the unconditional estimate and collapse effective
+sample size (COVID alone is 35 trading days); the window's ~13.5% stress share is already close to
+the historical base rate. Also added purge/embargo: no new IS entries in the final 40 trading days
+of the IS window (`optimize_daily_cadence.py::EMBARGO_TRADING_DAYS`), so no IS-scored trade is
+force-closed at the boundary before its own exit condition could fire.
+
+**Result:** regenerated `SPY_synthetic_options_2018-01-01_2026-07-10_db1.csv` (9.97M rows) and
+re-ran both 150-trial daily-cadence Optuna searches. New delta-wing winner: 21 DTE / 0.35Δ short /
+0.15Δ long / PT 80% / SL 30% (was 24 DTE / 0.35Δ / 0.19Δ / PT 90%) — full-span Sharpe 0.80 → 0.97,
+CAGR 7.60% → 9.16%, achieved-delta accuracy 25% off-target → 0.0% off-target. The old report's
+unresolved "20Δ live vs. backtest" tension substantially narrowed: every ~20Δ combination went
+from uniformly negative Sharpe to solidly positive (0.29-0.41) under corrected pricing. The
+width-wing search's new winner ($20 wide, the edge of the tested range) looks competitive on
+pooled OOS Sharpe (1.03) but has a deeply negative OOS-stress Sharpe (-1.05) vs. the delta wing's
+positive 0.54 in the same window — recommendation stays delta-selected wing. See
+`DAILY_CADENCE_STRATEGY.md` for full before/after tables.
+
+### Pricing model overhaul (skew, friction, vol level) + full width/delta/risk-budget validation — SUPERSEDES the 2026-08-02 strike-width verdict below (2026-08-09)
+
+Triggered by pushback on the "adopted" 24Δ/8Δ config: user proposed 20Δ short with a fixed $5-$10
+wide wing on risk grounds, distrusting the backtests' price/slippage realism. Investigation found
+the distrust was justified, in three separate, compounding ways — all fixed, then the whole
+width/delta/risk-budget space was re-validated on the corrected surface.
+
+**1. Put skew was 25-60% too flat.** `src/data_fetchers/skew_calibration.py` (new) fits the real
+put/call skew shape from 38 days of logged $1-strike Schwab chains (`data/raw/chains/`, compiled by
+the previously-unused `data_collection/compile_chains.py`) + the DoltHub 2021-2026 sample, via a
+within-(date,dte) ATM-anchored regression, DTE-restricted to 20-45 (the strategy's actual window).
+Real OTM put skew is far steeper and more convex than the old symmetric model
+(`skew_slope=1.00, curv=2.50`); refit as a PIECEWISE put/call curve (puts: `slope=2.34, curv=19.51`;
+calls: `slope=6.21, curv=20.0`, since the two wings have genuinely different curvature) in
+`synthetic_generator.py::_iv_surface`. Weighted R²=0.95-0.98 on held-out moneyness bins.
+
+**2. Bid-ask spread was flat 0.8% regardless of delta or VIX.** Measured real spreads from the same
+sources: 0.52% at 30Δ widening to 1.6% at 5Δ (thin OTM liquidity), plus a real VIX-regime effect
+(~0.81% spread at VIX<20 rising to ~1.13% at VIX 25-35). Replaced with
+`_spread_fraction(delta, vix)` = `0.443% + 0.0572%/delta`, ×`(1+0.05·(vix-20))` above VIX 20.
+Matters because friction scales with contract COUNT while credit scales with WIDTH — at real
+spreads a $5-wide wing pays ~11% of gross credit in round-trip friction vs ~1.5% for a wide
+delta-selected wing, a ~7x penalty that the flat old model hid.
+
+**3. Base vol level ran ~20-30% rich for 2024-2026 specifically — the OOS window every recent
+result draws from.** `src/data_fetchers/vol_level_calibration.py` (new): the old
+`vix_scale=0.95/vix_offset=0.015` constant implied a ~1.0-1.05 ATM-IV/VIX ratio; real DoltHub data
+shows that ratio has been secularly declining (2022 1.04 → 2023 1.07 → 2024 0.96 → 2025 0.88 →
+2026 0.91, weighted R²=0.74). Refit as a time-varying linear-in-year ratio
+(`_vix_level_ratio(date)`), held FLAT at the 2022 value for any date before 2022 (no options data
+exists anywhere in this project pre-2021, so nothing supports projecting the trend further back —
+2008-2021 pricing, including the entire GFC stress-test window, is best-effort, not validated).
+Net effect after all three fixes, validated against the live-chain overlap: put price error at
+K/S 0.86-1.00 improved from +26%..+52% (skew-only fix) to -19%..+5% (all three fixes) — real
+improvement, not perfect; the deep-OTM tail (where the 0.08-0.10Δ long leg lives) still runs
+~15-19% cheap, an acknowledged residual.
+
+**Regenerated all three synthetic datasets** on the corrected generator:
+`SPY_synthetic_options_2018-01-01_2026-07-10.csv` (main), `..._2008-01-01_2009-12-31.csv` (GFC),
+and a new `..._2008-01-01_2026-07-10.csv` (full continuous span, 4.79M contracts) built by
+`scripts_gen_2008_2026.py`.
+
+**Validation pipeline** (`compare_width_frontier.py`, `validate_finalists.py`,
+`run_full_span_backtest.py`, `stress_test_gfc.py` — all new/extended):
+
+- *140-trial grid* (short_delta {0.16,0.20,0.24,0.30} × wing {w5,w10,w15,w20,w30,d08,d10} ×
+  max_risk_percent {5,10,15,20,30}) → `backtest_results/width_frontier_full.csv`,
+  `charts/width_frontier_full.png`. Top Sharpe 0.66 (0.30Δ/w10/30%risk) is NOT statistically
+  distinguishable from a no-skill search: deflated Sharpe ratio 0.050 (need >0.95), expected
+  best-of-124-trials-under-luck is 1.22, haircut Sharpe is negative. **The grid-search "winner"
+  should not be trusted as a discovered edge on its own.**
+- *Walk-forward IS(2018-23)/OOS(2023-26) on 9 pre-registered finalists* (not grid-search winners —
+  chosen before looking, to avoid repeating the grid's own overfitting): fixed-$5/$10-wide 0.20Δ
+  structures show NEGATIVE in-sample Sharpe (-0.57, -0.43) over 2018-2023 (they lose money through
+  COVID + the 2022 bear); delta-selected wings hold up better (IS Sharpe -0.09 to +0.40 depending
+  on delta/long-delta).
+- *GFC (2008-09) replay, 14 scenarios*: delta-selected wings with a far (0.08-0.10Δ) protective
+  leg lose 3-5x less than fixed-width equivalents (best: 0.30Δ/0.08Δ/15%risk at -1.85% total,
+  -2.47% maxDD vs 0.20Δ/$5-wide at -11.77%/-13.88%). Caveat: thin samples (15-25 trades/2yr) and
+  the vix_max=35 gate suppresses entries during the worst VIX spikes (30% of GFC trading days had
+  VIX>35, concentrated in Sep2008-Apr2009) rather than the structure surviving full exposure —
+  read as "avoided the crash" more than "weathered the crash." **Tested directly**: reran the
+  0.30Δ/0.24Δ finalists with vix_max=999 (no ceiling) — the fixed-width structure's loss MORE
+  THAN DOUBLED (grid_w10: -11.1%→-26.0% total, -15.3%→-29.3% maxDD, 47→51 trades), while the
+  delta-selected wings barely moved (grid_d08: -1.85%→-2.40%; grid_d10: -2.87%→-4.52%;
+  prior_d10: -5.59%→-5.83%). Mechanism: fixed-width strikes don't adapt to vol, so a new $10-wide
+  entry at VIX 80 gets thin, badly-placed protection; a delta-selected wing re-picks its strikes
+  off the day's vol, so its protection widens automatically as VIX explodes. This is a 4th
+  independent signal against the fixed-width/30%-risk structure specifically.
+- *Full continuous 2008-2026 backtest, 9 finalists* → `backtest_results/finalists_full_span.csv`:
+  answers the actual full-span CAGR/Sharpe/return question directly rather than stitching disjoint
+  windows. Best non-alarming candidate: **0.30Δ/0.10Δ, 15% risk — CAGR 5.7%, Sharpe 0.46, maxDD
+  -17.1%**. The 30%-risk fixed-$10-wide config posts the best raw numbers (CAGR 13.4%, Sharpe 0.58)
+  but with a -57.5% max drawdown — essentially SPY's own GFC decline — so not recommended despite
+  the headline Sharpe.
+- *Cost sensitivity* (fill_fraction × spread_multiplier grid on finalists) → `backtest_results/cost_sensitivity_full.csv`.
+
+**0.08Δ vs 0.10Δ long leg — a genuine tradeoff, not a clean winner (correcting an earlier claim
+mid-investigation):** the grid, full-span backtest, and walk-forward all show 0.10Δ beating 0.08Δ
+on Sharpe/CAGR at every short delta tested (e.g. full-span 0.30Δ: Sharpe 0.46 vs 0.17) — the extra
+protection at 0.08Δ mostly goes unused in calm years, costing collected premium. But the GFC
+replay shows the OPPOSITE: 0.08Δ preserves capital better in an actual crisis (-1.85% vs -2.87% at
+0.30Δ/15%risk). Mechanism confirmed directly: 0.08Δ produces a wider spread (avg $19.80 vs $15.16
+at 0.20Δ/20%risk) → fewer contracts fit the same risk budget (2.41 vs 2.64) → less correlated
+exposure when a crash hits everything at once. **Use 0.10Δ for normal-regime Sharpe, 0.08Δ if
+crisis tail protection is the priority — there is no dominant choice.**
+
+**Capital-size dependency, quantified:** the winning wide/delta-selected structures need
+$820-1,870 max risk per contract. At a $20k account and 15-30% risk budget that's 1-3 contracts,
+comfortably sizeable. At a **$2,000** account, a single contract of even the best-performing
+structure would consume 45-94% of the entire account — the width choice that wins at $20k is not
+executable at $2k. Below roughly $5-8k, narrow ($5-wide) or no bull-put-spread trading at all is
+closer to a capital constraint than a risk-preference choice.
+
+**Verdict on the original question (0.20Δ + fixed width vs 0.24Δ/0.08Δ "optimal"):** neither. The
+stated mechanism (delta drift raising PITM probability) doesn't hold up — at an equal risk budget
+a narrow spread has the same max loss with a *higher* chance of realizing it. But the destination
+(move away from very wide, very levered structures) was directionally right for a different
+reason: capital granularity and friction, not delta drift. Recommended starting point at a $20k
+account: **0.20-0.30Δ short, 0.08-0.10Δ long (delta-selected, not fixed-width), 15-20% risk
+budget** — not the fixed $5/$10 width originally proposed, and not the 30% risk budget the
+"adopted" config used (every severe drawdown in this project's history, old model and new, traces
+to that 30% figure, independent of wing choice).
+
+**Known unresolved limitation:** all 2008-2021 pricing (flat-extrapolated vol level, no skew
+ground truth) is best-effort. The relative ranking between structures is far more trustworthy than
+any absolute CAGR/Sharpe number quoted above.
+
+### Addendum — post-fix re-validation continued past the sections above (2026-08-09, same day)
+
+Further rounds of testing, prompted by direct pushback on early claims, materially updated two of
+the findings above. Full interactive report with charts:
+`backtest_results/` (grid/walkforward/GFC/full-span/cost-sensitivity/exit-params/covid CSVs) +
+published artifact (see repo owner for link).
+
+- **0.08Δ vs 0.10Δ reversed on the level-corrected grid.** The original 0.08Δ recommendation above
+  was made on data that still had the vol-level bug; once fixed, **0.10Δ beats 0.08Δ on Sharpe/CAGR
+  at every short delta tested** (grid, full 2008-2026 continuous span, and walk-forward all agree),
+  e.g. full-span 0.30Δ: Sharpe 0.46 (0.10Δ) vs 0.17 (0.08Δ). GFC-specific capital preservation
+  still favors 0.08Δ (a genuine, narrower tradeoff than first stated, not a clean win either way).
+- **GFC replay was gating out the worst days by construction.** Every GFC scenario used
+  vix_max=35, but 30% of GFC trading days had VIX>35 (concentrated in Sep2008-Apr2009). Rerunning
+  with vix_max=999 (no ceiling) on the 0.30Δ finalists: the fixed-width structure's loss **more
+  than doubled** (grid_w10: -11.1%->-26.0% total, -15.3%->-29.3% maxDD), while delta-selected
+  wings barely moved (grid_d08: -1.85%->-2.40%; grid_d10: -2.87%->-4.52%) -- a fixed width doesn't
+  reprice its protection as vol rises, a delta-selected wing does. 4th independent signal against
+  the fixed-width/30%-risk structure.
+- **Cost sensitivity (fill_fraction x spread_multiplier) on 6 finalists**: only 0.30Δ/0.10Δ/15%risk
+  stays Sharpe-positive (+0.06) under the worst assumptions tested (100% fill, 3x spreads);
+  everything else including 0.30Δ/$10-wide/30%risk (0.66->-0.24) goes negative.
+- **Exit parameters (profit_target 0.4-0.8 x stop_loss 0.5-0.9) do NOT rescue $5-wide**: Sharpe
+  stayed -0.19 to -0.37 across all 9 combinations tested (0.20Δ, 2018-2026 window) -- the friction
+  penalty is paid at entry, independent of exit timing. The delta-selected comparison structure
+  stayed positive throughout (+0.08 to +0.21) and improved with a HIGHER profit target than the
+  0.60 used everywhere else in this investigation -- a separate, smaller finding worth a future
+  look.
+- **100% risk_percent stress test, 9 finalists x {$2k, $10k, $20k, $100k} accounts, full
+  2008-2026 span**: every structure at every account size showed max drawdown in the 60-99.6%
+  range. Account size does NOT change the outcome of over-leveraging -- $100k lands within a point
+  or two of $20k on every structure, confirming leverage risk is scale-invariant. $2,000 cannot
+  fund even one contract of any tested structure at a sane 15-20% risk budget (needs 45-94% of the
+  account per contract); ~$10-12k is the rough floor for one contract, $20k+ is the tested,
+  validated 2-3-contract zone this investigation's headline numbers were built on.
+- **COVID-19 (Feb19-Apr7 2020) trade counts**: 1-2 trades per structure regardless of width/delta
+  -- the ~7-week window is too short for a ~30-day-DTE strategy to show a turnover difference the
+  way the 2-year GFC window did. Dollar P&L still separates: -$1,953 to -$5,190 across finalists,
+  smallest for the 15%-risk delta-selected wings.
+
+**Updated final recommendation** (supersedes the "New recommended baseline" above):
+0.24-0.30Δ short / **0.10Δ** long (delta-selected, not fixed strike_width), **15-20% risk budget**,
+**$20,000+ account** (below ~$10-12k, no structure funds even one contract sanely). Use 0.08Δ
+specifically if GFC-style tail protection is prioritized over normal-regime Sharpe. Config.yaml's
+long_delta is 0.10 (matches this); short_delta is 0.24 as the steadier of the two solid choices
+tested -- 0.30Δ posts better raw numbers repeatedly but has a documented history of being the most
+fragile structure under stress across two separate pricing-model iterations now, including this one.
+
+### Results — fixed $5 strike-width wing loses to delta-selected wing; strike_width option added (2026-08-02) — SUPERSEDED, see above
+
+Added `entry.strike_width` to `VerticalSpread.generate_entry_signal` (src/strategies/vertical_spreads.py):
+pins the long wing a fixed dollar width further OTM than the short leg (puts: short − width, calls:
+short + width), taking precedence over `long_delta`; guards — distinct strikes, leg existence,
+debit/credit sign — already reject degenerates, and a None short strike (delta tolerance miss)
+now skips the day before the width math. Intended for credit spreads; debit spreads reject via
+the sign guard. Added `compare_strike_width.py` (reuses the existing synthetic CSV; runs the full
+2018-01-02..2026-07-10 and 2024-01-02..2026-06-30 windows) → `charts/bull_put_width_comparison.png`
+(6 metric panels + equity-curve overlay + stats table).
+
+**Verdict: the delta-selected wing (control, 24Δ/10Δ) beats both $5-wide variants on every
+risk-adjusted metric in both windows.** Full window — control: Sharpe 1.08, maxDD -43.1%, PF 1.65,
+606 trades, +1173%; w5-24d: Sharpe 0.95, maxDD -49.7%, PF 1.50, 829 trades, +1145%; w5-20d:
+Sharpe 0.84, maxDD -46.4%, PF 1.48, 731 trades, +641%. 2024-26 — control: Sharpe 1.63, maxDD
+-30.3%, +205%, 170 trades; w5-24d: Sharpe 1.28, maxDD -39.5%, +191%, 228 trades; w5-20d: Sharpe
+1.21, maxDD -38.5%, +152%, 205 trades. Mechanism: the $5 wing collects ~$1.00-1.04 credit/contract
+vs $2.18-2.83 dynamic (width $13.8-17.9), so fixed-risk 30% sizing runs ~3x the contracts (24-30
+vs 5-12) with the same budget — deeper drawdowns, more commission drag, lower win rate (66.5-68.8%
+vs 72.3-73.5%). Saved per-window CSVs: `backtest_results/strike_width_{full,2024-26}.csv`.
+
+### Results — vix_min floor sweep finds 17.5 sweet spot; vix 10-35 adopted; README + chart (2026-08-02)
+
+Ran a vix_min × vix_max sweep on the robust 30 DTE / 24Δ/10Δ bull put (pt .60/sl .50/dte_min 22,
+full 2018-01-02..2026-07-09 window, $20k fixed-risk 30%): 17.5 scores the best Sharpe/PF
+(1.15 / 2.06, maxDD -35.6%, 319 trades, +847%) but the user's **adopted config is vix 10-35** —
+the always-on variant: **Sharpe 1.08, Sortino 1.20, maxDD -43.1%, PF 1.65, 606 trades, +1173%**
+(full window) and **Sharpe 1.63, maxDD -30.3%, +204.7%, 170 trades** on 2024-01-02..2026-06-30
+(vs vix_min 20: Sharpe 1.24, maxDD -16.4%, 41 trades, +67%). The vix_max 30 cap loses on the full
+window (Sharpe 1.00-1.02) — it only helped in crisis sub-windows, so vix_max 35 stands. VIX
+distribution check (cached `vix_history.csv`): past 24 months VIX ≥ 20 on only 24.6% of days
+(2024: 9.9%), which is what starves the vix_min 20 gate; vix_min 15 is gate-open 87% of days.
+Updated `README.md` "Recommended Settings" with the adopted bull put configuration
+(30 DTE / 24Δ/10Δ, VIX 10-35, pt 0.60, sl 0.50, dte_min 22) + the vix_min tuning table, and added
+`make_bull_put_metrics_chart.py` → `charts/bull_put_vix10_35_metrics.png` (metrics dashboard,
+vix 10-35 highlighted vs 15/17.5/20, both windows).
+
+### Results — GFC (2008-09) bull put stress test (2026-07-31)
+
+Added `stress_test_gfc.py`: regenerates the synthetic dataset for 2008-01-01..2009-12-31 (real
+SPY/^VIX/^VIX3M/^VIX6M history; ^VIX9D pre-2011 fallback handled by the generator) and backtests
+5 bull-put scenarios through the GFC to answer (a) how the strategy's 2018-26 search champions
+hold up in the worst SPY drawdown on record (-57% peak-to-trough, VIX 80.9), and (b) what a
+vix_max crisis gate is worth. Dataset: `data/processed/SPY_synthetic_options_2008-01-01_2009-12-31.csv`.
+
+**Results (2008-01-02..2009-12-31, $20k fixed-risk 30%):** the in-sample Sharpe champion
+(30 DTE / 30Δ/8Δ, no VIX gate, pt .45/sl .50/dte_min 18) goes **negative through the GFC —
+Sharpe -0.45, maxDD -48.3%, -22%** — confirming it was a truncated-search (grid-edge) artifact,
+not a real edge. The user's 30 DTE / 20Δ/10Δ (vix 20-35, pt .60/sl .90/dte_min 22) is
+**-3.2% total, -17.9% maxDD** (effectively flat, survives the GFC intact). Best of the tested
+set: 30 DTE / 24Δ/10Δ (vix 20-35, pt .60/sl .50/dte_min 22) — **+10.3%, maxDD -17.7%**.
+vix_max sensitivity on the 20Δ/10Δ set: cap 25 → **worse** (-16.6%, 19 trades — fewer, unluckier
+trades, no edge from the gate); cap 30 → best DD (-13.3%) but flat (+0.8%). Conclusion: the
+spread structure + dte exit, not the vix_max gate, is what survives a true crisis; the
+pre-registered VIX>30 skip (2026-07-19 changelog) adds protection in the 2018-26 window without
+helping here. Also closes the vix_max search gap: the optimizer only ever swept vix_min
+(10/15/20/25), keeping vix_max fixed at config (bull_put 35, bull_call/bear_put 17,
+call_calendar 25, iron_condor 40).
+
 ### Results — Bull put regime attribution + pre-registered overlay validation (2026-07-19)
 
 Added `src/utils/regime.py` (fixed-rule VIX-level, VIX IV-rank, SPY-trend, and composite regime

@@ -16,6 +16,23 @@ synthetic_data:
                              #   2022 bear — the stress regimes a short-put backtest must survive.
   end_date: "2026-07-10"
   max_dte: 90
+  # Strike grid (2026-08-11). Legacy default 'fixed': $5 spacing, 40 strikes (+/-$100 band) --
+  # reproducible, matches every dataset generated in this project through 2026-08-10. NOT flipped
+  # to delta_band by default: every other optimizer (bull put spread, iron condor, calendar) reads
+  # this same block and would force a dataset regen. 'delta_band' fixes two findings: (1) a fixed
+  # dollar band is +/-45% of spot in 2020 vs +/-13% in 2026, so the low-delta tail is UNREACHABLE
+  # on crisis days at today's higher SPY price; (2) $5 spacing is 5x coarser than real SPY's $1
+  # increments. See synthetic_generator.py's generate_delta_band_strikes for the mechanism.
+  grid_mode: "fixed"        # fixed | delta_band
+  num_strikes: 40           # fixed mode only
+  strike_interval: 5.0      # fixed mode only ($)
+  fine_interval: 1.0        # delta_band mode: $ spacing within the fine (traded) delta range
+  coarse_interval: 5.0      # delta_band mode: $ spacing in the outer tail (marking only)
+  fine_min_abs_delta: 0.02  # delta_band mode: fine band's far (lowest-delta) boundary
+  fine_max_abs_delta: 0.60  # delta_band mode: fine band's near (slightly-ITM) boundary
+  coarse_extra_frac: 0.35   # delta_band mode: outer tail extends +/- this fraction of spot beyond
+                             #   the fine band, so a position that moves deep ITM/OTM after entry
+                             #   can still be marked/exited
 
 # Backtesting period (the window a backtest runs over; may be a SUBSET of the
 # synthetic_data range above -- these are distinct from the generation range).
@@ -98,17 +115,30 @@ costs:
 strategies:
   bull_put_spread:          # Credit spread - neutral to bullish
     enabled: true
+    # 2026-08-09: re-validated width/delta/risk-budget choice on a corrected pricing surface (real
+    # skew + delta/VIX-dependent friction + time-varying vol level — see CHANGELOG). Delta-selected
+    # wing (long_delta, NOT strike_width) wins on every test: grid, walk-forward IS/OOS, GFC replay,
+    # and GFC with the VIX gate removed (where a fixed-width wing's loss more than doubled while
+    # delta-selected wings barely moved — a fixed width doesn't re-price its protection as vol
+    # rises, a delta-selected one does). 0.08 vs 0.10 long_delta is a genuine tradeoff, not a clean
+    # winner: 0.10 wins on normal-regime Sharpe/CAGR (grid + full 2008-2026 span + walk-forward all
+    # agree), 0.08 wins on GFC-specific capital preservation. 0.10 is set here as the default; use
+    # 0.08 if crisis tail protection is the priority. short_delta 0.20-0.30 all tested reasonably;
+    # 0.24 chosen as a moderate middle rather than the more aggressive 0.30 corner, which has a
+    # repeated history (across multiple pricing-model iterations) of looking best in-sample and
+    # then being the most fragile under stress. See position_sizing.max_risk_percent below — the
+    # risk BUDGET, not the wing choice, drives every severe drawdown in this project's history.
     entry:
       dte_min: 35           # Entry window; the strategy pins the ONE expiration closest to the
       dte_max: 45           #   window midpoint (or to entry.dte_target ± dte_tolerance if set)
-      short_delta: 0.30     # Sell put with ~30 delta
-      long_delta: 0.10      # Buy put with ~10 delta (protective wing)
-      vix_min: 19           # Enter when VIX >= 19 (elevated IV - higher premium)
+      short_delta: 0.24     # Sell put with ~24 delta
+      long_delta: 0.10      # Buy put with ~10 delta (protective wing, delta-selected not fixed width)
+      vix_min: 10            # Always-on; see 2026-08-02 vix_min sweep entry above
       vix_max: 35           # Don't enter if VIX > 35 (too volatile)
     exit:
       profit_target: 0.60   # Close at 60% of max profit
-      stop_loss: 0.20       # Stop at 20% of max loss (positive fraction — vertical convention)
-      dte_min: 10           # Close if DTE drops to 10 (entries with dte <= this are refused)
+      stop_loss: 0.50       # Stop at 50% of max loss (positive fraction — vertical convention)
+      dte_min: 22           # Close if DTE drops to 22 (entries with dte <= this are refused)
 
   bull_call_spread:         # Debit spread - moderately bullish
     enabled: true
@@ -219,12 +249,24 @@ strategies:
 
 # Position sizing
 position_sizing:
-  method: "fixed_risk"  # Options: fixed_risk, kelly
+  method: "fixed_risk"  # Options: fixed_risk, kelly, fixed_contracts
+  contracts_per_trade: 1  # Used only when method: fixed_contracts -- same count every entry,
+                          # independent of account value or other open positions. Models a
+                          # daily-cadence trader (one new spread every day, sized the same way
+                          # regardless of what else is open) rather than a shared risk-budget pool.
   max_risk_percent: 30.0  # Maximum portfolio risk exposure (% of current portfolio value).
                           # Raised 10 -> 30 with the $20k account: a 30Δ/10Δ SPY put spread runs
                           # ~$2.5-4k max risk per contract, so a 10% cap ($2k) sized every entry to
                           # 0 contracts and silently restricted the optimizer to narrow spreads.
                           # 30% of $20k = $6k ≈ one wide spread + one narrow, or 2-3 narrow.
+                          # 2026-08-09: this 30% budget is what drives every severe drawdown found
+                          # in the bull_put_spread width/delta re-validation (see CHANGELOG), NOT
+                          # the wing/delta choice -- e.g. the same 0.30Δ/0.08Δ structure runs -13%
+                          # maxDD at 15% risk vs much worse at 30%. Recommend 15-20% for
+                          # bull_put_spread specifically. NOT changed here because this setting is
+                          # GLOBAL (no per-strategy override exists in the code) and would also
+                          # affect bull_call_spread/call_calendar/iron_condor, which this
+                          # investigation did not re-test.
 
   # Kelly Criterion percentages (manually updated from Kelly_Criteria notebook)
   # Workflow:

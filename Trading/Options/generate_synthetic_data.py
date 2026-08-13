@@ -57,6 +57,16 @@ def main():
     start_date = sd["start_date"]
     end_date = sd["end_date"]
     max_dte_ = sd["max_dte"]
+    grid_kwargs = dict(
+        num_strikes=sd.get("num_strikes", 40),
+        strike_interval=sd.get("strike_interval", 5.0),
+        grid_mode=sd.get("grid_mode", "fixed"),
+        fine_interval=sd.get("fine_interval", 1.0),
+        coarse_interval=sd.get("coarse_interval", 5.0),
+        fine_min_abs_delta=sd.get("fine_min_abs_delta", 0.02),
+        fine_max_abs_delta=sd.get("fine_max_abs_delta", 0.60),
+        coarse_extra_frac=sd.get("coarse_extra_frac", 0.35),
+    )
 
     # Derive the output path from the SAME helper the loaders use, so the file we
     # write is exactly the file they look for.
@@ -68,6 +78,10 @@ def main():
     print(f"  Data frequency: End-of-Day (EOD)")
     print(f"  Include weekly expirations: Yes")
     print(f"  Maximum DTE:  {max_dte_} days")
+    print(f"  Grid mode: {grid_kwargs['grid_mode']}"
+          + (f" (${grid_kwargs['fine_interval']:g} fine / ${grid_kwargs['coarse_interval']:g} coarse)"
+             if grid_kwargs['grid_mode'] == 'delta_band'
+             else f" (${grid_kwargs['strike_interval']:g} spacing, {grid_kwargs['num_strikes']} strikes)"))
 
     # User confirmation (skip if -y flag is used)
     if not args.yes:
@@ -100,7 +114,8 @@ def main():
             include_weekly=True,
             max_dte=max_dte_,
             save_to_csv=True,
-            output_path=output_path
+            output_path=output_path,
+            **grid_kwargs
         )
 
         print("\n" + "="*70)

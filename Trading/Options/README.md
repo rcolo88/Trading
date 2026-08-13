@@ -151,6 +151,7 @@ Options/
 - **Max Profit**: Premium collected
 - **Max Loss**: Strike width - premium
 - **Exit Criteria**: Profit target %, stop loss %, DTE threshold
+- **Recommended Parameters**: See [Recommended Settings](#recommended-settings) — 30 DTE, 24Δ short / 10Δ long (delta-selected wing), VIX 10-35, 15-20% risk budget
 
 #### Bear Call Spread (Credit Spread)
 - **Setup**: Sell lower strike call, buy higher strike call
@@ -294,12 +295,80 @@ Exit conditions:
 
 ### Recommended Settings
 
-**Credit Spreads** (Bull Put, Bear Call):
-- `profit_target: 0.50` - Take profits at 50% of max profit (common wisdom)
-- `stop_loss: 0.50` - Cut losses at 50% of max loss
-- `dte_min: 21` - Exit when DTE drops below 21 days
+#### Bull Put Spread — Research-Backed Configuration (SPY)
 
-**Debit Spreads** (Bull Call, Bear Put):
+**Full interactive report** (charts, GFC/COVID stress tests, account-size breakdowns):
+https://claude.ai/code/artifact/516ea042-f54f-4332-a9c9-be2227a4654b
+
+**2026-08-09 update: the pricing model this section's original numbers were built on has been
+corrected (real skew shape, delta/VIX-dependent friction, time-varying vol level — see
+CHANGELOG). The old numbers below (Sharpe 1.08, +1173%) were inflated by a put skew that was
+25-60% too flat and a flat friction assumption; they are NOT reliable and are kept only as
+historical context.** The parameters (30 DTE, 24Δ/10Δ, VIX 10-35, pt 0.60/sl 0.50/dte_min 22)
+happen to still be a reasonable choice on the corrected surface — delta-selected wings beat
+fixed-width structures on every re-test (grid search, walk-forward IS/OOS, GFC replay, GFC with
+the VIX gate removed) — but the **max_risk_percent 30.0 sizing below is not recommended**; every
+severe drawdown found in the re-validation traces to that 30% budget, not the wing/delta choice.
+Use 15-20% instead.
+
+**Entry**
+- `dte_target: 30` — enter the expiration closest to 30 DTE (window 25-35)
+- `short_delta: 0.24` — sell ~24Δ put (0.20-0.30 all tested reasonably; 0.30 posts the best raw
+  numbers but has a repeated history — across multiple pricing-model iterations — of looking best
+  in-sample and being the most fragile under stress; 0.24 is a moderate middle)
+- `long_delta: 0.10` — buy ~10Δ protective wing, delta-selected (**not** a fixed `strike_width` —
+  a fixed dollar width loses on every test: more trading friction, and it doesn't reprice its
+  protection as vol rises, so it's dramatically worse specifically in a real crisis — see the GFC
+  no-VIX-ceiling result below). 0.08Δ vs 0.10Δ is a genuine tradeoff: 0.10Δ wins on normal-regime
+  Sharpe/CAGR (grid + full 2008-2026 span + walk-forward all agree), 0.08Δ wins on GFC-specific
+  capital preservation. Use 0.08Δ if crisis tail protection is the priority.
+- `vix_min: 10` — enter when VIX ≥ 10 (essentially always-on; maximum trade frequency) — this
+  dimension was NOT re-examined in the 2026-08-09 width/delta investigation; kept from the
+  original vix_min sweep below, whose relative conclusions likely still hold even though its
+  absolute numbers predate the pricing fix.
+- `vix_max: 35` — skip extreme-volatility crisis days (VIX > 35)
+
+**Exit**
+- `profit_target: 0.60` — close at 60% of max profit
+- `stop_loss: 0.50` — close at 50% of max loss
+- `dte_min: 22` — close when DTE drops to 22 (entries with ≤ 22 DTE are refused)
+
+**Sizing / Costs**
+- `position_sizing.method: fixed_risk`, **`max_risk_percent: 15-20`** (not the 30.0 default in
+  config.yaml, which is a global setting shared with other strategies — see its comment there)
+- Commission: `$0.65`/contract/leg/side; bid-ask friction is now delta- and VIX-dependent
+  (0.52% at 30Δ widening to 1.6% at 5Δ, wider still above VIX 20) rather than a flat 0.8%
+
+**Backtested performance, corrected surface** (full continuous 2008-01-02 → 2026-07-09,
+$20k start, 0.24Δ/0.10Δ, 20% risk): **CAGR 3.6% · Sharpe 0.20 · Max DD -25.8% · +93% total
+return**, 748 trades. The best *non-alarming* candidate on this metric across the whole
+re-validation was 0.30Δ/0.10Δ at 15% risk: **CAGR 5.7% · Sharpe 0.46 · Max DD -17.1% · +177%**.
+A more aggressive 0.30Δ/$10-wide/30%-risk config posts much higher raw numbers (CAGR 13.4%,
+Sharpe 0.58) but a -57.5% max drawdown — roughly SPY's own GFC decline — so it is not
+recommended despite the headline Sharpe. **These numbers should be read as directionally useful,
+not precise**: the deflated-Sharpe check on the full 140-trial grid search came back weak
+(DSR 0.05, best grid Sharpe not statistically distinguishable from a no-skill search), and all
+2008-2020 pricing is a flat extrapolation with no real options quotes to validate against (none
+exist anywhere in this project before 2021). See CHANGELOG's 2026-08-09 entry for the full
+validation pipeline (grid, walk-forward, GFC replay, GFC with no VIX ceiling, cost sensitivity).
+(Chart: [`charts/width_frontier_full.png`](charts/width_frontier_full.png))
+
+**VIX floor (vix_min) tuning — historical, predates the pricing fix, kept for directional
+context only** — all other params identical (vix_max 35):
+
+| vix_min | Trades | Max DD | Return | Notes |
+|---|---|---|---|---|
+| **10** | **606** | -43.1% | **+1173%** | **Adopted config** — always-on, maximum trades & return; strikes hug spot in calm regimes, stops fire on routine pullbacks |
+| 15 | 439 | -35.7% | +661% | More active, slightly lower Sharpe |
+| 17.5 | 319 | -35.6% | +847% | Best Sharpe (1.15) & PF (2.06) — best risk-adjusted profile |
+| 20 | 224 | **-27.3%** | +518% | Lowest DD but idles in calm years (2024: only ~10% of days ≥ 20) |
+
+The **vix 10-35** config is the aggressive, always-in-market choice: nearly 3x the trades of the
+20 gate with the highest total return, at the cost of the deepest drawdown. This table's absolute
+numbers are stale (pre-pricing-fix); its relative conclusion (10-35 trades most, 20 has shallowest
+DD) has not been re-examined on the corrected surface.
+
+**Debit Spreads** (Bull Call, Bear Put) — generic starting point:
 - `profit_target: 0.75` - Take profits at 75% of max profit
 - `stop_loss: 0.50` - Cut losses at 50% of max loss
 - `dte_min: 14` - Exit when DTE drops below 14 days
@@ -503,4 +572,4 @@ MIT License - see LICENSE file for details
 
 **Project Status**: 🚀 Ready for Backtesting - Vertical & Calendar Spreads Implemented
 
-**Last Updated**: 2025-10-22
+**Last Updated**: 2026-08-09

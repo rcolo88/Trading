@@ -19,6 +19,7 @@ from ..utils.black_scholes import (
     calculate_all_greeks,
     find_strike_by_delta
 )
+from .skew_calibration import PUT_M_MIN as _PUT_SKEW_FIT_MIN, CALL_M_MAX as _CALL_SKEW_FIT_MAX
 
 
 class SyntheticOptionsGenerator:
@@ -55,20 +56,96 @@ class SyntheticOptionsGenerator:
         self.volatility_window = volatility_window
         self.use_vix_for_iv = use_vix_for_iv
 
-        # IV-surface shape — calibrated against DoltHub real data (compare_synthetic_real.py).
-        # Skew term: 1.0 - slope * log_moneyness + curv * log_moneyness^2
+        # IV-surface shape — refit 2026-08-08 (src/data_fetchers/skew_calibration.py) against
+        # genuine SPY quotes: 38 days of logged $1-strike Schwab/yfinance chains
+        # (data/processed/SPY_real_options_2026-06-05_2026-08-07.csv) + the DoltHub 2021-2026
+        # sample, restricted to the 20-45 DTE window this project actually trades. Fit method: a
+        # within-(date,dte) fixed-effects regression on binned log-IV medians isolates the skew
+        # SHAPE from the (separately-validated) base_vol/term levels.
+        #
+        # The vol(K) curve is genuinely ONE function of strike (put-call parity implies a single
+        # implied vol per strike/expiry), but its curvature is NOT symmetric around ATM: the data
+        # shows a materially steeper, more convex put (low-strike) wing than call (high-strike)
+        # wing, so the OLD symmetric single quadratic (slope=1.00, curv=2.50, fit against DoltHub
+        # only, no DTE restriction) was both too flat AND wrong-shaped — ~25-60% too cheap on the
+        # put wing, which matters a great deal for THIS project (bull put spreads price entirely
+        # off the put wing: a 0.20 delta put runs materially richer relative to a 0.10 delta put
+        # than the old curve implied, which favors wide delta-selected wings over fixed-dollar
+        # widths in any backtest run on the old surface).
+        #
+        # PUT wing (m<=0, weighted R^2=0.95 over m in [-0.20,+0.06]): clean quadratic, no boundary
+        # issues. CALL wing (m>0): the real curve is monotonic decreasing only out to about
+        # m=+0.065, then reverses upward on far-OTM, thin/penny-priced calls — a quadratic can't
+        # fit "down then up" without degenerate curvature, so the call fit uses only the
+        # monotonic band (m in [-0.16,+0.06], weighted R^2=0.965) and EXTRAPOLATES beyond m=+0.06.
+        # That extrapolation gets steep quickly (skew ~0.46 by m=+0.10) — treat iron_condor's long
+        # call wing and bull_call/bear_put results with more caution than the put-side ones; they
+        # were not this recalibration's target and have not been separately re-validated.
+        #
+        # Re-run skew_calibration.py --report as the logged-chain history grows; it is currently
+        # just 38 days, all in a calm (~VIX 15) regime.
+        # Skew term: 1.0 - slope * log_moneyness + curv * log_moneyness^2  (piecewise: put/call wing)
         # Term:      1.0 + term_slope * (dte - 30) / 365
         #             + short_premium * max(0, 30-dte) / 365  (short-dated vol premium)
-        self.skew_slope = 1.00          # equity put skew steepness (was 0.60 — too flat)
-        self.skew_curv = 2.50           # smile convexity (was 1.50 — wings too cheap)
+        self.put_skew_slope = 2.34      # put wing (m<=0) steepness (old symmetric value: 1.00)
+        self.put_skew_curv = 19.51      # put wing convexity (old symmetric value: 2.50)
+        self.call_skew_slope = 6.21     # call wing (m>0) steepness
+        self.call_skew_curv = 20.0      # call wing convexity
+
+        # Tail fix (2026-08-11): skew_calibration.py fits these quadratics ONLY over
+        # m in [PUT_M_MIN, 0] / [0, CALL_M_MAX] (real quotes don't exist reliably beyond that).
+        # Outside the fitted band the quadratic is unconstrained by any data and its curvature
+        # (curv=19.51/20.0, both large) blows up: skew hit 11x by m=-0.67 on a low-spot day's
+        # historically-fixed +/-$100 strike band (2020-03-23, spot=$204), which is most of why the
+        # 20-45 DTE / 0.05-0.35 delta search space this project trades ran 17-50%/year "extrapolated"
+        # and clipped at the iv=3.0 ceiling on crisis days. Real equity skew flattens in the tail
+        # (Lee's moment formula bounds the ASYMPTOTIC SLOPE, not curvature growth), so beyond each
+        # knot _iv_surface continues LINEARLY at the quadratic's own value+slope AT the knot --
+        # continuous in both value and first derivative (no kink), no runaway acceleration past the
+        # point real quotes actually support. See _iv_surface().
+        self._put_skew_knot = _PUT_SKEW_FIT_MIN    # -0.20
+        self._call_skew_knot = _CALL_SKEW_FIT_MAX  # +0.06
+        self._put_skew_knot_val = (1.0 - self.put_skew_slope * self._put_skew_knot
+                                    + self.put_skew_curv * self._put_skew_knot ** 2)
+        self._put_skew_knot_slope = -self.put_skew_slope + 2.0 * self.put_skew_curv * self._put_skew_knot
+        self._call_skew_knot_val = (1.0 - self.call_skew_slope * self._call_skew_knot
+                                     + self.call_skew_curv * self._call_skew_knot ** 2)
+        self._call_skew_knot_slope = -self.call_skew_slope + 2.0 * self.call_skew_curv * self._call_skew_knot
         self.term_slope = 0.0           # residual contango (was +0.10; short_premium does the work)
         self.short_premium = 3.0        # extra annualized vol for days below 30 DTE
         self.min_half_spread = 0.01     # floor on half bid/ask ($); SPY ATM spreads are ~1¢
-        # VIX → base-vol calibration.  VIX itself is ~30d ATM, so raw vix/100 is a decent starting
-        # point.  Real SPY atmf vol ≈ 0.95 * VIX + 1.5 vol-pts (low-VIX regimes have a higher
-        # premium over VIX; high-VIX regimes trade near VIX).
-        self.vix_scale = 0.95           # scale factor on vix/100 (was implicit 1.0)
-        self.vix_offset = 0.015         # additive offset so low-vix doesn't floor out
+        # Bid-ask spread model — refit 2026-08-08 (same sources as the skew fit above) against
+        # genuine SPY put quotes. Spread WIDENS as delta falls (thinner OTM liquidity): a robust
+        # weighted fit of spread_pct(delta) = a + c/delta to binned medians across 0.03-0.45 delta
+        # gives a=0.443%, c=0.0572% (matches empirical medians closely: 1.6% at 0.05 delta -> 0.63%
+        # at 0.30 delta). This REPLACES the old flat 0.008 (0.8%) assumption used for every leg
+        # regardless of moneyness, which was reasonable at 20-30 delta but ~2x too tight on the
+        # 5-10 delta long wing of a bull put. Also measured a real VIX effect on DoltHub's
+        # multi-year sample (0.15-0.25 delta puts): ~0.81% median spread for VIX<20, rising to
+        # ~1.13% for VIX 25-35 -- approximated as a floor-1.0 linear multiplier above VIX 20;
+        # not calibrated beyond VIX 35 (no crisis-period quotes on disk), so GFC-replay spread
+        # widening past that point is an extrapolation, not a fit.
+        self.spread_delta_a = 0.00443
+        self.spread_delta_c = 0.000572
+        self.spread_vix_threshold = 20.0
+        self.spread_vix_slope = 0.05    # +5%/vix-point above the threshold
+        # VIX -> base-vol calibration -- refit 2026-08-09 (src/data_fetchers/vol_level_calibration.py)
+        # as a TIME-VARYING ratio, not a constant. The old fixed vix_scale=0.95/vix_offset=0.015
+        # (implying a ~1.0-1.05 ATM-IV/VIX ratio at typical VIX levels) was found to run ~20-30%
+        # too rich for 2024-2026 specifically -- exactly the years this project's OOS windows draw
+        # from -- because the real ratio has been declining: 2022 1.04, 2023 1.07, 2024 0.96,
+        # 2025 0.88, 2026 0.91 (weighted R^2=0.74 on a linear-in-year fit). A uniform overprice of
+        # ATM vol directly inflates the credit collected on any net-short-premium structure (the
+        # near-the-money short leg gains more in dollar terms than the far-OTM long leg), so this
+        # was producing inflated backtest returns specifically in the recent-year window investors
+        # would trust most. See _vix_level_ratio() below for the fitted curve.
+        # LIMITATION: no options data exists anywhere in this project before 2021, so the fit uses
+        # 2022-2026 only and years before that are held FLAT at the 2022 value (conservative
+        # extrapolation, not a fit) -- 2008-2021 pricing (incl. the entire GFC stress-test window)
+        # is best-effort, not validated against real quotes.
+        self._vix_level_slope = -0.03585
+        self._vix_level_intercept = 73.5356
+        self._vix_level_fit_start_year = 2022
 
         self.underlying_data = None
         self.volatility = None
@@ -85,13 +162,52 @@ class SyntheticOptionsGenerator:
         Falls back to the parametric formula when the VIX complex is unavailable.
         """
         m = np.log(strike / spot) if spot > 0 and strike > 0 else 0.0
-        skew = 1.0 - self.skew_slope * m + self.skew_curv * m * m
+        # Piecewise: the fitted put (m<=0) and call (m>0) wings have different curvature (see
+        # __init__) — both pass through skew(0)=1 by construction, so the curve is continuous.
+        # Beyond each wing's fitted knot, continue LINEARLY at the quadratic's own slope there
+        # (see __init__ tail-fix note) instead of letting the quadratic itself run unbounded.
+        if m <= 0.0:
+            if m >= self._put_skew_knot:
+                skew = 1.0 - self.put_skew_slope * m + self.put_skew_curv * m * m
+            else:
+                skew = self._put_skew_knot_val + self._put_skew_knot_slope * (m - self._put_skew_knot)
+        else:
+            if m <= self._call_skew_knot:
+                skew = 1.0 - self.call_skew_slope * m + self.call_skew_curv * m * m
+            else:
+                skew = self._call_skew_knot_val + self._call_skew_knot_slope * (m - self._call_skew_knot)
+        skew = max(skew, 1e-4)  # matches skew_calibration.py's own floor; guards a negative-slope
+                                 # extrapolation (e.g. the call wing) from going negative far out
         if self._day_term_curve is not None:
             term = self._day_term_curve(dte)
         else:
             short_extra = max(0, 30 - dte) * self.short_premium / 365.0 if self.short_premium else 0.0
             term = 1.0 + self.term_slope * (dte - 30.0) / 365.0 + short_extra
         return float(np.clip(base_vol * skew * term, 0.03, 3.0))
+
+    def _spread_fraction(self, abs_delta: float, vix: Optional[float]) -> float:
+        """Bid-ask half-spread as a fraction of mid, for one leg at this delta/VIX (see __init__).
+
+        ``spread_pct(delta) = a + c/delta`` widens as the contract goes further OTM (thin
+        liquidity); a VIX multiplier widens it further in stressed regimes. Floors at a tiny
+        delta so a near-zero-delta deep wing doesn't blow up the 1/delta term.
+        """
+        d = max(abs(abs_delta), 0.01)
+        base = self.spread_delta_a + self.spread_delta_c / d
+        if vix is not None and not np.isnan(vix) and vix > self.spread_vix_threshold:
+            base *= 1.0 + self.spread_vix_slope * (vix - self.spread_vix_threshold)
+        return base
+
+    def _vix_level_ratio(self, date) -> float:
+        """Fitted ATM-IV/VIX ratio for this date (see __init__ for the fit + its limitation).
+
+        Held flat at the fit's start-year value for any date before the fitted window -- no real
+        options quotes exist before 2021 anywhere in this project, so nothing supports projecting
+        the trend further back; flat is the conservative choice, not a validated one.
+        """
+        year = max(getattr(date, "year", self._vix_level_fit_start_year), self._vix_level_fit_start_year)
+        ratio = self._vix_level_intercept + self._vix_level_slope * year
+        return float(np.clip(ratio, 0.5, 1.5))
 
     def _build_term_curve(self, date):
         """Build a per-day term-ratio callable from the real VIX tenor complex.
@@ -326,6 +442,95 @@ class SyntheticOptionsGenerator:
 
         return strikes[strikes > 0]  # Remove any negative strikes
 
+    def generate_delta_band_strikes(
+        self,
+        spot_price: float,
+        dte: int,
+        base_vol: float,
+        fine_interval: float = 1.0,
+        coarse_interval: float = 5.0,
+        fine_min_abs_delta: float = 0.02,
+        fine_max_abs_delta: float = 0.60,
+        coarse_extra_frac: float = 0.35,
+    ) -> np.ndarray:
+        """Strike grid at $1 resolution across a vol-adaptive delta band, plus a coarse outer tail.
+
+        Fixes two 2026-08-11 findings in the legacy fixed $5/+-$100 grid (generate_strike_prices):
+        (1) a fixed dollar band is +/-45% of spot in 2020 vs +/-13% in 2026, so on low-spot/high-vol
+        days a target delta as high as 0.10-0.20 can be UNREACHABLE (verified: 2020-03-23 minimum
+        available |delta| on a 20-45 DTE put was 0.105); (2) $5 spacing is 5x coarser than real
+        SPY's $1 increments, so a single strike step can jump delta by 0.04-0.06 near the money.
+
+        This computes the delta band directly (via find_strike_by_delta) rather than fixing a
+        dollar width, so the fine band automatically widens in high-vol regimes and narrows in
+        calm ones -- constant delta RESOLUTION in every era, not a constant dollar window.
+
+        Coverage still can't be cut where resolution is: entries only ever target
+        ~fine_min_abs_delta..fine_max_abs_delta, but a position can move far ITM after entry (a
+        short put entered OTM can go deep ITM on a crash well within a <=45 DTE hold), and the
+        daily chain is regenerated fresh each day centered on THAT day's spot -- so an old entry
+        strike must still be findable even after a large adverse move. The coarse outer tail (at
+        `coarse_interval` spacing, spanning `coarse_extra_frac` of spot beyond the fine band on
+        each side) exists purely for that marking/exit lookup, matching the +/-~35-45% reach the
+        project's original fixed band empirically provided without a missing-leg incident.
+
+        Args:
+            spot_price: Current underlying price
+            dte: Days to expiration
+            base_vol: Base (unskewed) volatility used to seed the delta search -- the ACTUAL
+                per-strike vol (which is higher, via _iv_surface's skew) is used to refine the
+                boundary in a second pass, so the band is never too narrow.
+            fine_interval: Dollar spacing within the fine (traded) delta band
+            coarse_interval: Dollar spacing in the outer tail (marking only)
+            fine_min_abs_delta: Fine band's far (lowest-delta, deepest OTM) boundary
+            fine_max_abs_delta: Fine band's near (slightly-ITM) boundary
+            coarse_extra_frac: Outer tail extends +/- this fraction of spot beyond the fine band
+
+        Returns:
+            Array of strike prices (deduplicated, sorted, positive only)
+        """
+        T = dte / 365.0
+        r, q = self.risk_free_rate, self.dividend_yield
+
+        def _boundary(option_type: str, target_delta: float) -> float:
+            # Pass 1: unskewed base_vol locates a rough strike. Pass 2: re-seed with the ACTUAL
+            # (skewed) vol AT that strike -- skew always makes OTM vol >= base_vol, so this can
+            # only push the boundary further from spot, never closer (never clips a reachable
+            # low-delta strike).
+            k1 = find_strike_by_delta(target_delta, spot_price, T, r, base_vol, option_type, q)
+            iv_at_k1 = self._iv_surface(spot_price, k1, dte, base_vol)
+            return find_strike_by_delta(target_delta, spot_price, T, r, iv_at_k1, option_type, q)
+
+        put_far = _boundary('put', fine_min_abs_delta)
+        put_near = _boundary('put', fine_max_abs_delta)
+        call_far = _boundary('call', fine_min_abs_delta)
+        call_near = _boundary('call', fine_max_abs_delta)
+
+        fine_lo = min(put_far, put_near, call_far, call_near, spot_price)
+        fine_hi = max(put_far, put_near, call_far, call_near, spot_price)
+        # Safety margin: the 2-pass seed is a good approximation, not an exact fixed point --
+        # extend a little further so it never clips a genuinely reachable boundary strike.
+        margin = 0.05 * (fine_hi - fine_lo)
+        fine_lo = max(fine_interval, fine_lo - margin)
+        fine_hi = fine_hi + margin
+
+        fine_lo = np.floor(fine_lo / fine_interval) * fine_interval
+        fine_hi = np.ceil(fine_hi / fine_interval) * fine_interval
+        fine_strikes = np.arange(fine_lo, fine_hi + fine_interval, fine_interval)
+
+        # Walk outward from the fine band's own edges (not absolute multiples of coarse_interval)
+        # so the fine/coarse seam is always exactly one coarse_interval wide on both sides.
+        coarse_span = coarse_extra_frac * spot_price
+        n_below = max(0, int(np.ceil((fine_lo - coarse_span) / coarse_interval)))
+        n_above = max(0, int(np.ceil(coarse_span / coarse_interval)))
+        coarse_below = fine_lo - coarse_interval * np.arange(n_below, 0, -1)
+        coarse_above = fine_hi + coarse_interval * np.arange(1, n_above + 1)
+        coarse_below = coarse_below[coarse_below > 0]
+
+        strikes = np.concatenate([coarse_below, fine_strikes, coarse_above])
+        strikes = np.unique(np.round(strikes, 2))
+        return strikes[strikes > 0]
+
     def generate_options_chain(
         self,
         quote_date: datetime,
@@ -336,7 +541,12 @@ class SyntheticOptionsGenerator:
         num_strikes: int = 40,
         strike_interval: float = 5.0,
         add_spread: bool = True,
-        spread_pct: float = 0.008
+        grid_mode: str = 'fixed',
+        fine_interval: float = 1.0,
+        coarse_interval: float = 5.0,
+        fine_min_abs_delta: float = 0.02,
+        fine_max_abs_delta: float = 0.60,
+        coarse_extra_frac: float = 0.35,
     ) -> pd.DataFrame:
         """
         Generate complete options chain for a single date and expiration.
@@ -346,11 +556,16 @@ class SyntheticOptionsGenerator:
             expiration_date: Option expiration date
             spot_price: Current underlying price
             volatility: Current volatility estimate
-            vix: VIX level (for reference)
-            num_strikes: Number of strikes to generate
-            strike_interval: Dollar spacing between strikes
-            add_spread: Add bid-ask spread to prices
-            spread_pct: Bid-ask spread as % of mid price
+            vix: VIX level (used for both term structure elsewhere and, here, the spread's VIX
+                multiplier — see self._spread_fraction)
+            num_strikes: Number of strikes to generate ('fixed' grid_mode only)
+            strike_interval: Dollar spacing between strikes ('fixed' grid_mode only)
+            add_spread: Add bid-ask spread to prices (per-leg width from self._spread_fraction,
+                calibrated by delta and VIX -- see __init__)
+            grid_mode: 'fixed' (legacy fixed-dollar grid, generate_strike_prices) or 'delta_band'
+                (vol-adaptive delta-driven grid, generate_delta_band_strikes -- see its docstring)
+            fine_interval, coarse_interval, fine_min_abs_delta, fine_max_abs_delta,
+                coarse_extra_frac: 'delta_band' grid_mode only -- see generate_delta_band_strikes
 
         Returns:
             DataFrame with options chain data
@@ -363,7 +578,15 @@ class SyntheticOptionsGenerator:
             return pd.DataFrame()  # Don't generate expired options
 
         # Generate strikes
-        strikes = self.generate_strike_prices(spot_price, num_strikes, strike_interval)
+        if grid_mode == 'delta_band':
+            strikes = self.generate_delta_band_strikes(
+                spot_price, dte, volatility,
+                fine_interval=fine_interval, coarse_interval=coarse_interval,
+                fine_min_abs_delta=fine_min_abs_delta, fine_max_abs_delta=fine_max_abs_delta,
+                coarse_extra_frac=coarse_extra_frac,
+            )
+        else:
+            strikes = self.generate_strike_prices(spot_price, num_strikes, strike_interval)
 
         options = []
 
@@ -395,7 +618,8 @@ class SyntheticOptionsGenerator:
 
             # Add call option
             if add_spread:
-                spread = max(self.min_half_spread, call_data['price'] * spread_pct / 2)
+                call_spread_pct = self._spread_fraction(call_data['delta'], vix)
+                spread = max(self.min_half_spread, call_data['price'] * call_spread_pct / 2)
                 call_bid = max(0.01, call_data['price'] - spread)
                 call_ask = call_data['price'] + spread
             else:
@@ -425,7 +649,8 @@ class SyntheticOptionsGenerator:
 
             # Add put option
             if add_spread:
-                spread = max(self.min_half_spread, put_data['price'] * spread_pct / 2)
+                put_spread_pct = self._spread_fraction(put_data['delta'], vix)
+                spread = max(self.min_half_spread, put_data['price'] * put_spread_pct / 2)
                 put_bid = max(0.01, put_data['price'] - spread)
                 put_ask = put_data['price'] + spread
             else:
@@ -462,7 +687,15 @@ class SyntheticOptionsGenerator:
         include_weekly: bool = True,
         max_dte: int = 60,
         save_to_csv: bool = True,
-        output_path: Optional[str] = None
+        output_path: Optional[str] = None,
+        num_strikes: int = 40,
+        strike_interval: float = 5.0,
+        grid_mode: str = 'fixed',
+        fine_interval: float = 1.0,
+        coarse_interval: float = 5.0,
+        fine_min_abs_delta: float = 0.02,
+        fine_max_abs_delta: float = 0.60,
+        coarse_extra_frac: float = 0.35,
     ) -> pd.DataFrame:
         """
         Generate complete historical options chains dataset.
@@ -474,6 +707,12 @@ class SyntheticOptionsGenerator:
             max_dte: Maximum DTE to include in chains
             save_to_csv: Save output to CSV
             output_path: Path for CSV output
+            num_strikes, strike_interval: 'fixed' grid_mode only (see generate_strike_prices).
+                PREVIOUSLY these were accepted here but never forwarded to generate_options_chain
+                below, so every dataset ever generated silently used the hardcoded 40/$5 default
+                regardless of what was passed in -- fixed 2026-08-11.
+            grid_mode, fine_interval, coarse_interval, fine_min_abs_delta, fine_max_abs_delta,
+                coarse_extra_frac: 'delta_band' grid_mode only (see generate_delta_band_strikes)
 
         Returns:
             DataFrame with all historical options data
@@ -525,9 +764,8 @@ class SyntheticOptionsGenerator:
 
             # Determine which volatility to use for pricing
             if self.use_vix_for_iv and vix is not None and not np.isnan(vix):
-                # Calibrated VIX → SPY IV: scale + offset so low-VIX regimes don't floor out
-                # and high-VIX regimes don't over-shoot (see compare_synthetic_real.py).
-                pricing_vol = max(vix / 100.0 * self.vix_scale + self.vix_offset, 0.05)
+                # Calibrated VIX -> SPY IV: TIME-VARYING ratio (see _vix_level_ratio / __init__).
+                pricing_vol = max(vix / 100.0 * self._vix_level_ratio(quote_date), 0.05)
             else:
                 # Fall back to historical volatility
                 pricing_vol = vol
@@ -545,7 +783,15 @@ class SyntheticOptionsGenerator:
                     expiration_date=exp_date,
                     spot_price=spot_price,
                     volatility=pricing_vol,  # Use VIX-based IV instead of historical vol
-                    vix=vix
+                    vix=vix,
+                    num_strikes=num_strikes,
+                    strike_interval=strike_interval,
+                    grid_mode=grid_mode,
+                    fine_interval=fine_interval,
+                    coarse_interval=coarse_interval,
+                    fine_min_abs_delta=fine_min_abs_delta,
+                    fine_max_abs_delta=fine_max_abs_delta,
+                    coarse_extra_frac=coarse_extra_frac,
                 )
 
                 if not chain.empty:
@@ -620,9 +866,19 @@ def synthetic_data_filename(config: dict) -> str:
 
     This is the ONE place the naming convention lives -- the generator saves to this
     name and every loader reads from it, so they can never drift apart.
+
+    Grid density/mode is encoded in the filename whenever it's non-default (2026-08-11): without
+    this, regenerating at a finer grid for the SAME date range would resolve to the exact same
+    filename as an existing coarse-grid dataset and silently overwrite it with no way to
+    distinguish or roll back. Legacy 'fixed'-mode filenames (every dataset generated through
+    2026-08-10) are unchanged byte-for-byte.
     """
     sd = config["synthetic_data"]
-    return f"{sd['symbol']}_synthetic_options_{sd['start_date']}_{sd['end_date']}.csv"
+    name = f"{sd['symbol']}_synthetic_options_{sd['start_date']}_{sd['end_date']}"
+    if sd.get("grid_mode", "fixed") != "fixed":
+        fine = sd.get("fine_interval", 1.0)
+        name += f"_db{fine:g}"
+    return f"{name}.csv"
 
 
 def real_data_filename(config: dict) -> str:
